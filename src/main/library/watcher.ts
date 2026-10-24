@@ -44,7 +44,16 @@ const libraryWatchers = new Map<string, WatcherEntry>()
 const RECREATE_BASE_DELAY_MS = 1_000
 const RECREATE_MAX_DELAY_MS = 30_000
 const POLL_INTERVAL_MS = 15_000
-const LINUX_FORCE_POLLING = process.platform === 'linux'
+// Recursive watching works on every supported platform: Node >= 19.1.0 ships a
+// JavaScript fallback for Linux, so `recursive: true` no longer throws there.
+// Only errors that cannot clear up by re-arming fall back to polling: the kernel
+// ran out of inotify/file descriptors, or the runtime lacks support entirely.
+const UNRECOVERABLE_WATCH_ERRORS = new Set([
+  'ENOSPC',
+  'EMFILE',
+  'ENFILE',
+  'ERR_FEATURE_UNAVAILABLE_ON_PLATFORM'
+])
 
 function notifyLibraryChanged(change?: {
   kind: 'add' | 'remove' | 'unknown'
@@ -207,7 +216,7 @@ function attachWatcherHandlers(folder: string, watcher: FSWatcher): void {
   watcher.on('error', (error) => {
     const code = watcherErrorCode(error)
     console.warn('[library] library folder watcher error:', code)
-    if (LINUX_FORCE_POLLING) {
+    if (UNRECOVERABLE_WATCH_ERRORS.has(code)) {
       startPollingFallback(folder, code)
       return
     }
@@ -235,11 +244,6 @@ function createFolderWatcher(folder: string, options: { resume?: boolean } = {})
     poller: null
   }
   libraryWatchers.set(folder, entry)
-
-  if (LINUX_FORCE_POLLING) {
-    startPollingFallback(folder, 'linux-recursive-watch-unsupported')
-    return
-  }
 
   try {
     const watcher = watch(folder, { recursive: true }, (_eventType, filename) => {
@@ -289,7 +293,14 @@ function createFolderWatcher(folder: string, options: { resume?: boolean } = {})
   } catch (error) {
     const code = watcherErrorCode(error)
     console.warn('[library] unable to watch a configured library folder:', code)
-    startPollingFallback(folder, code)
+    if (UNRECOVERABLE_WATCH_ERRORS.has(code)) {
+      startPollingFallback(folder, code)
+      return
+    }
+    // A transient arm failure (for example a root on a slow or briefly offline
+    // disk) is retried with backoff instead of demoting the folder to polling.
+    scheduleWatcherRecreate(folder, code)
+    forceRootReconcile(folder, code)
   }
 }
 
