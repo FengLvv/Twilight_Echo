@@ -1433,11 +1433,11 @@ html[data-te-motion='full'] .toggle-switch.active::after {
 }
 
 .settings-preview-page .settings-search-box:focus-within {
-  outline: var(--te-control-focus-width) solid var(--te-control-focus-color);
-  outline-offset: var(--te-control-focus-offset);
+  border-color: color-mix(in srgb, var(--te-control-focus-color) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-control-focus-color) 12%, transparent);
 }
 
-.settings-preview-page .settings-search-input input:focus-visible {
+.settings-preview-page input.settings-search-input:focus-visible {
   outline: none;
 }
 

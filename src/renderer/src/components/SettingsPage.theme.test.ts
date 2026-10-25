@@ -19,6 +19,10 @@ const desktopLyricsSettingsSource = readFileSync(
   new URL('./settings-page/DesktopLyricsSettingsSection.vue', import.meta.url),
   'utf8'
 )
+const settingsLayoutStyles = readFileSync(
+  new URL('./settings-page/SettingsLayout.css', import.meta.url),
+  'utf8'
+)
 
 test('desktop lyrics is an internal block in the lyrics category', () => {
   assert.match(
@@ -141,6 +145,27 @@ test('native checkboxes inherit the active dark color scheme and theme accent', 
     /html input\[type='checkbox'\]:checked\s*\{[\s\S]*?background-color:\s*var\(--te-primary-500\)/
   )
   assert.match(baseStyles, /html input\[type='checkbox'\]:checked::after\s*\{[\s\S]*?content:\s*''/)
+})
+
+test('desktop lyrics category checkbox keeps the shared square size', () => {
+  const checkboxRule = settingsLayoutStyles.match(
+    /#desktopLyrics\s+\.check-field\s*>\s*input\[type='checkbox'\]\s*\{[^}]*\}/s
+  )?.[0]
+  assert.ok(checkboxRule)
+  const componentRule = desktopLyricsSettingsSource.match(
+    /\.check-field input,\s*\.switch-field input\s*\{[^}]*\}/s
+  )?.[0]
+  assert.ok(componentRule)
+  assert.match(componentRule, /font-size:\s*inherit/)
+  assert.match(componentRule, /width:\s*1\.05em/)
+  assert.match(componentRule, /height:\s*1\.05em/)
+  assert.doesNotMatch(componentRule, /18px/)
+  assert.match(checkboxRule, /flex:\s*0\s+0\s+auto/)
+  assert.doesNotMatch(checkboxRule, /18px/)
+  assert.match(
+    baseStyles,
+    /html input\[type='checkbox'\]\s*\{[^}]*width:\s*1\.05em;[^}]*height:\s*1\.05em/s
+  )
 })
 
 test('settings wallpaper is painted once by the overlay root, never per element', () => {

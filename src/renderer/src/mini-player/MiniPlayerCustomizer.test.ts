@@ -76,6 +76,15 @@ test('mini player customizer uses semantic controls and automatic persistence ac
   assert.doesNotMatch(source, />\s*应用\s*</)
 })
 
+test('mini player visibility checkboxes use the customizer accent when selected', () => {
+  const checkedRule =
+    customizerStyles.match(
+      /\.customizer-switch-row input\[type='checkbox'\]:checked\s*\{[\s\S]*?\n\}/
+    )?.[0] ?? ''
+  assert.match(checkedRule, /border-color: var\(--customizer-accent\)/)
+  assert.match(checkedRule, /background-color: var\(--customizer-accent\)/)
+})
+
 test('overlay customizer uses the active mini player surface family for readable contrast', () => {
   const overlayRule =
     customizerStyles.match(/\.mini-customizer\.is-overlay\s*\{[\s\S]*?\n\}/)?.[0] ?? ''

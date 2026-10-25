@@ -119,8 +119,9 @@
   flex-shrink: 0;
 }
 .audio-workspace .icon-button.small {
-  width: 26px;
-  min-height: 28px;
+  width: var(--te-control-height-sm);
+  height: var(--te-control-height-sm);
+  min-height: var(--te-control-height-sm);
   padding: 4px;
   border-color: transparent;
 }

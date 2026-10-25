@@ -95,8 +95,8 @@ label > span {
 }
 input {
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
+  width: 1.05em;
+  height: 1.05em;
   margin: 0;
   accent-color: var(--te-primary-500);
   cursor: inherit;

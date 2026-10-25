@@ -590,6 +590,7 @@ p {
   color: var(--te-warning-500);
 }
 input[type='checkbox'] {
+  padding: 0;
   margin-right: 8px;
 }
 </style>

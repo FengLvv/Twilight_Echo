@@ -1832,8 +1832,8 @@ html[data-te-shell-layout='custom'] .streaming-content.without-header {
 }
 
 :global(html[data-theme='dark'] .streaming-page .streaming-search-box.focused) {
-  border-color: rgba(251, 146, 60, 0.45);
-  box-shadow: 0 0 0 3px var(--bar-accent-soft);
+  border-color: color-mix(in srgb, var(--te-control-focus-color) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-control-focus-color) 12%, transparent);
   background: var(--bar-paper-raised);
 }
 
@@ -1869,8 +1869,8 @@ html[data-te-shell-layout='custom'] .streaming-content.without-header {
 
 :global(html[data-window-transparent='on'] .streaming-page .streaming-search-box.focused) {
   background: color-mix(in srgb, var(--bar-paper-raised) 94%, transparent) !important;
-  border-color: color-mix(in srgb, var(--bar-accent) 48%, transparent) !important;
-  box-shadow: 0 0 0 3px var(--bar-accent-soft) !important;
+  border-color: color-mix(in srgb, var(--te-control-focus-color) 42%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-control-focus-color) 12%, transparent) !important;
 }
 
 :global(html[data-window-transparent='on'] .streaming-page .search-tab-pill.active) {

@@ -1946,7 +1946,7 @@ onBeforeUnmount(() => {
             :aria-label="modeTitle"
             @click="cyclePlayMode"
           >
-            <PlaybackModeIcon :mode="playMode" />
+            <PlaybackModeIcon :mode="playMode" variant="font" />
           </button>
 
           <div

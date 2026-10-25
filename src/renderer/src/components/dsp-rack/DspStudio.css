@@ -557,8 +557,9 @@
   color: var(--dsp-scope-text);
   border: 1px solid #bdd6cc30;
   background: #ffffff08;
-  min-height: 27px;
-  width: 28px;
+  width: var(--te-control-height-sm);
+  height: var(--te-control-height-sm);
+  min-height: var(--te-control-height-sm);
   padding: 4px;
   border-radius: 5px;
   font-size: 10px;
@@ -1638,7 +1639,9 @@
     font-size: 0.78em;
   }
   .audio-workspace .workspace-header > .toolbar > button:last-child {
-    width: 33px;
+    width: var(--te-control-height-md);
+    height: var(--te-control-height-md);
+    min-height: var(--te-control-height-md);
     padding: 5px;
   }
   .audio-workspace .workspace-tabs {

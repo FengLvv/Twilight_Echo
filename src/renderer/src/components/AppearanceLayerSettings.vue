@@ -552,9 +552,9 @@ button:not(:disabled):hover {
 .appearance-layer-enable input {
   appearance: none;
   position: relative;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 22px;
+  flex: 0 0 var(--te-switch-width);
+  width: var(--te-switch-width);
+  height: var(--te-switch-height);
   margin: 0;
   border: 1px solid var(--te-settings-text-muted);
   border-radius: var(--te-control-radius-pill, 999px);
@@ -564,10 +564,10 @@ button:not(:disabled):hover {
 .appearance-layer-enable input::before {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
+  top: calc(var(--te-switch-inset) - var(--te-control-border-width));
+  left: calc(var(--te-switch-inset) - var(--te-control-border-width));
+  width: var(--te-switch-thumb);
+  height: var(--te-switch-thumb);
   border-radius: 50%;
   background: var(--te-settings-text-muted);
 }
@@ -576,7 +576,9 @@ button:not(:disabled):hover {
   background: var(--te-settings-text);
 }
 .appearance-layer-enable input:checked::before {
-  left: 17px;
+  left: calc(
+    var(--te-switch-inset) + var(--te-switch-travel) - var(--te-control-border-width)
+  );
   background: var(--te-settings-control-bg);
 }
 label {

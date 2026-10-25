@@ -1353,10 +1353,19 @@ async function toggleLyricVisibility(
 }
 
 .lyric-voice-row input {
-  width: 14px !important;
-  height: 14px !important;
+  font-size: inherit;
+  width: max(1.05em, 14px) !important;
+  height: max(1.05em, 14px) !important;
+  padding: 0;
   margin: 0;
   accent-color: var(--d-accent);
+}
+.lyric-voice-row input:checked {
+  border-color: var(--d-accent);
+  background-color: var(--d-accent);
+}
+.lyric-voice-row input:disabled {
+  opacity: 1;
 }
 
 .lyric-voice-line-number,

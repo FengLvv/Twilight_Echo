@@ -978,7 +978,7 @@ button.primary {
   gap: 7px;
 }
 .station-actions button {
-  min-height: 33px;
+  min-height: var(--te-control-height-md);
 }
 .quiet-button {
   background: transparent !important;

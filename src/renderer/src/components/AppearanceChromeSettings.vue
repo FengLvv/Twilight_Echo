@@ -466,11 +466,16 @@ li {
   cursor: pointer;
 }
 .appearance-chrome-page > input {
-  width: 16px;
-  height: 16px;
   margin: 0;
   flex: 0 0 auto;
   accent-color: var(--te-editor-accent, currentColor);
+}
+.appearance-chrome-page > input[type='checkbox']:checked {
+  border-color: var(--te-editor-accent, currentColor);
+  background-color: var(--te-editor-accent, currentColor);
+}
+.appearance-chrome-page > input[type='checkbox']:focus-visible {
+  outline-color: var(--te-editor-accent, currentColor);
 }
 .appearance-chrome-page-name,
 .appearance-chrome-name {

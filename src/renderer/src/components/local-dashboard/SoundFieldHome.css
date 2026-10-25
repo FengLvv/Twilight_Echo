@@ -991,8 +991,8 @@
     gap: 2px;
   }
   .sf-transport-buttons .sf-icon-button {
-    width: 26px;
-    height: 32px;
+    width: var(--te-control-height-sm);
+    height: var(--te-control-height-sm);
   }
   .sf-play-button {
     width: 38px;
@@ -1266,8 +1266,8 @@
     gap: 2px;
   }
   .sf-transport-buttons .sf-icon-button {
-    width: 26px;
-    height: 32px;
+    width: var(--te-control-height-sm);
+    height: var(--te-control-height-sm);
   }
   .sf-play-button {
     width: 38px;

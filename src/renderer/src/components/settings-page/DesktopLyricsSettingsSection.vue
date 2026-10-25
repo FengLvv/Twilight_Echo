@@ -650,8 +650,9 @@ function updatePaletteColor(key: 'customActiveColor' | 'customInactiveColor', ev
 
 .check-field input,
 .switch-field input {
-  width: 18px;
-  height: 18px;
+  font-size: inherit;
+  width: 1.05em;
+  height: 1.05em;
   margin: 0;
   accent-color: var(--theme-accent);
 }
