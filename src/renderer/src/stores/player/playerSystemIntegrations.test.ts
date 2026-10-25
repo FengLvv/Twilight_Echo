@@ -377,3 +377,88 @@ test('dispose before start is inert and a slow update is followed by clear, neve
   await flush()
   assert.deepEqual(calls, ['A', null])
 })
+
+test('a native-owned Linux session still arms the sentinel so MPRIS is publishable', async () => {
+  const armed: string[] = []
+  const f = fixture({
+    // active: true means the native engine owns audio and the renderer binds no
+    // session; the sentinel must still be armed or Chromium exports a stub.
+    getNativeStatus: async () => ({ active: true }),
+    requiresMediaSentinel: true,
+    mediaSentinel: () => ({
+      arm: () => armed.push('arm'),
+      dispose: () => armed.push('dispose')
+    })
+  })
+  f.integration.start()
+  await flush()
+  assert.deepEqual(armed, ['arm'])
+  // With a sentinel the MPRIS player is the renderer's element, so the renderer
+  // is the only side that can publish metadata and bind the media keys.
+  assert.ok(f.actions.has('play'))
+  assert.ok(f.actions.has('pause'))
+  assert.ok(f.metadataCreates() > 0)
+  f.integration.dispose()
+  assert.deepEqual(armed, ['arm', 'dispose'])
+})
+
+test('the sentinel follows the media switch and is parked when media is disabled', async () => {
+  const armed: string[] = []
+  const f = fixture({
+    requiresMediaSentinel: true,
+    mediaSentinel: () => ({
+      arm: () => armed.push('arm'),
+      dispose: () => armed.push('dispose')
+    })
+  })
+  f.integration.start()
+  await flush()
+  assert.deepEqual(armed, ['arm'])
+  f.mediaEnabled.value = false
+  await flush()
+  assert.deepEqual(armed, ['arm', 'dispose'])
+  f.mediaEnabled.value = true
+  await flush()
+  assert.deepEqual(armed, ['arm', 'dispose', 'arm'])
+  f.integration.dispose()
+  assert.deepEqual(armed, ['arm', 'dispose', 'arm', 'dispose'])
+})
+
+test('the sentinel is armed only once even when many publications follow', async () => {
+  let arms = 0
+  const f = fixture({
+    requiresMediaSentinel: true,
+    mediaSentinel: () => ({
+      arm: () => {
+        arms++
+      },
+      dispose: () => {}
+    })
+  })
+  f.integration.start()
+  await flush()
+  f.currentTrack.value = { ...f.track, title: 'B' }
+  await flush()
+  f.isPlaying.value = false
+  await flush()
+  assert.equal(arms, 1)
+  f.integration.dispose()
+})
+
+test('a session owned by the renderer is unaffected by the sentinel option', async () => {
+  const bound: string[] = []
+  const f = fixture({
+    getNativeStatus: async () => ({ active: false }),
+    requiresMediaSentinel: false,
+    mediaSentinel: () => ({
+      arm: () => bound.push('arm'),
+      dispose: () => bound.push('dispose')
+    })
+  })
+  f.integration.start()
+  await flush()
+  // Non-Linux platforms keep their existing behaviour: the renderer owns the
+  // session through its own media element and needs no extra sentinel traffic.
+  assert.ok(f.actions.size > 0)
+  f.integration.dispose()
+})

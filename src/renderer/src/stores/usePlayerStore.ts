@@ -4533,6 +4533,9 @@ const playerSystemIntegrations = createPlayerSystemIntegrations({
   },
   getNativeStatus: () => window.api.systemMedia.getNativeStatus(),
   mediaSession: typeof navigator !== 'undefined' ? navigator.mediaSession : undefined,
+  // Chromium publishes MPRIS only for a media element, and the native engine owns
+  // audio on Linux, so Linux alone needs the renderer-side silent sentinel.
+  requiresMediaSentinel: appPlatform.value === 'linux',
   createMetadata:
     typeof MediaMetadata !== 'undefined' ? (init) => new MediaMetadata(init) : undefined,
   discord: window.api?.discord

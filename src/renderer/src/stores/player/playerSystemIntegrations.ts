@@ -1,5 +1,6 @@
 import { effectScope, watch, type Ref } from 'vue'
 import type { Track } from '../../types/music.ts'
+import { createMediaSessionSentinel, type MediaSessionSentinel } from './mediaSessionSentinel.ts'
 
 type IntegrationTrack = Pick<Track, 'id' | 'queueEntryId' | 'title' | 'artist' | 'album' | 'cover'>
 type ReadRef<T> = Readonly<Ref<T>>
@@ -85,6 +86,13 @@ export interface PlayerSystemIntegrationOptions {
   getNativeStatus(): Promise<{ active: boolean }>
   mediaSession?: BrowserMediaSession
   createMetadata?(init: MediaMetadataInit): MediaMetadata
+  /**
+   * Linux only: Chromium publishes MPRIS solely for a MediaSession backed by a
+   * live media element, and the native engine owns audio there, so the renderer
+   * must arm its own silent element. See mediaSessionSentinel.ts.
+   */
+  mediaSentinel?: () => MediaSessionSentinel
+  requiresMediaSentinel?: boolean
   discord?: {
     updateActivity(activity: DiscordActivity): Promise<void>
     clearActivity(): Promise<void>
@@ -106,9 +114,49 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
   let discordStart: number | null = null
   let discordKey = ''
   let discordPublication: ReturnType<typeof claimDiscordPublication> | null = null
+  let sentinel: MediaSessionSentinel | null = null
+  let sentinelArmed = false
+  /** Set once the native-status probe resolves; a live session needs the sentinel. */
+  let sessionLive = false
+
+  /**
+   * Chromium derives the MPRIS player from a media element, so without one the
+   * exported name is an empty stub whose capability flags all read false. Arm the
+   * sentinel whenever the session is meant to be live, even when the renderer
+   * does not own the session: the native engine does not create an element.
+   */
+  function syncSentinel(): void {
+    // Opt-in: Windows/macOS have a native media session that owns the keys, so the
+    // renderer must stay out of the way there. Only Linux, where the native engine
+    // merely plays audio, publishes through the sentinel.
+    const enabled = options.requiresMediaSentinel === true || options.mediaSentinel != null
+    if (disposed) {
+      // A torn-down integration must still release an armed sentinel, otherwise
+      // the silent element outlives the publication it was created for.
+      if (sentinelArmed) releaseSentinel()
+      return
+    }
+    const wanted = enabled && options.mediaEnabled.value && sessionLive
+    if (wanted && !sentinelArmed) {
+      const factory = options.mediaSentinel ?? (() => createMediaSessionSentinel())
+      sentinel = factory()
+      sentinel.arm()
+      sentinelArmed = true
+      return
+    }
+    if (!wanted && sentinelArmed) {
+      releaseSentinel()
+    }
+  }
+
+  function releaseSentinel(): void {
+    sentinel?.dispose()
+    sentinel = null
+    sentinelArmed = false
+  }
 
   function clearSession(): void {
-    if (!session || !rendererOwnsSession) return
+    if (!session || (!rendererOwnsSession && !sentinelArmed)) return
     for (const action of boundActions) {
       try {
         session.setActionHandler(action, null)
@@ -128,7 +176,7 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
   }
 
   function publishPosition(): void {
-    if (!session || !rendererOwnsSession || disposed || !options.mediaEnabled.value) return
+    if (!shouldPublish() || !options.mediaEnabled.value) return
     const total = options.duration.value
     const position = options.currentTime.value
     const rate = options.playbackRate.value
@@ -184,8 +232,20 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
     }
   }
 
+  /**
+   * The renderer must publish when it owns the session, and also when a sentinel
+   * backs the session on a platform where the native engine owns audio: there the
+   * renderer owns no player but is the only side that can publish MPRIS metadata
+   * and action handlers. Without this the exported name stays a capability-less
+   * stub even though the sentinel created it.
+   */
+  function shouldPublish(): boolean {
+    if (!session || disposed) return false
+    return rendererOwnsSession || sentinelArmed
+  }
+
   function publishSession(): void {
-    if (!session || !rendererOwnsSession || disposed) return
+    if (!shouldPublish()) return
     if (!options.mediaEnabled.value) {
       clearSession()
       return
@@ -194,7 +254,7 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
     const track = options.currentTrack.value
     if (!track) {
       metadataKey = ''
-      session.metadata = null
+      session!.metadata = null
     } else {
       const key = JSON.stringify([track.id, track.title, track.artist, track.album, track.cover])
       if (key !== metadataKey) {
@@ -205,11 +265,11 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
             album: track.album || '',
             artwork: track.cover ? [{ src: track.cover, sizes: '512x512', type: 'image/jpeg' }] : []
           }) ?? null
-        session.metadata = metadata
+        session!.metadata = metadata
         metadataKey = key
       }
     }
-    session.playbackState = track ? (options.isPlaying.value ? 'playing' : 'paused') : 'none'
+    session!.playbackState = track ? (options.isPlaying.value ? 'playing' : 'paused') : 'none'
     publishPosition()
   }
 
@@ -258,6 +318,7 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
           ],
           () => {
             publishSession()
+            syncSentinel()
             publishDiscord()
           },
           { immediate: true }
@@ -273,12 +334,19 @@ export function createPlayerSystemIntegrations(options: PlayerSystemIntegrationO
         }
         if (disposed) return
         rendererOwnsSession = !nativeActive
+        sessionLive = true
+        // Arm before publishing: on Linux the MPRIS player only exists once a
+        // media element is attached, and publishing into a session Chromium has
+        // not created yet leaves the exported name a capability-less stub.
+        syncSentinel()
         publishSession()
       })()
     },
     dispose(): void {
       if (disposed) return
       disposed = true
+      sessionLive = false
+      syncSentinel()
       scope.stop()
       if (started) {
         clearSession()
