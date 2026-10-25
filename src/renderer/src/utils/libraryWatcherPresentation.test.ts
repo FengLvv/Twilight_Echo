@@ -18,13 +18,25 @@ function folder(overrides: Partial<LibraryWatcherFolderStatus> = {}): LibraryWat
 test('watcher diagnostics never surface raw kernel error codes to the user', () => {
   // The retired 'linux-recursive-watch-unsupported' code reached the settings
   // page verbatim; known codes map to copy and unknown ones stay readable.
-  for (const code of ['ENOSPC', 'EMFILE', 'ENFILE', 'EACCES', 'EPERM', 'ENOENT'])
+  for (const code of ['ENOSPC', 'EMFILE', 'ENFILE', 'EACCES', 'EPERM', 'ENOENT', 'EIO'])
     assert.doesNotMatch(libraryWatcherErrorText(code), new RegExp(code))
   assert.match(libraryWatcherErrorText('ENOSPC'), /inotify/)
+  // An unmapped code (such as the retired Linux one) still yields usable copy.
+  assert.match(libraryWatcherErrorText('linux-recursive-watch-unsupported'), /重试/)
+  assert.doesNotMatch(libraryWatcherErrorText('linux-recursive-watch-unsupported'), /linux-/)
   assert.equal(libraryWatcherErrorText(null), '')
   assert.equal(libraryWatcherErrorText(''), '')
-  assert.doesNotMatch(libraryWatcherErrorText('linux-recursive-watch-unsupported'), /linux-/)
-  assert.match(libraryWatcherErrorText('linux-recursive-watch-unsupported'), /定时检查/)
+})
+
+test('the copy matches whether the folder polls or keeps retrying', () => {
+  // UNRECOVERABLE_WATCH_ERRORS in watcher.ts demotes the folder to timed
+  // reconciliation; anything else is re-armed. The copy must not claim both.
+  for (const code of ['ENOSPC', 'EMFILE', 'ENFILE', 'ERR_FEATURE_UNAVAILABLE_ON_PLATFORM'])
+    assert.match(libraryWatcherErrorText(code), /已改为定时检查/)
+  for (const code of ['EACCES', 'EPERM', 'ENOENT', 'EIO', 'some-unknown-code']) {
+    assert.doesNotMatch(libraryWatcherErrorText(code), /已改为定时检查/)
+    assert.match(libraryWatcherErrorText(code), /重试|核对|监听/)
+  }
 })
 
 test('a degraded polling fallback is not reported as an actionable failure', () => {
