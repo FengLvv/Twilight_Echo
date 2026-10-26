@@ -25,30 +25,11 @@ function fixture(
   const deliveries: LocalLibraryWatchChange[][] = []
   const watchCalls: { folder: string; recursive: boolean }[] = []
   const watch = Object.assign(new EventEmitter(), { close() {} })
-  const runtime = {
-    libraryDatabase: {
-      enqueueWatcherChanges: (changes: LocalLibraryWatchChange[]) => deliveries.push(changes),
-      poll: async () => false
-    },
-    libraryWatcherDebounceMs: 350
-  }
   const exports: {
-    applyLibraryWatchers?: (folders: string[], enabled: boolean) => void
-    getLibraryWatcherStatusSnapshot?: (
-      folders: string[],
-      enabled: boolean
-    ) => {
-      enabled: boolean
-      folders: {
-        folder: string
-        state: string
-        mode: string
-        lastError: string | null
-      }[]
-    }
+    createLibraryWatchers?: typeof import('../../core/library/watcher.ts').createLibraryWatchers
   } = {}
   const dependencies: Record<string, unknown> = {
-    fs: {
+    'node:fs': {
       watch: (
         folder: string,
         watchOptions: { recursive?: boolean },
@@ -61,19 +42,17 @@ function fixture(
       },
       existsSync: () => true
     },
-    path,
-    '../core/runtime': { runtime },
-    './libraryRepository.ts': {
-      isActiveLibraryPathExcluded: () => false,
-      isLibraryPathMutationInProgress: () => false
-    },
+    'node:path': path,
     './watcherExtensions.ts': extensions,
-    './libraryWatcherPolling.ts': { LibraryWatcherPoller }
+    './watcherPolling.ts': { LibraryWatcherPoller }
   }
   runInNewContext(
-    ts.transpileModule(readFileSync(new URL('./watcher.ts', import.meta.url), 'utf8'), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
-    }).outputText,
+    ts.transpileModule(
+      readFileSync(new URL('../../core/library/watcher.ts', import.meta.url), 'utf8'),
+      {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+      }
+    ).outputText,
     {
       exports,
       console,
@@ -92,7 +71,20 @@ function fixture(
     }
   )
   const root = path.resolve('media')
-  exports.applyLibraryWatchers!([root], true)
+  const watchers = exports.createLibraryWatchers!({
+    platform: options.platform ?? 'win32',
+    now: () => new Date(),
+    debounceMs: () => 350,
+    database: () => ({
+      enqueueWatcherChanges: (changes) => deliveries.push(changes),
+      poll: async () => false
+    }),
+    coordinator: () => null,
+    isExcluded: () => false,
+    isMutating: () => false,
+    changed: () => {}
+  })
+  watchers.apply([root], true)
   return {
     root,
     deliveries,
@@ -100,7 +92,7 @@ function fixture(
     watchCalls,
     watch,
     status() {
-      return exports.getLibraryWatcherStatusSnapshot!([root], true).folders[0]
+      return watchers.snapshot([root], true).folders[0]
     },
     emit(name: string) {
       callback('change', name)
@@ -111,7 +103,7 @@ function fixture(
       timers.forEach((timer) => timer())
     },
     stop() {
-      exports.applyLibraryWatchers!([], false)
+      watchers.apply([], false)
     }
   }
 }
