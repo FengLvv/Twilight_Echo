@@ -1,12 +1,23 @@
-import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import { access } from 'node:fs/promises'
-import { request as httpRequest, type ClientRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
-import { extname } from 'node:path'
-import { pipeline } from 'node:stream/promises'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { extname } from '../../shared/portablePath.ts'
+import {
+  coreAudioMetadata,
+  coreFs,
+  coreFsPromises,
+  coreHttp,
+  coreHttps,
+  coreStream,
+  type PortableClientRequest
+} from '../ports/index.ts'
 import { normalizeTransferUrl } from './cloudTransferHelpers.ts'
 import type { NcmCloudTransferProgress } from '../../shared/ncmCloud.ts'
+
+const { createReadStream } = coreFs
+const { access } = coreFsPromises
+const { request: httpRequest } = coreHttp
+const { request: httpsRequest } = coreHttps
+const { pipeline } = coreStream
 
 export interface SelectedFileGrant {
   handle: string
@@ -55,8 +66,10 @@ export async function readAudioMetadata(
 }> {
   const fallbackTitle = fileName.replace(/\.[^.]+$/, '')
   try {
-    const { parseFile } = await import('music-metadata')
-    const metadata = await parseFile(path, { duration: false, skipCovers: true })
+    const metadata = await coreAudioMetadata.musicMetadata.parseFile(path, {
+      duration: false,
+      skipCovers: true
+    })
     const bitrate = Math.round(Number(metadata.format.bitrate))
     return {
       title: metadata.common.title?.trim() || fallbackTitle,
@@ -79,7 +92,7 @@ export async function uploadToNos(
 ): Promise<void> {
   const target = normalizeTransferUrl(preparation.uploadUrl, '网易云上传地址')
   const requestImpl = target.protocol === 'https:' ? httpsRequest : httpRequest
-  let request!: ClientRequest
+  let request!: PortableClientRequest
   const response = new Promise<void>((resolve, reject) => {
     request = requestImpl(
       target,
@@ -94,10 +107,10 @@ export async function uploadToNos(
         signal
       },
       (response) => {
-        const chunks: Buffer[] = []
+        const chunks: Uint8Array[] = []
         let capturedBytes = 0
         response.once('error', reject)
-        response.on('data', (chunk: Buffer) => {
+        response.on('data', (chunk: Uint8Array) => {
           if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) return
           const remaining = MAX_NOS_ERROR_RESPONSE_BYTES - capturedBytes
           if (remaining <= 0) return
@@ -111,7 +124,7 @@ export async function uploadToNos(
           else
             reject(
               new Error(
-                `网易云存储上传失败：HTTP ${status} ${Buffer.concat(chunks).toString('utf8').slice(0, 300)}`
+                `网易云存储上传失败：HTTP ${status} ${PortableBuffer.concat(chunks).toString('utf8').slice(0, 300)}`
               )
             )
         })
@@ -121,8 +134,8 @@ export async function uploadToNos(
   })
   const stream = createReadStream(grant.path, { signal })
   let bytes = 0
-  stream.on('data', (chunk: string | Buffer) => {
-    bytes += Buffer.byteLength(chunk)
+  stream.on('data', (chunk: string | Uint8Array) => {
+    bytes += PortableBuffer.byteLength(chunk)
     emitProgress({
       ...progress(transferId, 'upload', 'uploading', grant.name, bytes, grant.size),
       handle

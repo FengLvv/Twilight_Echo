@@ -15,6 +15,18 @@ function targetsWindows(args) {
   return args.includes('--win') || (process.platform === 'win32' && args.includes('--dir'))
 }
 
+function packageOutputDirectory(args, projectRoot = root) {
+  const flag = '--config.directories.output'
+  const index = args.findIndex((arg) => arg === flag || arg.startsWith(`${flag}=`))
+  const directory =
+    index < 0
+      ? 'dist'
+      : args[index] === flag
+        ? args[index + 1]
+        : args[index].slice(flag.length + 1)
+  return path.resolve(projectRoot, directory)
+}
+
 function run(args, environment = process.env) {
   return spawnSync(process.execPath, [electronBuilder, ...args], {
     cwd: root,
@@ -49,9 +61,9 @@ function main(args = process.argv.slice(2)) {
   }
   if (result.error) throw result.error
   if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1)
-  const packagedAsar = path.join(root, 'dist', 'win-unpacked', 'resources', 'app.asar')
+  const unpackedApp = path.join(packageOutputDirectory(args), 'win-unpacked')
+  const packagedAsar = path.join(unpackedApp, 'resources', 'app.asar')
   if (process.platform === 'win32') {
-    const unpackedApp = path.join(root, 'dist', 'win-unpacked')
     const branding = verifyWindowsAppBranding(unpackedApp)
     console.log(`Windows executable branding verified: ${branding.productName}`)
   }
@@ -63,4 +75,4 @@ function main(args = process.argv.slice(2)) {
 
 if (require.main === module) main()
 
-module.exports = { electronBuilder, main, run }
+module.exports = { electronBuilder, main, packageOutputDirectory, run }

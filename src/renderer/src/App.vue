@@ -77,7 +77,11 @@ const ExperienceView = defineAsyncComponent(
 const OnboardingWizard = defineAsyncComponent(
   () => import('./components/onboarding/OnboardingWizard.vue')
 )
+const MusicMetadataSetupHost = defineAsyncComponent(
+  () => import('./components/music-metadata/MusicMetadataSetupHost.vue')
+)
 import type { OnboardingFinishResult } from './components/onboarding/OnboardingWizard.vue'
+import { saveOnboardingSettings } from './components/onboarding/saveOnboardingSettings.ts'
 import { useMusicStore } from './stores/useMusicStore'
 import { startPlaylistPersistenceNotifications } from './app/playlistPersistenceNotifications.ts'
 import { getExternalPlaylistService } from './stores/library/externalPlaylistService.ts'
@@ -86,6 +90,7 @@ import { isPlaybackSpace } from '@renderer/app/playbackKeyboard'
 import { usePlayerStore } from './stores/usePlayerStore'
 import { useCoreLibraryApi } from './stores/library/coreLibraryApi.ts'
 import { useSettingsStore } from './stores/useSettingsStore'
+import { useCoreConnection } from './stores/coreConnection.ts'
 import { useThemeStore, applyActiveTheme, bootstrapThemeRuntime } from './stores/useThemeStore'
 import { getStartupSnapshot } from './app/startupSnapshot'
 import { useExtensionRegistry } from './extensions/registry'
@@ -397,7 +402,7 @@ async function handleOnboardingFinish(result: OnboardingFinishResult): Promise<v
   onboardingSaving.value = true
   onboardingSaveError.value = ''
   try {
-    await updateSettings(result.patch)
+    await saveOnboardingSettings(result.patch, { core: useCoreConnection(), updateSettings })
   } catch (error) {
     onboardingSaveError.value = `保存失败，请重试：${error instanceof Error ? error.message : String(error)}`
     return
@@ -1239,6 +1244,7 @@ onBeforeUnmount(() => onWorkshopDecorationsUnmount?.())
       @finish="handleOnboardingFinish"
     />
   </Transition>
+  <MusicMetadataSetupHost :suspended="showOnboarding" />
   <NativeDialogTransition>
     <QueueWorkspaceDialog
       v-if="queueSessions.open.value"

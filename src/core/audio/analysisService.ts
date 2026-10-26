@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join } from '../../shared/portablePath.ts'
 import type {
   BpmAnalysisResult,
   PlaybackInfo,

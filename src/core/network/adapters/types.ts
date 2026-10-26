@@ -10,6 +10,14 @@ export type NetworkAuth =
   | { kind: 'password'; username?: string; password: string }
   | { kind: 'privateKey'; username?: string; keyPath: string; passphrase?: string }
 
+/** 可移植字节读取流接口，兼容 Node Readable 与 Core Stream Port。 */
+export interface NetworkReadableStream {
+  on(event: string, listener: (...args: any[]) => void): any
+  once(event: string, listener: (...args: any[]) => void): any
+  destroy?(error?: Error): any
+  [Symbol.asyncIterator](): AsyncIterableIterator<any>
+}
+
 /** 一个已建立的协议会话（HTTP 类协议为无状态，仍保持同一 seam）。 */
 export interface NetworkSourceSession {
   protocol: NetworkProtocol
@@ -19,7 +27,7 @@ export interface NetworkSourceSession {
     remotePath: string,
     signal?: AbortSignal,
     options?: { start?: number }
-  ): Promise<NodeJS.ReadableStream>
+  ): Promise<NetworkReadableStream>
   /**
    * 返回可直接交给播放内核的 URL；需要认证或协议不支持 URL 播放时返回 null
    * （此时由 sourcesManager 下载到本地缓存再播）。

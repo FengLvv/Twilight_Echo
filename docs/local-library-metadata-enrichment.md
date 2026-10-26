@@ -17,6 +17,29 @@ The production wiring is in [Core entry](D:/Project/Twilight_Echo/src/main/coreP
 [CoreMetadataService](D:/Project/Twilight_Echo/src/core/library/metadataService.ts) and the
 [SQLite worker](D:/Project/Twilight_Echo/src/main/library/libraryDatabaseService.ts).
 
+## Enable Everything After The First Import
+
+After the first successful import, **让音乐资料更完整** offers **开启自动补全** and
+**暂不开启**. Accepting enables new-import enrichment, existing-library backfill, every
+registered source and the NetEase local fallback together. Text, permitted portraits and
+their source attribution stay in the existing SQLite and durable artwork cache. Declining
+is remembered. Either choice survives a restart; **设置 → 媒体库与存储 → 音乐库资料 →
+开启全部资料获取** can enable everything later.
+
+New profiles and old profiles without identification preferences start with `setup: pending`.
+Automatic network work waits for that choice. An upgraded profile with music already imported
+gets the same one-time prompt. Existing saved scope/source choices are preserved rather than
+overwritten or re-prompted. The prompt waits until the welcome wizard and active scan finish.
+
+Development, preview and installed builds share the shipped public-service defaults in
+`src/main/coreProcess/metadataConfiguration.ts`: MusicBrainz identity/structured metadata,
+Wikipedia introductions, Commons licensed artist portraits and non-exportable local NCM
+text/image caching. No `.env.metadata.local` file or private key is required for those defaults.
+Explicit Core environment restrictions still take precedence. Source identity checks,
+per-image licensing, manual overrides and the existing request budgets remain in effect.
+Selecting every source does not supply missing TheAudioDB keys, Discogs search tokens or
+additional image rights; their actual capability reasons remain visible in settings.
+
 The task center's **刷新状态** only rereads saved task state; it does not start a scan
 or an online lookup. Facts and task transitions are committed as each result arrives.
 On restart, interrupted running jobs resume; completed results, candidates, failures
@@ -25,6 +48,28 @@ completed lookups just because the application reopened or a day elapsed. New im
 changed identification evidence and explicit online requery can create new work.
 Task totals include per-source lookups and retained history, not song counts or missing
 field counts. Use **资料覆盖明细** for actual missing fields.
+
+### Existing Libraries Recover Their Original Identification Tags
+
+Upgrading does not require removing or reimporting songs. The startup scan upgrades old
+file metadata caches from version 1 to version 2 by rereading raw identification tags and
+NetEase native recording/release/artist references. It publishes those observations only
+after the scan succeeds, using the existing file-version and library-scope fences. Changed
+evidence automatically reschedules previous failed identity tasks and continues enrichment.
+Track IDs, displayed names, lyrics, artwork and personal fields remain unchanged; explicit
+manual identification observations remain authoritative. CUE and ISO segment identities
+are kept separate from their containing file. Successfully upgraded files are not reread
+on the next unchanged startup. Unreadable files remain retryable.
+
+Automatic jobs wait while a present local track is being re-projected into the catalog.
+A cover/lyrics refresh does not cancel its identity or biography demand as if the track
+had left the library. In-flight results wait for fresh claim/input checks before publication;
+actual removals and changed identification evidence retain their existing commit fences.
+
+The SQLite worker backs up schema 29 before migrating to schema 30. Cached biographies
+remain in SQLite; permitted metadata images remain in `music-cache/cover-cache/metadata-artwork`
+while cover caching is enabled. They can display after a restart without redownloading.
+Ambiguous identities still require review; a same-name search is not automatic confirmation.
 
 ## Library Organization And One-Click Completion
 
@@ -207,20 +252,27 @@ recording evidence, these need explicit native profile review. This source impro
 field availability after identity selection; it does not turn every same-name result
 into an identified person.
 
-For a personal deployment explicitly approved for local display and caching, set:
+The installed app includes local NCM display and caching. Accept the first-import prompt,
+or enable **网易云资料兜底** in the library metadata settings. Its switch is saved in the
+existing settings file; enabling it also selects NCM for automatic work. Disabling it
+withdraws the local text/image permission and invalidates old automatic projections without
+removing NCM identity search or deleting the saved records. Existing attribution controls
+identify the source; no additional badge is added.
+
+Deployment owners can still override the profile choice with:
 
 ```dotenv
 TWILIGHT_METADATA_ENABLED=1
 TWILIGHT_METADATA_NCM_LOCAL_FALLBACK=1
 ```
 
-The second switch opts into NCM text and image use on this local library, retains source
-attribution and sets `export: false`. It does not assign an open license. General deployments
-continue using separately reviewed `TWILIGHT_METADATA_PLATFORM_USAGE` and
+The second switch explicitly enables NCM text and image use on this local library, retains
+source attribution and sets `export: false`; `0` prohibits that local fallback. It does not
+assign an open license. Other platform deployments continue using separately reviewed `TWILIGHT_METADATA_PLATFORM_USAGE` and
 `TWILIGHT_METADATA_PLATFORM_ARTWORK_USAGE` provider-to-usage JSON maps. Explicit denials and
 expiry in those maps narrow the personal opt-in. Other providers receive no new permissions.
 The development launcher allowlists these keys from `.env.metadata.local`; the next launcher
-start loads changes. Preview/release builds only use explicitly supplied process configuration.
+start loads changes. Preview/release builds use the shipped defaults and any explicit process overrides.
 Opening a page still reads saved data; **更新资料** submits the existing durable tasks.
 
 ## Combine Public Sources Without Requiring MusicBrainz
@@ -255,8 +307,8 @@ native-only identities, rather than requiring a MusicBrainz artwork ID.
 ### Configure keys in Core, not in the renderer
 
 Development reads these optional keys through the existing `.env.metadata.local` allowlist;
-release deployments provide them in the Core launch environment. Restart after changing them.
-The public adapters also require the existing metadata enablement and application contact.
+release deployments provide private keys in the Core launch environment. Restart after changing
+keys. Public enablement and the application contact are already included in the installed app.
 
 ```dotenv
 TWILIGHT_METADATA_VOCADB=1
@@ -492,7 +544,8 @@ development launch, not in a process that already inherited the old environment.
 
 ### First import: choose once, enrich in the background
 
-The local import dialog shows the available approved sources and an explicit
+On the first import, the local import dialog leaves metadata preferences unchanged and
+asks once in the post-import prompt. For already-configured profiles, it shows the available sources and an explicit
 “自动补全头像、简介和专辑资料” choice. Choosing a folder grants access through
 the existing native picker but does not register a watcher or start import.
 Acceptance saves the metadata choice, submits the explicit import, then registers

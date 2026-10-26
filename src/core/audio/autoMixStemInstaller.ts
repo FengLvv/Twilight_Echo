@@ -1,16 +1,23 @@
-import { createRequire } from 'node:module'
-import { createReadStream, createWriteStream, readFileSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rename, rm, statfs, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join } from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+import { basename, dirname, extname, join } from '../../shared/portablePath.ts'
 import {
   autoMixStemInstallBusy,
   type AutoMixStemInstallStatus
 } from '../../shared/twilightAutoMix.ts'
+import {
+  coreArchive,
+  coreFs,
+  coreFsPromises,
+  coreStream,
+  type PortableReadableStream
+} from '../ports/index.ts'
 import type { StemRuntimeProbe } from './autoMixStemCapabilities.ts'
 import { STEM_CHECKPOINT_SHA256, STEM_MODEL_VERSION } from './autoMixStemService.ts'
+
+const { createReadStream, createWriteStream, readFileSync } = coreFs
+const { mkdir, mkdtemp, readFile, rename, rm, statfs, writeFile } = coreFsPromises
+const { Transform, pipeline } = coreStream
+const { yauzl, crc32 } = coreArchive
 
 interface Entry {
   fileName: string
@@ -21,21 +28,21 @@ interface Entry {
   compressionMethod: number
   crc32: number
 }
-interface Zip extends NodeJS.EventEmitter {
+interface Zip {
+  on(event: string, listener: (...args: any[]) => void): this
+  once(event: string, listener: (...args: any[]) => void): this
   readEntry(): void
   close(): void
-  openReadStream(entry: Entry, callback: (error: Error | null, stream: Readable) => void): void
+  openReadStream(
+    entry: Entry,
+    callback: (error: Error | null, stream: PortableReadableStream) => void
+  ): void
   openReadStream(
     entry: Entry,
     options: { decodeFileData: false },
-    callback: (error: Error | null, stream: Readable) => void
+    callback: (error: Error | null, stream: PortableReadableStream) => void
   ): void
 }
-const require = createRequire(import.meta.url)
-const yauzl = require('yauzl') as {
-  open(path: string, options: object, callback: (error: Error | null, zip?: Zip) => void): void
-}
-const crc32 = require('buffer-crc32') as { unsigned(data: Buffer, previous?: number): number }
 const MODEL = 'models/955717e8-8726e21a.th'
 const REQUIRED = ['manifest.json', 'model.lock.json', 'runtime/python.exe', MODEL]
 const MAX_FILES = 30_000
@@ -106,11 +113,11 @@ export class AutoMixStemInstaller {
     chooseArchive: (signal: AbortSignal) => Promise<string | null>
     probe: (directory: string, signal: AbortSignal) => Promise<StemRuntimeProbe>
     decodeLzma: (
-      input: Readable,
+      input: PortableReadableStream,
       bytes: number,
       signal: AbortSignal,
       progress: (bytes: number) => void
-    ) => Readable
+    ) => PortableReadableStream
     lzmaDiskTickets?: boolean
     changed?: () => void
     // Small integrity fixtures use their own checkpoint; production uses the pinned release.
@@ -178,7 +185,7 @@ export class AutoMixStemInstaller {
             validateEntrySizes: true,
             strictFileNames: true
           },
-          (error, value) =>
+          (error: Error | null, value?: Zip) =>
             error || !value ? reject(new InstallError('invalid_archive')) : resolve(value)
         )
       })
@@ -274,8 +281,8 @@ export class AutoMixStemInstaller {
         const name = entry.fileName.slice(prefix.length)
         const destination = join(staging, name)
         await mkdir(dirname(destination), { recursive: true })
-        const raw = await new Promise<Readable>((resolve, reject) => {
-          const callback = (error: Error | null, value: Readable): void =>
+        const raw = await new Promise<PortableReadableStream>((resolve, reject) => {
+          const callback = (error: Error | null, value: PortableReadableStream): void =>
             error ? reject(new InstallError('invalid_archive')) : resolve(value)
           if (entry.compressionMethod === 14)
             opened.openReadStream(entry, { decodeFileData: false }, callback)
@@ -300,7 +307,11 @@ export class AutoMixStemInstaller {
         let bytes = 0,
           crc = 0
         const progress = new Transform({
-          transform: (chunk: Buffer, _encoding, callback) => {
+          transform: (
+            chunk: Uint8Array,
+            _encoding: string,
+            callback: (error?: Error | null, data?: unknown) => void
+          ) => {
             bytes += chunk.length
             report(bytes)
             if (bytes > entry.uncompressedSize) return callback(new InstallError('invalid_archive'))
@@ -317,7 +328,7 @@ export class AutoMixStemInstaller {
           if (
             entry.compressionMethod === 14 &&
             !abort.signal.aborted &&
-            !['ENOSPC', 'EACCES', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '')
+            !['ENOSPC', 'EACCES', 'EPERM'].includes((error as { code?: string }).code ?? '')
           )
             throw new InstallError('integrity')
           throw error
@@ -375,14 +386,16 @@ export class AutoMixStemInstaller {
         staging = undefined
         unpublished = destination
       } catch (error) {
-        if (!['EEXIST', 'ENOTEMPTY', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? ''))
+        if (!['EEXIST', 'ENOTEMPTY', 'EPERM'].includes((error as { code?: string }).code ?? ''))
           throw error
         // Reinstalling identical content is valid only if the existing pack's
         // bytes still match. Do not trust a stale folder name.
         for (const [name, expected] of hashes) {
           const hash = createHash('sha256')
           let bytes = 0
-          for await (const chunk of createReadStream(join(destination, name))) {
+          for await (const chunk of createReadStream(
+            join(destination, name)
+          ) as unknown as AsyncIterable<Uint8Array>) {
             checkCancelled()
             bytes += chunk.length
             hash.update(chunk)
@@ -425,7 +438,7 @@ export class AutoMixStemInstaller {
             ? error.reason
             : error instanceof SyntaxError
               ? 'invalid_pack'
-              : (error as NodeJS.ErrnoException)?.code === 'ENOSPC'
+              : (error as { code?: string })?.code === 'ENOSPC'
                 ? 'disk_space'
                 : 'io'
     } finally {

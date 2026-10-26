@@ -31,6 +31,7 @@ test(
               profile,
               phase,
               directory,
+              metadataEvidence: join(root, '.local', 'metadata-release-preview'),
               screenshot: join(root, '.core-packaged-render.png')
             })
           )
@@ -44,6 +45,15 @@ test(
       assert.equal(first.replayedTransport, 0)
       assert.equal(first.rendererCommandsOnRebuild, 0)
       assert.equal(first.migrationCommits, 1)
+      assert.equal(first.metadataSetup.declined, true)
+      assert.equal(first.metadataSetup.accepted.setup, 'accepted')
+      assert.equal(first.metadataSetup.accepted.newImports, true)
+      assert.equal(first.metadataSetup.accepted.history, true)
+      assert.equal(first.metadataSetup.accepted.ncmLocalFallback, true)
+      for (const source of ['musicbrainz', 'vocadb', 'theaudiodb', 'discogs', 'platform.ncm'])
+        assert.ok(first.metadataSetup.accepted.sources.includes(source))
+      assert.ok(first.metadataSetup.jobs > 0)
+      assert.deepEqual(cold.metadataSetup, first.metadataSetup.accepted)
       assert.match(first.nativeAddon, /resources[\\/]audio-engine[\\/]twilight_audio_node\.node$/)
       assert.equal(cold.migrationCommits, 0)
       assert.equal(cold.state, 'paused')
@@ -128,6 +138,10 @@ async function prepareProfile(profile) {
 async function runPackage(executable, directory, expression) {
   const env = { ...process.env }
   for (const key of ['ELECTRON_RUN_AS_NODE', 'ELECTRON_RENDERER_URL', 'TWILIGHT_DEV_USER_DATA_DIR'])
+    delete env[key]
+  for (const key of Object.keys(env).filter(
+    (key) => key.startsWith('TWILIGHT_METADATA_') || key === 'TWILIGHT_DEV_METADATA_SETUP_FILE'
+  ))
     delete env[key]
   const child = spawn(executable, ['--inspect-brk=127.0.0.1:0'], {
     cwd: directory,
@@ -229,7 +243,7 @@ const bootstrap = String.raw`(() => {
   const { writeFileSync, appendFileSync, mkdirSync } = require('node:fs')
   const { join } = require('node:path')
   const assert = require('node:assert/strict')
-  const { profile, phase, directory, screenshot } = __TEST_CONFIGURATION__
+  const { profile, phase, directory, screenshot, metadataEvidence } = __TEST_CONFIGURATION__
   assert.equal(app.isReady(), false, 'Profile must be isolated before Electron is ready')
   app.setPath('userData', profile)
   mkdirSync(join(profile,'logs'),{recursive:true});app.setPath('logs',join(profile,'logs'))
@@ -251,7 +265,7 @@ const bootstrap = String.raw`(() => {
   let core, epoch, snapshot, nativeAddon, coreProcesses = 0, requestSerial = 0, result
   const identity = { id:'packaged-acceptance', role:'desktop', permissions:[
     'playback:read','playback:write','library:read','library:write',
-    'statistics:read','settings:read','migration:write'
+    'statistics:read','settings:read','settings:write','migration:write'
   ] }
   const fork = utilityProcess.fork.bind(utilityProcess)
   utilityProcess.fork = (entry, args, options) => {
@@ -351,11 +365,71 @@ const bootstrap = String.raw`(() => {
     assert.equal((await request('query','migration.status')).complete,true)
     if(phase==='cold') {
       const state=await request('query','state.snapshot')
+      const metadataSetup=(await request('query','settings.state')).settings.musicIdentification
+      await pause(300)
+      assert.equal(await win.webContents.executeJavaScript("Boolean(document.querySelector('.metadata-setup[open]'))"),false)
       result={state:state.playback.state,occurrenceId:state.queue.occurrenceId,position:state.playback.position,
-        migrationCommits:commands.filter(row=>row.name==='migration.commit').length,transportMethods}
+        migrationCommits:commands.filter(row=>row.name==='migration.commit').length,transportMethods,metadataSetup}
       for(const window of BrowserWindow.getAllWindows()) window.destroy()
       app.quit();return
     }
+    const policy=await until(async()=>{
+      const p=await request('query','metadata.entity.policy')
+      return p.sources?.some(source=>source.provider==='platform.ncm' && source.enrichment.some(c=>c.kind==='artist' && !c.reason)) && p
+    },'packaged NCM metadata capabilities')
+    assert.equal(policy.enabled,true);assert.equal(policy.identity,true);assert.equal(policy.introduction,true)
+    assert.equal(policy.artwork.find(item=>item.kind==='artist').reason,null)
+    const before=(await request('query','settings.state')).settings.musicIdentification
+    assert.equal(before.setup,'pending');assert.equal(before.newImports,false);assert.equal(before.history,false)
+    assert.equal((await request('query','metadata.entity.jobs')).total,0)
+    const dialog=()=>win.webContents.executeJavaScript("Boolean(document.querySelector('.metadata-setup[open]'))")
+    await until(dialog,'post-import metadata opt-in dialog')
+    mkdirSync(metadataEvidence,{recursive:true})
+    async function setTheme(theme) {
+      const state=await request('query','settings.state')
+      await request('command','settings.edit',{revision:state.revision,patch:{theme}})
+      await until(()=>win.webContents.executeJavaScript('document.documentElement.dataset.theme === '+JSON.stringify(theme)),'rendered '+theme+' theme')
+    }
+    await setTheme('pureWhite')
+    win.show();await pause(200)
+    writeFileSync(join(metadataEvidence,'prompt-light.png'),(await win.webContents.capturePage()).toPNG())
+    win.setMinimumSize(480,540);win.setSize(520,760)
+    await setTheme('dark')
+    await pause(200)
+    assert.equal(await win.webContents.executeJavaScript("(()=>{const d=document.querySelector('.metadata-setup');return d.scrollWidth<=d.clientWidth && d.getBoundingClientRect().right<=innerWidth})()"),true)
+    writeFileSync(join(metadataEvidence,'prompt-narrow-dark.png'),(await win.webContents.capturePage()).toPNG())
+    await win.webContents.executeJavaScript("[...document.querySelectorAll('.metadata-setup button')].find(b=>b.textContent.trim()==='暂不开启').click()")
+    await until(async()=>(await request('query','settings.state')).settings.musicIdentification.setup==='declined','saved metadata decline')
+    assert.equal((await request('query','metadata.entity.jobs')).total,0)
+    await until(async()=>!await dialog(),'closed metadata dialog')
+    const declined=await request('query','settings.state')
+    await request('command','settings.edit',{revision:declined.revision,patch:{musicIdentification:{...declined.settings.musicIdentification,setup:'pending'}}})
+    await until(dialog,'reopened fixture metadata choice')
+    await win.webContents.executeJavaScript("document.querySelector('.metadata-setup-enable').click()")
+    const accepted=await until(async()=>{
+      const s=(await request('query','settings.state')).settings.musicIdentification
+      return s.setup==='accepted' && s
+    },'saved all-source metadata acceptance')
+    const metadataJobs=await until(async()=>{
+      const page=await request('query','metadata.entity.jobs');return page.total>0 && page.total
+    },'automatic metadata jobs after consent')
+    const metadataSetup={declined:true,accepted,jobs:metadataJobs}
+    await until(async()=>!await dialog(),'accepted metadata dialog closed')
+    win.setSize(1280,900)
+    await setTheme('pureWhite')
+    await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\"设置\"]').click()")
+    await until(()=>win.webContents.executeJavaScript("Boolean(document.querySelector('[data-settings-category=library]'))"),'packaged settings mount')
+    await win.webContents.executeJavaScript("document.querySelector('[data-settings-category=library]').click(); const trigger=document.querySelector('#music-metadata .settings-group-trigger');if(trigger.getAttribute('aria-expanded')!=='true')trigger.click();document.getElementById('music-metadata').scrollIntoView({block:'start'})")
+    await until(()=>win.webContents.executeJavaScript("document.querySelectorAll('#music-metadata input[type=checkbox]').length>=5"),'all metadata source controls')
+    assert.equal(await win.webContents.executeJavaScript("[...document.querySelectorAll('#music-metadata input[type=checkbox]')].every(input=>input.checked)"),true)
+    assert.equal(await win.webContents.executeJavaScript("[...document.querySelectorAll('#music-metadata [role=switch]')].every(input=>input.getAttribute('aria-checked')==='true')"),true)
+    await pause(250)
+    writeFileSync(join(metadataEvidence,'settings-all-sources.png'),(await win.webContents.capturePage()).toPNG())
+    await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\"网易云资料兜底\"]').click()")
+    await until(async()=>(await request('query','settings.state')).settings.musicIdentification.ncmLocalFallback===false,'disabled NCM local fallback')
+    await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\"网易云资料兜底\"]').click()")
+    await until(async()=>(await request('query','settings.state')).settings.musicIdentification.ncmLocalFallback===true,'restored NCM local fallback')
+    await win.webContents.executeJavaScript("document.querySelector('button[aria-label=\"设置\"]').click()")
     const page=await request('query','library.tracks',{limit:10})
     assert.equal(page.total,1)
     const staged=await request('command','queue.submit',{kind:'begin',selectedIndex:0,play:true})
@@ -393,7 +467,7 @@ const bootstrap = String.raw`(() => {
     assert.equal(statistics.total,1);assert.equal(statistics.items[0].plays,1)
     win.show();await pause(500)
     writeFileSync(screenshot,(await win.webContents.capturePage()).toPNG())
-    result={rebuilds:2,coreProcesses,zeroWindowPlayback:true,replayedTransport,rendererCommandsOnRebuild,
+    result={rebuilds:2,coreProcesses,zeroWindowPlayback:true,replayedTransport,rendererCommandsOnRebuild,metadataSetup,
       migrationCommits:commands.filter(row=>row.name==='migration.commit').length,
       occurrenceId,position:final.playback.position,nativeAddon}
     for(const window of BrowserWindow.getAllWindows()) window.destroy()

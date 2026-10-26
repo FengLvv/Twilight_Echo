@@ -1,6 +1,13 @@
-import type { Server } from 'node:http'
+export interface NcmBindableServer {
+  listening?: boolean
+  address(): { address: string; family: string; port: number } | string | null
+  once(event: string, listener: (...args: any[]) => void): this
+  removeListener(event: string, listener: (...args: any[]) => void): this
+  close(callback?: (err?: Error) => void): this
+  [key: string]: any
+}
 
-export function getListeningPort(server: Server): number {
+export function getListeningPort(server: NcmBindableServer): number {
   const address = server.address()
   if (!server.listening || !address || typeof address === 'string') {
     throw new Error('NetEase API server is not listening on a TCP port')
@@ -8,7 +15,7 @@ export function getListeningPort(server: Server): number {
   return address.port
 }
 
-export async function waitForListeningPort(server: Server): Promise<number> {
+export async function waitForListeningPort(server: NcmBindableServer): Promise<number> {
   if (server.listening) return getListeningPort(server)
 
   await new Promise<void>((resolve, reject) => {

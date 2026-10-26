@@ -1,13 +1,16 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { mkdtemp, mkdir, readFile, rm, writeFile, open, readdir } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+import { basename, dirname, join, resolve } from '../../shared/portablePath.ts'
 import type { AutoMixSelection } from '../../shared/twilightAutoMix.ts'
 import {
   normalizeAutoMixStemCacheMiB,
   normalizeAutoMixStemDevice,
   TWILIGHT_AUTOMIX_STEM_ARRANGEMENT_VERSION
 } from '../../shared/twilightAutoMix.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+
+const { existsSync } = coreFs
+const { mkdtemp, mkdir, readFile, rm, writeFile, open, readdir } = coreFsPromises
 
 // A bounded read on one handle binds the digest and length to the same file.
 export async function validateStemMaterial(
@@ -21,7 +24,7 @@ export async function validateStemMaterial(
   try {
     if ((await file.stat()).size !== length) throw new Error('material_digest_mismatch')
     const hash = createHash('sha256')
-    const buffer = Buffer.allocUnsafe(256 * 1024)
+    const buffer = PortableBuffer.allocUnsafe(256 * 1024)
     let total = 0
     for (;;) {
       signal.throwIfAborted()
@@ -198,7 +201,7 @@ export class AutoMixStemService {
       await this.runWorker(pack, worker, request, budget, signal)
       signal.throwIfAborted()
       const text = await readFile(join(directory, 'result.json'), 'utf8')
-      if (Buffer.byteLength(text) > 64 * 1024) throw new Error('invalid_material_ticket')
+      if (PortableBuffer.byteLength(text) > 64 * 1024) throw new Error('invalid_material_ticket')
       const result = JSON.parse(text)
       if (!result.ok) {
         this.reportResources?.({ ...(result.resources ?? {}), reason: result.reason })

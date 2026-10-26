@@ -1,4 +1,5 @@
-import { extname } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { extname } from '../../shared/portablePath.ts'
 import { MAX_LYRICS_BYTES } from '../../shared/lyricsEncoding.ts'
 
 export const MAX_IMPORTED_LYRICS_BYTES = MAX_LYRICS_BYTES
@@ -18,7 +19,7 @@ export function validateImportedLyricsPath(filePath: string): void {
 export function validateImportedLyrics(filePath: string, contents: string): string {
   validateImportedLyricsPath(filePath)
   const extension = extname(filePath).toLowerCase()
-  if (Buffer.byteLength(contents, 'utf-8') > MAX_IMPORTED_LYRICS_BYTES) {
+  if (PortableBuffer.byteLength(contents, 'utf-8') > MAX_IMPORTED_LYRICS_BYTES) {
     throw new Error('Imported lyrics exceed the 1 MiB limit')
   }
 

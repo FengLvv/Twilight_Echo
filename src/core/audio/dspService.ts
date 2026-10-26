@@ -1,4 +1,6 @@
-import { readFile, stat } from 'node:fs/promises'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { readFile, stat } = coreFsPromises
 import type {
   AudioProcessingSettings,
   ConvolverInfo,

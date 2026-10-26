@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
-import { realpath, stat } from 'node:fs/promises'
-import { relative, isAbsolute } from 'node:path'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { relative, isAbsolute } from '../../shared/portablePath.ts'
+import { coreFsPromises } from '../ports/index.ts'
 import type {
   LibraryRepairCandidateCommand,
   LibraryRepairCandidateReply
@@ -27,7 +27,7 @@ type Session = {
   abort: AbortController
   operation: Promise<LibraryPlaylistRepairResponse> | null
   closing?: Promise<void>
-  timer?: NodeJS.Timeout
+  timer?: ReturnType<typeof setTimeout>
   destroyed(): void
   candidateSequence: number
   sequence: number
@@ -130,7 +130,7 @@ export class LibraryPlaylistRepairService {
       }
       const authorize = async (path: string, fileOnly = false) => {
         check()
-        const canonical = await realpath(path),
+        const canonical = await coreFsPromises.realpath(path),
           scope = relative(root, canonical)
         if (
           scope === '..' ||
@@ -139,7 +139,7 @@ export class LibraryPlaylistRepairService {
           isAbsolute(scope)
         )
           throw new Error('修复候选的实际位置超出所选文件夹')
-        if (!fileOnly && (await stat(canonical)).isDirectory())
+        if (!fileOnly && (await coreFsPromises.stat(canonical)).isDirectory())
           await this.options.authorizeDirectory(canonical)
         else await this.options.authorizeFile(canonical)
         check()

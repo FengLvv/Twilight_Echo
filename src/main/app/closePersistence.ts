@@ -1,4 +1,27 @@
+import type { MessageBoxOptions } from 'electron'
+import type { AppLocale } from '../../shared/i18n/locale.ts'
+import { translate } from '../../shared/i18n/translate.ts'
+
 export type ClosePersistenceAttempt = 'closed' | 'cancelled' | 'retry'
+
+export function closePersistenceDialogOptions(
+  locale: AppLocale,
+  error: Error,
+  discarding = false
+): MessageBoxOptions {
+  const t = (key: string) => translate(locale, `app.closePersistence.${key}`)
+  const prefix = discarding ? 'cleanup.' : ''
+  return {
+    type: 'error',
+    title: t(`${prefix}title`),
+    message: t(`${prefix}message`),
+    detail: `${t(`${prefix}detail`)}\n\n${error.message}`,
+    buttons: [t('retry'), t('keepOpen'), t('discard')],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true
+  }
+}
 
 export interface ClosePersistenceCoordinatorOptions {
   requestPersistence(): Promise<void>

@@ -2,8 +2,31 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   ClosePersistenceAttemptGate,
+  closePersistenceDialogOptions,
   closeOnlyAfterRendererPersistence
 } from './closePersistence.ts'
+
+test('save failure choices are localized, disclose discard risk and default to preserving data', () => {
+  const error = new Error('Core did not confirm final persistence')
+  for (const locale of ['zh-CN', 'en-US'] as const) {
+    const options = closePersistenceDialogOptions(locale, error)
+    assert.equal(options.defaultId, 0)
+    assert.equal(options.cancelId, 1)
+    assert.equal(options.buttons?.length, 3)
+    assert.match(options.detail!, /Core did not confirm final persistence/)
+    if (locale === 'zh-CN') {
+      assert.deepEqual(options.buttons, ['重试退出', '保留窗口', '不保存退出'])
+      assert.match(options.detail!, /可能丢失.*队列、歌单或设置/)
+    } else {
+      assert.deepEqual(options.buttons, ['Retry quit', 'Keep window open', 'Quit without saving'])
+      assert.match(options.detail!, /may lose recent queue, playlist or settings changes/)
+    }
+    const cleanup = closePersistenceDialogOptions(locale, error, true)
+    assert.notEqual(cleanup.title, options.title)
+    assert.match(cleanup.message!, locale === 'zh-CN' ? /后台服务/ : /Background services/)
+    assert.match(cleanup.detail!, locale === 'zh-CN' ? /已选择跳过/ : /chosen to skip/)
+  }
+})
 
 test('failed renderer persistence prevents closing the main window', async () => {
   let closeCalls = 0

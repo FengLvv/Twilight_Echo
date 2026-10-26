@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash } from '../../shared/portableCrypto.ts'
 import type { LibraryDatabaseApi } from '../../shared/libraryDatabase.ts'
 import type { CatalogDatabaseApi } from '../../shared/musicCatalog.ts'
 import type {

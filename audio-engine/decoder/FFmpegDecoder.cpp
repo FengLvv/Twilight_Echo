@@ -282,8 +282,9 @@ struct FFmpegDecoder::Impl {
   bool inputEof = false;
   bool resamplerFlushed = false;
   uint64_t declaredFlacSamples = 0;
-  uint64_t decodedFlacSamples = 0;
-  bool flacDecodedFromStart = true;
+  std::optional<uint64_t> decodedFlacEndSample = uint64_t{0};
+  bool flacSampleTimelineValid = true;
+  bool flacAfterSeek = false;
   bool icyEnabled = false;
   std::vector<uint8_t> pending;
   std::vector<uint8_t> convertedScratch;
@@ -370,8 +371,9 @@ struct FFmpegDecoder::Impl {
     inputEof = false;
     resamplerFlushed = false;
     declaredFlacSamples = 0;
-    decodedFlacSamples = 0;
-    flacDecodedFromStart = true;
+    decodedFlacEndSample = uint64_t{0};
+    flacSampleTimelineValid = true;
+    flacAfterSeek = false;
     icyEnabled = false;
     eof = false;
     terminalReadError.clear();
@@ -510,6 +512,37 @@ struct FFmpegDecoder::Impl {
     return flushResampler(error);
   }
 
+  void recordFlacFrame() {
+    if (declaredFlacSamples == 0 || !flacSampleTimelineValid) return;
+    if (flacAfterSeek) {
+      // Anchor to decoded source samples, not the requested seek time or a
+      // rounded duration. Each following frame must continue that sample grid.
+      const AVStream* stream = formatContext->streams[audioStreamIndex];
+      const int64_t pts = frame->best_effort_timestamp;
+      const int64_t origin = stream->start_time == AV_NOPTS_VALUE ? 0 : stream->start_time;
+      const AVRational sampleTimeBase{1, codecContext->sample_rate};
+      if (pts == AV_NOPTS_VALUE || pts < origin || codecContext->sample_rate <= 0 ||
+          stream->time_base.num <= 0 || stream->time_base.den <= 0 ||
+          av_cmp_q(stream->time_base, sampleTimeBase) > 0) {
+        flacSampleTimelineValid = false;
+        return;
+      }
+      const int64_t sample = av_rescale_q(pts - origin, stream->time_base, sampleTimeBase);
+      if (sample < 0 || av_rescale_q(sample, sampleTimeBase, stream->time_base) != pts - origin ||
+          (decodedFlacEndSample && *decodedFlacEndSample != static_cast<uint64_t>(sample))) {
+        flacSampleTimelineValid = false;
+        return;
+      }
+      decodedFlacEndSample = static_cast<uint64_t>(sample);
+    }
+    if (!decodedFlacEndSample || *decodedFlacEndSample > declaredFlacSamples || frame->nb_samples <= 0 ||
+        static_cast<uint64_t>(frame->nb_samples) > declaredFlacSamples - *decodedFlacEndSample) {
+      flacSampleTimelineValid = false;
+      return;
+    }
+    *decodedFlacEndSample += frame->nb_samples;
+  }
+
   bool decodeOneFrame(std::string* error) {
     resetPending();
     if (eof) return false;
@@ -517,7 +550,7 @@ struct FFmpegDecoder::Impl {
     while (true) {
       int ret = avcodec_receive_frame(codecContext, frame);
       if (ret == 0) {
-        if (declaredFlacSamples > 0) decodedFlacSamples += frame->nb_samples;
+        recordFlacFrame();
         const bool ok = convertFrame(error);
         av_frame_unref(frame);
         if (!ok) return failRead(error && !error->empty() ? *error : "Audio frame conversion failed", error);
@@ -578,14 +611,17 @@ struct FFmpegDecoder::Impl {
     }
   }
   bool isCompletedFlacTail(int code) const {
-    // A duration estimate is insufficient: require the exact, nonzero FLAC
-    // STREAMINFO count and uninterrupted successful decoding from sample zero.
-    return code == AVERROR_INVALIDDATA && flacDecodedFromStart &&
-        declaredFlacSamples > 0 && decodedFlacSamples == declaredFlacSamples;
+    // Only tolerate invalid data beyond the exact STREAMINFO sample boundary.
+    // After a seek, decoded frame timestamps establish the source position.
+    return code == AVERROR_INVALIDDATA && flacSampleTimelineValid &&
+        declaredFlacSamples > 0 && decodedFlacEndSample == declaredFlacSamples;
   }
   bool finishCompletedFlacTail(std::string* error) {
     DiagnosticLog::instance().append(DiagLevel::Warning, "ffmpeg.flac.trailing-data",
-        "Ignored invalid trailing data after all declared FLAC samples were decoded");
+        "Ignored invalid trailing data after decoded audio reached the declared FLAC sample boundary",
+        "{\"decodedEndSample\":" + std::to_string(*decodedFlacEndSample) +
+        ",\"declaredSamples\":" + std::to_string(declaredFlacSamples) +
+        ",\"afterSeek\":" + (flacAfterSeek ? "true" : "false") + "}");
     if (!drainResamplerOnce(error))
       return failRead(error && !error->empty() ? *error : "Audio resampler flush failed", error);
     eof = true;
@@ -1086,8 +1122,10 @@ bool FFmpegDecoder::seek(double seconds, std::string* error) {
   impl_->resetPending();
   impl_->exactSeek = false;
   impl_->exactInputCursor.reset();
-  // A packet seek may skip undecoded audio; do not infer completeness from position.
-  impl_->flacDecodedFromStart = false;
+  // The first decoded frame must establish the new source-sample position.
+  impl_->decodedFlacEndSample.reset();
+  impl_->flacSampleTimelineValid = true;
+  impl_->flacAfterSeek = true;
   return true;
 #else
   (void)seconds;

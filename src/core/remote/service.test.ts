@@ -276,3 +276,54 @@ test('mixed playlist playback keeps private sources, CUE and repeated occurrence
   assert.equal(f.disconnected(), true)
   await assert.rejects(f.service.command({ action: 'play' }), /core_not_ready/)
 })
+
+
+test('Roon-style Core RPC bridge translates mobile CoreRequestEnvelope queries and commands', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  const snapRes = await f.service.handleCoreRpc({
+    requestId: 'req-1',
+    epoch: 'epoch-boot',
+    kind: 'query',
+    name: 'core.getSnapshot',
+    payload: {}
+  })
+  assert.equal(snapRes.ok, true)
+  assert.equal(snapRes.epoch, 'test')
+  assert.equal((snapRes.value as { playback: { playMode: string } }).playback.playMode, 'shuffle')
+
+  const winRes = await f.service.handleCoreRpc({
+    requestId: 'req-2',
+    epoch: 'test',
+    kind: 'query',
+    name: 'playback.getQueueWindow',
+    payload: { offset: 0, limit: 10 }
+  })
+  assert.equal(winRes.ok, true)
+  assert.equal((winRes.value as { limit: number }).limit, 10)
+  assert.equal(
+    (winRes.value as { items: Array<{ occurrenceId: string }> }).items[0].occurrenceId,
+    'occurrence-a'
+  )
+
+  const searchRes = await f.service.handleCoreRpc({
+    requestId: 'req-3',
+    epoch: 'test',
+    kind: 'query',
+    name: 'search.songs',
+    payload: { query: 'Song' }
+  })
+  assert.equal(searchRes.ok, true)
+  assert.equal((searchRes.value as { total: number }).total, 1)
+
+  const modeRes = await f.service.handleCoreRpc({
+    requestId: 'req-4',
+    epoch: 'test',
+    kind: 'command',
+    name: 'playback.setPlayMode',
+    payload: { mode: 'single' }
+  })
+  assert.equal(modeRes.ok, true)
+  assert.equal(f.requests.at(-1)?.name, 'playback.mode')
+  assert.deepEqual(f.requests.at(-1)?.payload, { mode: 'repeat' })
+})

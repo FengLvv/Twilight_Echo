@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, statSync, unlinkSync } from 'node:fs'
-import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { join } from '../../shared/portablePath.ts'
+import { coreFs } from '../ports/index.ts'
 import { loadJsonFileWithBackup, writeJsonValueAtomic } from './jsonFile.ts'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import type { LocalMusicLibraryDocument } from '../../shared/localLibrary.ts'
@@ -136,7 +137,7 @@ export function createPersonalBackupRepository(
     throw new Error('SQLite library is required for Core personal data')
   }
   function parsePersonalBackup(text: string): PersonalBackup {
-    if (Buffer.byteLength(text, 'utf8') > PERSONAL_BACKUP_LIMIT) throw new Error('备份超过 180 MiB')
+    if (PortableBuffer.byteLength(text, 'utf8') > PERSONAL_BACKUP_LIMIT) throw new Error('备份超过 180 MiB')
     const value = parseJsonWithNestingLimit(text)
     if (!validatePersonalBackup(value)) throw new Error('备份格式、版本或数据内容无效')
     for (const domain of PERSONAL_DOMAINS)
@@ -145,13 +146,13 @@ export function createPersonalBackupRepository(
   }
   function assertDomainSize(domain: PersonalDomain, data: unknown) {
     // Leave room for the persistence envelope; restored files must fit their normal loader.
-    if (Buffer.byteLength(JSON.stringify(data)) > (limits[domain] || 16) * 1024 * 1024 - (domain === 'music' ? 0 : 1024))
+    if (PortableBuffer.byteLength(JSON.stringify(data)) > (limits[domain] || 16) * 1024 * 1024 - (domain === 'music' ? 0 : 1024))
       throw new Error(`${domain} 数据超过容量限制`)
     if (domain === 'playback' && isRecord(data)) {
       const { queue, ...session } = data
       if (
-        Buffer.byteLength(JSON.stringify(session)) > 2 * 1024 * 1024 - 1024 ||
-        (queue !== undefined && Buffer.byteLength(JSON.stringify(queue)) > 32 * 1024 * 1024 - 1024)
+        PortableBuffer.byteLength(JSON.stringify(session)) > 2 * 1024 * 1024 - 1024 ||
+        (queue !== undefined && PortableBuffer.byteLength(JSON.stringify(queue)) > 32 * 1024 * 1024 - 1024)
       )
         throw new Error('播放快照超过保存容量')
     }
@@ -167,7 +168,7 @@ export function createPersonalBackupRepository(
     return isRecord(value) && value.version === 2 && 'data' in value ? value.data : value
   }
   function readPersonalData(root: string, options?: LibraryReadOptions, domains: readonly PersonalDomain[] = PERSONAL_V1_DOMAINS): PersonalData {
-    if (!options && existsSync(join(root, 'music-library.sqlite')))
+    if (!options && coreFs.existsSync(join(root, 'music-library.sqlite')))
       throw new Error('当前曲库使用 SQLite，请通过数据库导出；未读取旧 JSON')
     const result: PersonalData = {}
     for (const domain of domains) {
@@ -177,7 +178,7 @@ export function createPersonalBackupRepository(
         domain === 'library'
           ? options
             ? (options.library ?? undefined)
-            : existsSync(join(root, file))
+            : coreFs.existsSync(join(root, file))
               ? readLegacyLibrary
                 ? readLegacyLibrary(join(root, file))
                 : missingDatabase()
@@ -299,7 +300,7 @@ export function createPersonalBackupRepository(
     // after its primary completion log has already been removed.
     for (const suffix of ['.bak', '']) {
       const p = join(root, name + suffix)
-      if (existsSync(p)) unlinkSync(p)
+      if (coreFs.existsSync(p)) coreFs.unlinkSync(p)
     }
   }
   // Called after the single-instance lock and before persistence owners are constructed.
@@ -505,7 +506,7 @@ export function createPersonalBackupRepository(
     removeArtifact(root, journalName)
     return path
   }
-  const personalRestoreNeedsReview = (root: string): boolean => existsSync(join(root, reviewName)) || existsSync(join(root, reviewName + '.bak'))
+  const personalRestoreNeedsReview = (root: string): boolean => coreFs.existsSync(join(root, reviewName)) || coreFs.existsSync(join(root, reviewName + '.bak'))
   function readPersonalRestoreReview(root: string): PersonalBackup | null {
     const loaded = loadJsonFileWithBackup(join(root, reviewName), {
       label: 'personal restore review', maxBytes: PERSONAL_BACKUP_LIMIT, validate: validatePersonalBackup
@@ -522,7 +523,7 @@ export function createPersonalBackupRepository(
     validateRestoreWrites(journal.writes)
     if (
       journal.libraryBackend === 'sqlite' ||
-      ('music-library.json' in journal.writes && existsSync(join(root, 'music-library.sqlite')))
+      ('music-library.json' in journal.writes && coreFs.existsSync(join(root, 'music-library.sqlite')))
     )
       throw new Error('此恢复日志需要 SQLite 曲库，未写入旧 JSON')
     for (const [name, value] of Object.entries(journal.writes)) {
@@ -566,7 +567,7 @@ export function createPersonalBackupRepository(
     const base = createPersonalBackupFromData(data, rendererData, version, domains)
     if (music && domains.includes('music')) {
       // Reserve the enclosing key/comma before asking the bounded producer. No records are dropped.
-      const remaining = PERSONAL_BACKUP_LIMIT - Buffer.byteLength(JSON.stringify(base)) - 16
+      const remaining = PERSONAL_BACKUP_LIMIT - PortableBuffer.byteLength(JSON.stringify(base)) - 16
       if (remaining <= 0) throw new Error('备份超过 180 MiB，请减少导出项目')
       base.data.music = await music.musicBackupExport(remaining)
     }
@@ -778,8 +779,8 @@ export function createPersonalBackupRepository(
     if (isRecord(current) && current.id === id) removeArtifact(root, rendererName)
   }
   function readBackupFile(path: string): PersonalBackup {
-    if (statSync(path).size > PERSONAL_BACKUP_LIMIT) throw new Error('备份超过 180 MiB')
-    return parsePersonalBackup(readFileSync(path, 'utf8'))
+    if (coreFs.statSync(path).size > PERSONAL_BACKUP_LIMIT) throw new Error('备份超过 180 MiB')
+    return parsePersonalBackup(coreFs.readFileSync(path, 'utf8'))
   }
   function writePersonalBackupFile(path: string, backup: PersonalBackup): void {
     writeJsonValueAtomic(path, backup, {

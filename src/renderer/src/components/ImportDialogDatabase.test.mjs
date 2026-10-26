@@ -44,6 +44,7 @@ function fixture(mode = 'sqlite') {
     scannedFolders: ref(['D:/Music/a', 'D:/Music/b']),
     settingsLoaded: ref(true),
     settings,
+    metadataSetupPending: ref(false),
     automaticMetadata: ref(false),
     metadataSources: ref([]),
     updateSettings: async (patch) => {
@@ -137,6 +138,16 @@ test('SQLite import failure preserves partial results and allows explicit retry,
   await f.context.startScan()
   assert.equal(attempts, 2)
   assert.equal(f.context.scanError.value, '')
+})
+
+test('a pending first import leaves metadata consent to the post-import prompt', async () => {
+  const f = fixture()
+  f.context.metadataSetupPending.value = true
+  f.context.settings.value.musicIdentification.setup = 'pending'
+  await f.context.startScan()
+  assert.deepEqual(f.settingsWrites, [{ libraryFolders: ['D:/Music/a'] }])
+  assert.equal(f.context.settings.value.musicIdentification.setup, 'pending')
+  assert.equal(f.context.settings.value.musicIdentification.newImports, false)
 })
 
 test('SQLite root removal only revokes settings; pause/resume/cancel use the shared durable owner', async () => {

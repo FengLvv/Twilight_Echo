@@ -1,14 +1,6 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync
-} from 'node:fs'
-import { dirname } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { coreFs } from '../ports/index.ts'
 import { isJsonNestingWithinLimit, tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 
 export interface JsonFileOptions<T> {
@@ -73,8 +65,8 @@ export function loadJsonFileWithBackup<T>(
     const corruptCopyPath = primary.status === 'invalid' ? preserveCorruptCopy(filePath) : null
     let restoreError: string | null = null
     try {
-      mkdirSync(dirname(filePath), { recursive: true })
-      copyFileSync(backupPath, filePath)
+      coreFs.mkdirSync(dirname(filePath), { recursive: true })
+      coreFs.copyFileSync(backupPath, filePath)
     } catch (error) {
       restoreError = errorMessage(error)
     }
@@ -108,7 +100,7 @@ export function writeJsonFileAtomic<T>(
   options: JsonFileOptions<T>,
   value?: T
 ): void {
-  if (Buffer.byteLength(json, 'utf-8') > options.maxBytes) {
+  if (PortableBuffer.byteLength(json, 'utf-8') > options.maxBytes) {
     throw new Error(`${options.label} is too large`)
   }
   const parsed = tryParseJsonWithNestingLimit(json)
@@ -140,7 +132,7 @@ export function writeJsonValueAtomic<T>(
   }
   const json = JSON.stringify(value)
   if (typeof json !== 'string') throw new Error(`${options.label} is not serializable`)
-  if (Buffer.byteLength(json, 'utf-8') > options.maxBytes) {
+  if (PortableBuffer.byteLength(json, 'utf-8') > options.maxBytes) {
     throw new Error(`${options.label} is too large`)
   }
   if (!isJsonNestingWithinLimit(json)) {
@@ -154,39 +146,39 @@ function writeValidatedJsonFileAtomic<T>(
   json: string,
   options: JsonFileOptions<T>
 ): void {
-  mkdirSync(dirname(filePath), { recursive: true })
+  coreFs.mkdirSync(dirname(filePath), { recursive: true })
   const tmpPath = temporaryPathFor(filePath)
   const backupPath = backupPathFor(filePath)
   const current = readJsonCandidate(filePath, options)
   let backupIsKnownValid = false
 
   try {
-    writeFileSync(tmpPath, json, 'utf-8')
+    coreFs.writeFileSync(tmpPath, json, 'utf-8')
     if (current.status === 'loaded') {
-      copyFileSync(filePath, backupPath)
+      coreFs.copyFileSync(filePath, backupPath)
       backupIsKnownValid = true
     } else if (current.status === 'invalid') {
       preserveCorruptCopy(filePath)
     }
 
     try {
-      renameSync(tmpPath, filePath)
+      coreFs.renameSync(tmpPath, filePath)
     } catch {
-      if (existsSync(filePath)) unlinkSync(filePath)
-      renameSync(tmpPath, filePath)
+      if (coreFs.existsSync(filePath)) coreFs.unlinkSync(filePath)
+      coreFs.renameSync(tmpPath, filePath)
     }
 
     if (!backupIsKnownValid) {
       const activeBackup = readJsonCandidate(backupPath, options)
       if (activeBackup.status !== 'loaded') {
-        copyFileSync(filePath, backupPath)
+        coreFs.copyFileSync(filePath, backupPath)
       }
     }
   } catch (error) {
     const recoveryBackup = readJsonCandidate(backupPath, options)
-    if (!existsSync(filePath) && recoveryBackup.status === 'loaded') {
+    if (!coreFs.existsSync(filePath) && recoveryBackup.status === 'loaded') {
       try {
-        copyFileSync(backupPath, filePath)
+        coreFs.copyFileSync(backupPath, filePath)
       } catch {
         // Preserve the original write failure.
       }
@@ -194,7 +186,7 @@ function writeValidatedJsonFileAtomic<T>(
     throw error
   } finally {
     try {
-      unlinkSync(tmpPath)
+      coreFs.unlinkSync(tmpPath)
     } catch {
       // Atomic rename removes the temporary file on success.
     }
@@ -209,7 +201,7 @@ export function clearJsonFileArtifacts(filePath: string): void {
     corruptPathFor(filePath)
   ]) {
     try {
-      unlinkSync(targetPath)
+      coreFs.unlinkSync(targetPath)
     } catch {
       // Missing files are already clear.
     }
@@ -232,13 +224,13 @@ export function readJsonCandidate<T>(
   filePath: string,
   options: JsonFileOptions<T>
 ): JsonCandidate<T> {
-  if (!existsSync(filePath)) return { status: 'missing' }
+  if (!coreFs.existsSync(filePath)) return { status: 'missing' }
   try {
-    const fileSize = statSync(filePath).size
+    const fileSize = coreFs.statSync(filePath).size
     if (fileSize <= 0) return { status: 'invalid', error: 'file is empty' }
     if (fileSize > options.maxBytes) return { status: 'invalid', error: 'file is too large' }
-    const raw = readFileSync(filePath, 'utf-8')
-    if (Buffer.byteLength(raw, 'utf-8') > options.maxBytes) {
+    const raw = coreFs.readFileSync(filePath, 'utf-8')
+    if (PortableBuffer.byteLength(raw, 'utf-8') > options.maxBytes) {
       return { status: 'invalid', error: 'file is too large' }
     }
     if (!isJsonNestingWithinLimit(raw)) {
@@ -255,11 +247,11 @@ export function readJsonCandidate<T>(
 }
 
 function preserveCorruptCopy(filePath: string): string | null {
-  if (!existsSync(filePath)) return null
+  if (!coreFs.existsSync(filePath)) return null
   const corruptPath = corruptPathFor(filePath)
   try {
-    if (existsSync(corruptPath)) unlinkSync(corruptPath)
-    copyFileSync(filePath, corruptPath)
+    if (coreFs.existsSync(corruptPath)) coreFs.unlinkSync(corruptPath)
+    coreFs.copyFileSync(filePath, corruptPath)
     return corruptPath
   } catch {
     return null

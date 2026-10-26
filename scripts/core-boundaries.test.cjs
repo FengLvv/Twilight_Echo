@@ -20,7 +20,7 @@ function files(directory) {
     )
 }
 
-test('portable Core imports only its business layer, shared contracts and non-platform Node primitives', () => {
+test('portable Core imports only its business layer and shared contracts', () => {
   const violations = []
   for (const file of files(path.join(ROOT, 'src/core'))) {
     const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
@@ -36,77 +36,63 @@ test('portable Core imports only its business layer, shared contracts and non-pl
       if (specifier) {
         const spec = ts.isStringLiteral(specifier) ? specifier.text : ''
         const target = spec.startsWith('.') ? rel(path.resolve(path.dirname(file), spec)) : spec
-        const portable = /^(?:src\/(?:core|shared)\/|node:events$)/.test(target)
-        // The plugin repository owns existing on-disk packages/state. OS UI,
-        // credentials, paths and process spawning are injected capabilities.
-        const repositoryNode =
-          /^src\/core\/(?:plugins|persistence|audio|providers|downloads)\//.test(rel(file)) &&
-          /^(?:node:(?:crypto|fs|fs\/promises|path|module|http|stream|stream\/promises|timers\/promises)|extract-zip|yauzl|music-metadata|strtok3)$/.test(
-            target
-          )
-        const pluginVendor = /^src\/core\/plugins\/rhine-vendor\//.test(rel(file)) && target === 'opencc-js'
-        const pluginIndexNode =
-          /^src\/core\/plugins\/index(?:Service|Trust)\.ts$/.test(rel(file)) && /^(?:node:os|node:url)$/.test(target)
-        const importFileNode =
-          /^src\/core\/playlists\/(?:fileParser|readFile)\.ts$/.test(rel(file)) &&
-          /^(?:node:(?:fs\/promises|path|url)|@xmldom\/xmldom|iconv-lite)$/.test(target)
-        const lyricsNode =
-          /^src\/core\/lyrics\/(?:loadLyrics|localLoader|amllTtml|importLyrics|saveLyrics|files)\.ts$/.test(
-            rel(file)
-          ) && /^(?:node:(?:fs\/promises|path|crypto|http)|music-metadata)$/.test(target)
-        const streamsNode =
-          rel(file) === 'src/core/streams/radioMediaService.ts' &&
-          /^(?:node:crypto|node:path)$/.test(target)
-        const remoteNode =
-          rel(file) === 'src/core/remote/service.ts' && target === 'node:crypto'
-        const networkNode =
-          /^src\/core\/network\//.test(rel(file)) &&
-          /^(?:node:(?:crypto|fs|fs\/promises|path|http|https|net|stream|stream\/promises)|basic-ftp|music-metadata)$/.test(
-            target
-          )
-        const castNode =
-          /^src\/core\/cast\//.test(rel(file)) &&
-          /^(?:node:(?:crypto|dgram|tls|http|fs|path|stream|stream\/web|stream\/promises))$/.test(
-            target
-          )
-        const taglibNode =
-          rel(file) === 'src/core/downloads/taglib.ts' && target === 'node-taglib-sharp'
-        const analysisEqualityNode =
-          rel(file) === 'src/core/audio/fileAnalysisCache.ts' && target === 'node:util'
-        const modelArchiveNode =
-          rel(file) === 'src/core/audio/autoMixStemInstaller.ts' && target === 'buffer-crc32'
-        const cloudTransferNode =
-          /^src\/core\/ncm\/(?:cloudTransferHelpers|cloudTransferIo|cloudTransferService)\.ts$/.test(
-            rel(file)
-          ) &&
-          /^(?:node:(?:crypto|fs|fs\/promises|http|https|path|stream|stream\/promises)|music-metadata)$/.test(
-            target
-          )
-        const watcherNode =
-          /^src\/core\/library\/watcher(?:Extensions)?\.ts$/.test(rel(file)) &&
-          /^(?:node:fs|node:path)$/.test(target)
-        const tagJournalNode =
-          /^src\/core\/library\/(?:tagWriteService|playlistRepairService)\.ts$/.test(rel(file)) &&
-          /^(?:node:fs|node:fs\/promises|node:path|node:crypto)$/.test(target)
-        if (
-          !portable &&
-          !analysisEqualityNode &&
-          !modelArchiveNode &&
-          !cloudTransferNode &&
-          !taglibNode &&
-          !repositoryNode &&
-          !pluginIndexNode &&
-          !pluginVendor &&
-          !importFileNode &&
-          !lyricsNode &&
-          !streamsNode &&
-          !remoteNode &&
-          !networkNode &&
-          !castNode &&
-          !watcherNode &&
-          !tagJournalNode
-        )
+        const portable = /^src\/(?:core|shared)\//.test(target)
+        if (!portable) {
           violations.push(`${rel(file)} -> ${target || 'dynamic import target'}`)
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+  }
+  assert.deepEqual(violations, [])
+})
+
+test('Core and shared have no Node.js runtime globals or NodeJS namespace references', () => {
+  const nodeGlobals = new Set([
+    'Buffer',
+    'process',
+    'require',
+    'setImmediate',
+    'clearImmediate',
+    '__dirname',
+    '__filename',
+    'NodeJS'
+  ])
+  const violations = []
+  for (const file of [
+    ...files(path.join(ROOT, 'src/core')),
+    ...files(path.join(ROOT, 'src/shared'))
+  ]) {
+    const source = ts.createSourceFile(
+      file,
+      fs.readFileSync(file, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true
+    )
+    function visit(node) {
+      if (ts.isIdentifier(node) && nodeGlobals.has(node.text)) {
+        const parent = node.parent
+        const isDeclarationOrMemberName =
+          (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+          (ts.isPropertyAssignment(parent) && parent.name === node) ||
+          (ts.isPropertySignature(parent) && parent.name === node) ||
+          (ts.isMethodDeclaration(parent) && parent.name === node) ||
+          (ts.isMethodSignature(parent) && parent.name === node) ||
+          (ts.isParameter(parent) && parent.name === node) ||
+          (ts.isVariableDeclaration(parent) && parent.name === node) ||
+          (ts.isBindingElement(parent) && parent.name === node) ||
+          ts.isImportSpecifier(parent)
+        if (!isDeclarationOrMemberName) {
+          violations.push(`${rel(file)}: ${node.text}`)
+        }
+      }
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        ['globalThis', 'global', 'self'].includes(node.expression.getText(source)) &&
+        nodeGlobals.has(node.name.text)
+      ) {
+        violations.push(`${rel(file)}: ${node.getText(source)}`)
       }
       ts.forEachChild(node, visit)
     }
@@ -184,4 +170,74 @@ test('no HTMLAudio playback implementation or environment-variable enablement re
       violations.push(rel(file))
   }
   assert.deepEqual(violations, [])
+})
+
+test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/core/ports/index.ts) and ratchet count never grows', () => {
+  const greenZonePrefixes = [
+    'src/core/application.ts',
+    'src/core/projections.ts',
+    'src/core/portableSlice.ts',
+    'src/core/playback/',
+    'src/core/settings/',
+    'src/core/catalog/',
+    'src/core/search/',
+    'src/core/bookmarks/',
+    'src/core/listening/',
+    'src/core/workspace/',
+    'src/core/lyrics/',
+    'src/core/providers/ncmApi.ts',
+    'src/core/providers/ncmServerBinding.ts',
+    'src/core/playlists/service.ts',
+    'src/core/playlists/controller.ts',
+    'src/core/playlists/views.ts',
+    'src/core/playlists/sqlView.ts',
+    'src/core/playlists/recordingVersions.ts',
+    'src/core/playlists/submission.ts'
+  ]
+  const isGreenZone = (relativePath) =>
+    greenZonePrefixes.some((prefix) =>
+      prefix.endsWith('/') ? relativePath.startsWith(prefix) : relativePath === prefix
+    )
+
+  const greenZoneViolations = []
+  const legacyShimImporters = []
+
+  for (const file of files(path.join(ROOT, 'src/core'))) {
+    const relativeFile = rel(file)
+    if (relativeFile === 'src/core/ports/index.ts') continue
+    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
+    let importsLegacyNodeShim = false
+
+    function visit(node) {
+      const specifier =
+        ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
+          ? node.moduleSpecifier
+          : null
+      if (specifier && ts.isStringLiteral(specifier) && specifier.text.startsWith('.')) {
+        const resolved = rel(path.resolve(path.dirname(file), specifier.text))
+        if (resolved === 'src/core/ports/index.ts' || resolved === 'src/core/ports/index') {
+          importsLegacyNodeShim = true
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+
+    if (importsLegacyNodeShim) {
+      legacyShimImporters.push(relativeFile)
+      if (isGreenZone(relativeFile)) {
+        greenZoneViolations.push(relativeFile)
+      }
+    }
+  }
+
+  assert.deepEqual(
+    greenZoneViolations,
+    [],
+    'Green-zone Portable Core modules must not depend on the Legacy Node I/O shim (src/core/ports/index.ts)'
+  )
+  assert.ok(
+    legacyShimImporters.length <= 65,
+    `Legacy Node I/O shim consumer count grew from baseline 65 to ${legacyShimImporters.length}`
+  )
 })

@@ -590,7 +590,7 @@ test('v15 migration backs up identities and adds monotonic folder-cohort fences'
   db.sql.exec(LEGACY_IDENTIFICATION_ALBUM_FENCE_SQL + 'PRAGMA user_version=15;')
   db.close()
   db = new LibraryDatabase(path)
-  assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 29)
+  assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
   assert.equal(db.identificationInput(entityId).version, before.version)
   const sourceId = before.sources![0].sourceId
   const oldKey = String(

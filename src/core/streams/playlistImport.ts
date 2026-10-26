@@ -1,6 +1,7 @@
 /**
  * Pure M3U / PLS playlist importers for internet radio station lists.
  */
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 
 export interface ImportedRadioEntry {
   name: string
@@ -92,7 +93,7 @@ function looksLikePls(text: string): boolean {
 
 function assertPlaylistText(text: string): void {
   if (typeof text !== 'string') throw new Error('Playlist text must be a string')
-  if (Buffer.byteLength(text, 'utf8') > MAX_PLAYLIST_BYTES) {
+  if (PortableBuffer.byteLength(text, 'utf8') > MAX_PLAYLIST_BYTES) {
     throw new Error('Playlist text is too large')
   }
 }

@@ -7,6 +7,7 @@ import type {
   AudioOutputOption,
   AudioOutputState,
   ChannelRoutingMode,
+  CorePlatformId,
   NativeAudioBinding,
   OutputConfig,
   OutputConfigApplyStatus,
@@ -115,7 +116,7 @@ export class OutputRouter {
   /** Last explicit device per backend, so a backend switch is not a device reset. */
   private readonly lastDeviceByOutput = new Map<AudioOutputId, string>()
 
-  private readonly platform: NodeJS.Platform
+  private readonly platform: CorePlatformId
   private readonly persist?: AudioEngineManagerDependencies['persistAudioOutput']
   private readonly host: OutputRouterHost
 
@@ -128,7 +129,7 @@ export class OutputRouter {
     dependencies: Pick<
       AudioEngineManagerDependencies,
       'deviceOptionsProvider' | 'persistAudioOutput'
-    > & { platform: NodeJS.Platform }
+    > & { platform: CorePlatformId }
   ) {
     this.host = host
     this.platform = dependencies.platform

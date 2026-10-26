@@ -1,6 +1,5 @@
-import { realpathSync } from 'node:fs'
-import { readFile, mkdir, writeFile, rename } from 'node:fs/promises'
-import { dirname, relative, resolve } from 'node:path'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+import { dirname, relative, resolve } from '../../shared/portablePath.ts'
 import type { LibraryDatabaseApi } from '../../shared/libraryDatabase.ts'
 import type { MusicAlbum } from '../../shared/rhineMusic.ts'
 import { normalizeExperiences, type InstalledExperience } from '../../shared/pluginExperience.ts'
@@ -15,6 +14,9 @@ import {
   type LegacyMusicAuthorityDatabase
 } from './legacyMusicAuthority.ts'
 import type { LegacyMusicTaskClient } from '../../shared/legacyMusicTasks.ts'
+
+const { realpathSync } = coreFs
+const { readFile, mkdir, writeFile, rename } = coreFsPromises
 
 /** Package authorization and long-running metadata jobs survive every UI window. */
 export class CorePluginExperiences {

@@ -1,3 +1,4 @@
+import '../adapters-node/index.ts'
 import './diagnostics/bootstrap.ts'
 import { relaunchWithX11BackendIfNeeded } from './imeBackend'
 

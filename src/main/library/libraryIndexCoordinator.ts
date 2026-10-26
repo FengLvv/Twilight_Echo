@@ -28,6 +28,7 @@ import type { LocalLibraryScanRunner } from './libraryScanServiceClient.ts'
 import { expandSacdIsoTracks, type SacdIsoMetadataReader } from './sacdIsoTracks.ts'
 import { LOCAL_LIBRARY_METADATA_VERSION } from '../../shared/localLibraryScan.ts'
 import { normalizeReleaseDate } from '../../shared/releaseDate.ts'
+import { observedTrackTags } from '../../shared/localLibraryObservations.ts'
 
 type LibraryTransaction = <T>(operation: () => Promise<T> | T) => Promise<T>
 
@@ -606,7 +607,9 @@ function applyScanBatch(accumulator: ScanAccumulator, batch: LocalLibraryScanBat
       accumulator.replacementsByPath.get(path) ?? accumulator.previousByPath.get(path) ?? []
     const parsed = previous.map((track) => {
       const { releaseDate: _oldDate, ...rest } = track
-      return update.releaseDate ? { ...rest, releaseDate: update.releaseDate } : rest
+      const identityTags = observedTrackTags(track, update.observations)
+      return { ...rest, ...(update.releaseDate ? { releaseDate: update.releaseDate } : {}),
+        ...(identityTags ? { identityTags } : {}) }
     })
     if (sameTrackCollection(previous, parsed)) continue
     accumulator.replacementsByPath.set(path, parsed)

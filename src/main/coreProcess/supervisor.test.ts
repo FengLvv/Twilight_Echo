@@ -522,6 +522,187 @@ test('an initialized Core awaiting browser migration still confirms its checkpoi
   assert.equal(supervisor.getStatus().phase, 'stopped')
 })
 
+test('a timed-out shutdown retry joins the original checkpoint and accepts its late ACK', async (t) => {
+  const { supervisor, children } = fixture(t, { requestTimeoutMs: 20 })
+  supervisor.connect(identity)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  core.shutdownReply = false
+  await assert.rejects(supervisor.shutdown(), /Core did not confirm final persistence/)
+  assert.equal(core.kills, 0)
+  await assert.rejects(supervisor.request(identity.id, command(core.epoch, 'after-timeout')), {
+    code: 'NOT_READY'
+  })
+  const retry = supervisor.shutdown()
+  const messages = core.sent.filter(({ message }) => message.kind === 'core:shutdown')
+  assert.equal(messages.length, 1)
+  core.emit('message', {
+    kind: 'core:shutdown-complete',
+    epoch: core.epoch,
+    requestId: messages[0].message.requestId,
+    ok: true
+  })
+  await retry
+  assert.equal(core.kills, 1)
+  assert.equal(supervisor.getStatus().phase, 'stopped')
+})
+
+test('shutdown still delivers responses to already-dispatched requests, while rejecting new work', async (t) => {
+  const { supervisor, children } = fixture(t)
+  supervisor.connect(identity)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  core.shutdownReply = false
+  const request = supervisor.request(identity.id, command(core.epoch, 'dispatched'))
+  const shutdown = supervisor.shutdown()
+  core.emit('message', {
+    kind: 'core:client-message',
+    clientId: identity.id,
+    message: {
+      kind: 'response',
+      epoch: core.epoch,
+      requestId: 'dispatched',
+      ok: true,
+      value: 'done'
+    }
+  })
+  assert.equal(await request, 'done')
+  await assert.rejects(supervisor.request(identity.id, command(core.epoch, 'new-work')), {
+    code: 'NOT_READY'
+  })
+  const message = core.sent.find(({ message }) => message.kind === 'core:shutdown')!.message
+  core.emit('message', {
+    kind: 'core:shutdown-complete',
+    epoch: core.epoch,
+    requestId: message.requestId,
+    ok: true
+  })
+  await shutdown
+})
+
+test('explicit discard after an unconfirmed checkpoint reclaims Core, audio and database without saving again', async (t) => {
+  let stoppedOutputs = 0
+  const { supervisor, children } = fixture(t, {
+    requestTimeoutMs: 20,
+    stopOutputs: async () => {
+      stoppedOutputs++
+    }
+  })
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  for (const service of ['audio', 'database'])
+    core.emit('message', {
+      kind: 'core:service-open',
+      epoch: core.epoch,
+      leaseId: service,
+      service
+    })
+  core.shutdownReply = false
+  await assert.rejects(supervisor.shutdown(), /final persistence/)
+  await supervisor.forceShutdown()
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:shutdown').length, 1)
+  assert.equal(stoppedOutputs, 1)
+  assert.equal(children.length, 3)
+  assert.ok(children.every(({ child }) => child.kills === 1))
+  assert.deepEqual(supervisor.getStatus(), { phase: 'stopped', epoch: null })
+})
+
+test('discard does not report completion before every owned service actually exits', async (t) => {
+  const { supervisor, children } = fixture(t)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  core.emit('message', {
+    kind: 'core:service-open',
+    epoch: core.epoch,
+    leaseId: 'database',
+    service: 'database'
+  })
+  const database = children[1].child
+  database.exitsOnKill = false
+  await assert.rejects(supervisor.forceShutdown(), /Service termination not confirmed/)
+  assert.notEqual(supervisor.getStatus().phase, 'stopped')
+  assert.equal(core.kills, 1)
+  database.emit('exit', 0)
+  await supervisor.forceShutdown()
+  assert.equal(supervisor.getStatus().phase, 'stopped')
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:shutdown').length, 0)
+})
+
+test('explicit discard settles in-flight writes as unknown and queries as cancelled without replay', async (t) => {
+  const { supervisor, children } = fixture(t)
+  supervisor.connect(identity)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  const write = assert.rejects(supervisor.request(identity.id, command(core.epoch, 'write-once')), {
+    code: 'OUTCOME_UNKNOWN'
+  })
+  const read = assert.rejects(
+    supervisor.request(identity.id, {
+      kind: 'query',
+      name: 'state.snapshot',
+      epoch: core.epoch,
+      requestId: 'cancel-read',
+      payload: {}
+    }),
+    { code: 'CANCELLED' }
+  )
+  await supervisor.forceShutdown()
+  await Promise.all([write, read])
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:request').length, 2)
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:shutdown').length, 0)
+  assert.equal(children.length, 1)
+})
+
+test('Core exit without a shutdown ACK fails promptly instead of waiting out the checkpoint deadline', async (t) => {
+  const { supervisor, children } = fixture(t)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  core.shutdownReply = false
+  const shutdown = supervisor.shutdown()
+  core.emit('exit', 7)
+  await assert.rejects(shutdown, /Core exited \(7\)/)
+  await supervisor.forceShutdown()
+  assert.equal(children.length, 1)
+})
+
+test('a late fatal failure after checkpoint timeout still reclaims services without restarting Core', async (t) => {
+  const { supervisor, children } = fixture(t, { requestTimeoutMs: 20 })
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  core.emit('message', {
+    kind: 'core:service-open',
+    epoch: core.epoch,
+    leaseId: 'audio',
+    service: 'audio'
+  })
+  core.shutdownReply = false
+  await assert.rejects(supervisor.shutdown(), /final persistence/)
+  core.emit('message', {
+    kind: 'core:fatal',
+    epoch: core.epoch,
+    error: 'Cannot confirm audio stopped'
+  })
+  await tick()
+  await tick()
+  assert.equal(children.length, 2)
+  assert.equal(children[1].child.kills, 1)
+  assert.equal(supervisor.getStatus().phase, 'failed')
+})
+
 test('an owned service rejected by pre-spawn kill is terminated on spawn before Core may restart', async (t) => {
   const { supervisor, children } = fixture(t)
   const started = supervisor.start()

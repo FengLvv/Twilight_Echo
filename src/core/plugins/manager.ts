@@ -1,8 +1,12 @@
-import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, statSync } from 'node:fs'
-import { cp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join, resolve } from 'node:path'
-import { EventEmitter } from 'node:events'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { coreFs, coreFsPromises, coreProcess } from '../ports/index.ts'
+const { existsSync, mkdirSync, statSync } = coreFs
+const { cp, readdir, readFile, rename, rm, stat, writeFile } = coreFsPromises
+
+
+import { basename, dirname, extname, join, resolve } from '../../shared/portablePath.ts'
+import { EventEmitter } from '../../shared/portableEvents.ts'
 import { planPluginStartup } from './dependencies'
 import {
   compareSemver,
@@ -2518,7 +2522,7 @@ export class TwilightPluginManager extends EventEmitter {
     const logPath = descriptor.paths.logPath
     ensureParent(logPath)
     const line = `[${shared?.timestamp ?? new Date().toISOString()}] [${level}] [eventId=${shared?.eventId ?? ''}] ${shared.text.trim()}\n`
-    const lineBytes = Buffer.byteLength(line)
+    const lineBytes = PortableBuffer.byteLength(line)
     // 每插件日志带尺寸轮转（current + .1 两档，仿 audioDiagnostics），同时把逐行
     // 追加串进 per-path 写链，避免高并发日志乱序与无界增长。
     const chain = this.logWriteChains.get(logPath) ?? Promise.resolve()
@@ -2687,8 +2691,8 @@ export class TwilightPluginManager extends EventEmitter {
   ): string | null {
     const binary = descriptor.binary
     if (!binary) return null
-    const key = `${process.platform}-${process.arch}`
-    const relPath = binary[key] ?? binary[process.platform]
+    const key = `${coreProcess.platform}-${coreProcess.arch}`
+    const relPath = binary[key] ?? binary[coreProcess.platform]
     if (!relPath) return null
     return resolvePluginFile(resolve(versionRoot, relPath), versionRoot)
   }

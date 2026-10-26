@@ -3,7 +3,7 @@ import type { TrackIdentityTags } from '../../shared/trackIdentification.ts'
 import { readNcmFileIdentity } from './ncmFileIdentity.ts'
 import { ncmFileTagMatches } from '../../shared/ncmFileIdentity.ts'
 
-/** Read alongside the existing parser. No extra file pass or metadata-version bump. */
+/** Read alongside the existing parser, including the one-time v2 upgrade read. */
 export function collectTrackIdentityTags(
   common: Partial<ICommonTagsResult>,
   duration: number | undefined,

@@ -29,6 +29,7 @@ export interface CoreApplicationOptions {
     CoreSupervisor,
     | 'start'
     | 'shutdown'
+    | 'forceShutdown'
     | 'retry'
     | 'getStatus'
     | 'connect'
@@ -109,6 +110,14 @@ export class CoreApplicationRuntime {
   async shutdown(): Promise<void> {
     await this.options.settings.flush()
     await this.options.supervisor.shutdown()
+    this.detach()
+  }
+  /** Only after the user explicitly chooses to quit without saving. */
+  async forceShutdown(): Promise<void> {
+    await this.options.supervisor.forceShutdown()
+    this.detach()
+  }
+  private detach(): void {
     this.options.windows.dispose()
     this.options.supervisor.off('client-message', this.message)
     this.options.supervisor.off('status', this.status)

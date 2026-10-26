@@ -4,6 +4,9 @@ import OnboardingWizard from './OnboardingWizard.vue'
 import TitleBar from '../TitleBar.vue'
 import { pushBackHandler } from '../../app/useBackStack.ts'
 import { useSettingsStore as realSettingsStore } from '../../stores/useSettingsStore.ts'
+import { useCoreConnection } from '../../stores/coreConnection.ts'
+import { isCoreRequest } from '../../../../shared/coreProtocol.ts'
+import { saveOnboardingSettings } from './saveOnboardingSettings.ts'
 import '../../assets/base.css'
 import '../../assets/icon-fonts.ts'
 
@@ -23,6 +26,7 @@ settings.value.closeWindowBehavior = 'tray'
 const seed = JSON.parse(JSON.stringify(settings.value))
 const noop = async () => undefined
 const volume = ref(0.35)
+const libraryTrackCount = ref(300_000)
 export const useSettingsStore = () => ({
   ...actual,
   settings,
@@ -42,7 +46,7 @@ export const useSettingsStore = () => ({
 })
 export const useMusicStore = () => ({
   tracks: ref([]),
-  libraryTrackCount: ref(300_000),
+  libraryTrackCount,
   libraryScanProgress: ref(null)
 })
 export const usePlayerStore = () => ({
@@ -124,6 +128,84 @@ window.api = {
   },
   desktopLyrics: { setEnabled: async (enabled) => enabled }
 }
+const coreRequests = []
+let outputRevision = 7,
+  preferencesRevision = 0,
+  failPreferences = false,
+  saveThroughCore = false
+window.api.core = {
+  connect: async () => ({
+    ok: true,
+    value: {
+      connectionId: 'onboarding',
+      snapshot: { protocolVersion: 1, epoch: 'onboarding', sequence: 0, phase: 'ready' }
+    }
+  }),
+  onMessage: () => () => {},
+  onStatus: () => () => {},
+  cancel: async () => ({ ok: true }),
+  disconnect: async () => ({ ok: true }),
+  request: async (_id, request) => {
+    if (!isCoreRequest(request))
+      return {
+        ok: false,
+        error: { code: 'INVALID_REQUEST', message: 'Unknown or malformed Core operation' }
+      }
+    coreRequests.push(JSON.parse(JSON.stringify(request)))
+    try {
+      let value
+      switch (request.name) {
+        case 'audio.outputTest':
+          value = { revision: 0, active: !!pendingTone }
+          break
+        case 'audio.outputTest.play':
+          value = await window.api.audioEngine.testOutput()
+          break
+        case 'audio.outputTest.stop':
+          await window.api.audioEngine.stopOutputTest()
+          break
+        case 'audio.output':
+          value = {
+            revision: outputRevision,
+            output: { exclusiveMode: settings.value.audioExclusiveMode }
+          }
+          break
+        case 'audio.output.edit':
+          if (request.payload.revision !== outputRevision)
+            throw new Error('Output configuration changed')
+          settings.value.audioExclusiveMode = request.payload.edit.enabled
+          outputRevision++
+          preferencesRevision++
+          break
+        case 'settings.state':
+          value = {
+            revision: preferencesRevision,
+            settings: JSON.parse(JSON.stringify(settings.value))
+          }
+          break
+        case 'settings.edit':
+          if (failPreferences) {
+            failPreferences = false
+            throw new Error('磁盘暂不可写')
+          }
+          if (request.payload.revision !== preferencesRevision) throw new Error('Settings changed')
+          settings.value = { ...settings.value, ...request.payload.patch }
+          preferencesRevision++
+          break
+        default:
+          throw new Error('Unexpected Core request: ' + request.name)
+      }
+      return { ok: true, value }
+    } catch (error) {
+      return { ok: false, error: { code: 'FAILED', message: error.message } }
+    }
+  }
+}
+const core = useCoreConnection()
+async function savePreferences(patch) {
+  const current = await core.query('settings.state', {})
+  await core.command('settings.edit', { revision: current.revision, patch })
+}
 const ipc = window.onboardingTestIpc
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const tick = async () => {
@@ -194,11 +276,17 @@ function mount() {
   app?.unmount()
   document.querySelector('#app').innerHTML = ''
   settings.value = JSON.parse(JSON.stringify(seed))
+  libraryTrackCount.value = 300_000
   theme(false)
   results = []
   saving.value = false
   saveError.value = ''
   wizardVisible.value = true
+  coreRequests.length = 0
+  outputRevision = 7
+  preferencesRevision = 0
+  failPreferences = false
+  saveThroughCore = false
   app = createApp({
     render: () => [
       h(TitleBar, { menuOpen: false, closeOnly: wizardVisible.value }),
@@ -209,6 +297,19 @@ function mount() {
           onFinish: (result) => {
             results.push(JSON.parse(JSON.stringify(result)))
             saving.value = true
+            if (saveThroughCore) {
+              saveError.value = ''
+              void saveOnboardingSettings(result.patch, { core, updateSettings: savePreferences })
+                .then(() => {
+                  wizardVisible.value = false
+                })
+                .catch((error) => {
+                  saveError.value = `保存失败，请重试：${error.message}`
+                })
+                .finally(() => {
+                  saving.value = false
+                })
+            }
           }
         })
     ]
@@ -253,6 +354,7 @@ function geometry() {
   )
 }
 window.runOnboardingTests = async () => {
+  await core.attach()
   mount()
   const disposeBack = pushBackHandler(() => undefined, '返回已有页面')
   await tick()
@@ -473,8 +575,60 @@ window.runOnboardingTests = async () => {
     'restored window controls failed'
   )
   disposeBack()
+
+  // Exercise the same save helper used by App, with the real Core protocol validator.
+  await reachPlayer()
+  saveThroughCore = true
+  settings.value.libraryFolders = []
+  libraryTrackCount.value = 0
+  await go('流媒体')
+  await click('完成后立即登录')
+  await go('播放器形态')
+  await advance()
+  await advance()
+  await advance()
+  await ipc.invoke('onboarding-resize', 1280, 755)
+  theme(true)
+  await tick()
+  geometry()
+  expect(findButton('保存并登录'), 'login handoff missing')
+  await capture('first-run-save-ready')
+  await advance()
+  await until(() => !document.querySelector('.onboarding-wizard'), 'default save did not finish')
+  expect(settings.value.onboardingCompleted, 'completion was not persisted')
+  expect(results.at(-1).action === 'streaming-login', 'save lost login handoff')
+  expect(!coreRequests.some((r) => r.name === 'audio.output.edit'), 'unchanged mode was reapplied')
+  expect(
+    coreRequests.some((r) => r.name === 'settings.edit'),
+    'preferences were not saved'
+  )
+
+  await reachPlayer('流媒体')
+  saveThroughCore = true
+  await advance()
+  await click('HiFi 独占')
+  await advance()
+  await advance()
+  failPreferences = true
+  await advance()
+  await until(() => saveError.value.includes('磁盘暂不可写'), 'save failure was hidden')
+  expect(!settings.value.onboardingCompleted && wizardVisible.value, 'failure closed the wizard')
+  expect(settings.value.audioExclusiveMode, 'acknowledged audio mode was lost')
+  expect(
+    document.querySelector('.onb-summary').textContent.includes('HiFi 独占'),
+    'retry lost audio choice'
+  )
+  await capture('first-run-save-retry')
+  await advance()
+  await until(() => !document.querySelector('.onboarding-wizard'), 'save retry did not finish')
+  expect(settings.value.onboardingCompleted, 'retry did not persist completion')
+  expect(
+    coreRequests.filter((r) => r.name === 'audio.output.edit').length === 1,
+    'retry replayed audio change'
+  )
 }
 window.previewOnboarding = async () => {
+  await core.attach()
   await reachPlayer()
   theme(false)
 }

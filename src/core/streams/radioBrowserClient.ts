@@ -4,6 +4,7 @@
  * Docs: https://api.radio-browser.info/
  */
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import type { RadioBrowserStation } from '../../shared/coreStreams.ts'
 export type { RadioBrowserStation } from '../../shared/coreStreams.ts'
 
@@ -124,7 +125,7 @@ async function defaultFetchJson(url: string, signal?: AbortSignal): Promise<unkn
       throw new Error(`Radio directory HTTP ${response.status}`)
     }
     const text = await response.text()
-    if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
+    if (PortableBuffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
       throw new Error('Radio directory response is too large')
     }
     return parseJsonWithNestingLimit(text) as unknown

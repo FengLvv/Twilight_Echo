@@ -1,10 +1,15 @@
-import { createReadStream } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { coreFs, coreFsPromises } from '../../ports/index.ts'
+import { join } from '../../../shared/portablePath.ts'
+import type { CorePlatformId } from '../../../shared/audioEngineTypes.ts'
 import { buildNetworkEntryId, normalizeRemotePath } from '../networkPath.ts'
 import { NetworkSourceFailure } from '../errors.ts'
 import { entryKind } from '../entryKinds.ts'
-import type { NetworkAuth, NetworkSourceAdapter, NetworkSourceSession } from './types.ts'
+import type {
+  NetworkAuth,
+  NetworkReadableStream,
+  NetworkSourceAdapter,
+  NetworkSourceSession
+} from './types.ts'
 import type { NetworkEntry, NetworkSourceProfile } from '../../../shared/networkSources.ts'
 
 export interface MountCommandResult {
@@ -20,7 +25,7 @@ export type MountCommandRunner = (
 ) => Promise<MountCommandResult>
 
 export interface MountAdapterDeps {
-  platform: NodeJS.Platform
+  platform: CorePlatformId
   runCommand: MountCommandRunner
   /** 挂载键（UNC / gvfs URI / NFS 挂载点）→ 本地路径映射，测试可注入。 */
   localMap?: (mountKey: string, remotePath: string) => string
@@ -74,7 +79,7 @@ function createMountAdapterForProtocol(
     if (!gvfsDir) return null
     const expected = `smb-share:server=${profile.host.toLowerCase()},share=${shareName(profile).toLowerCase()}`
     try {
-      const entries = await readdir(gvfsDir, { withFileTypes: true })
+      const entries = await coreFsPromises.readdir(gvfsDir, { withFileTypes: true })
       const mount = entries.find(
         (entry) => entry.isDirectory() && entry.name.toLowerCase() === expected
       )
@@ -143,8 +148,8 @@ function createMountAdapterForProtocol(
       async function ensureMounted(signal?: AbortSignal): Promise<void> {
         if (mounted) return
         if (protocol === 'nfs') {
-          mountPoint = await mkdtemp(join(mountBaseDir, 'twilight-nfs-'))
-          await mkdir(mountPoint, { recursive: true })
+          mountPoint = await coreFsPromises.mkdtemp(join(mountBaseDir, 'twilight-nfs-'))
+          await coreFsPromises.mkdir(mountPoint, { recursive: true })
           const exportPath = normalizeRemotePath(profile.rootPath)
           const result = await runCommand(
             'mount',
@@ -154,7 +159,7 @@ function createMountAdapterForProtocol(
           try {
             throwForMountResult(result, '挂载')
           } catch (err) {
-            await rm(mountPoint, { recursive: true, force: true }).catch(() => undefined)
+            await coreFsPromises.rm(mountPoint, { recursive: true, force: true }).catch(() => undefined)
             mountPoint = null
             throw err
           }
@@ -204,9 +209,9 @@ function createMountAdapterForProtocol(
           const local = localMap(parent)
           let dirents
           try {
-            dirents = await readdir(local, { withFileTypes: true })
+            dirents = await coreFsPromises.readdir(local, { withFileTypes: true })
           } catch (err) {
-            if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            if ((err as { code?: string })?.code === 'ENOENT') {
               throw new NetworkSourceFailure('notFound', '远程路径不存在')
             }
             throw new NetworkSourceFailure('network', `SMB 列目录失败：${(err as Error).message}`)
@@ -216,7 +221,7 @@ function createMountAdapterForProtocol(
             const childPath = parent === '/' ? `/${dirent.name}` : `${parent}/${dirent.name}`
             const size = dirent.isDirectory()
               ? undefined
-              : (await stat(localMap(childPath)).catch(() => undefined))?.size
+              : (await coreFsPromises.stat(localMap(childPath)).catch(() => undefined))?.size
             entries.push(toEntry(childPath, dirent.isDirectory(), size ?? 0))
           }
           return entries
@@ -226,10 +231,10 @@ function createMountAdapterForProtocol(
           await ensureMounted(signal)
           const path = normalizeRemotePath(remotePath)
           try {
-            const info = await stat(localMap(path))
+            const info = await coreFsPromises.stat(localMap(path))
             return toEntry(path, info.isDirectory(), info.size)
           } catch (err) {
-            if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            if ((err as { code?: string })?.code === 'ENOENT') {
               throw new NetworkSourceFailure('notFound', '远程路径不存在')
             }
             throw new NetworkSourceFailure('network', `SMB stat 失败：${(err as Error).message}`)
@@ -239,16 +244,16 @@ function createMountAdapterForProtocol(
           remotePath: string,
           signal?: AbortSignal,
           options?: { start?: number }
-        ): Promise<NodeJS.ReadableStream> {
+        ): Promise<NetworkReadableStream> {
           await ensureMounted(signal)
           if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络文件读取已取消')
-          const stream = createReadStream(localMap(normalizeRemotePath(remotePath)), {
+          const stream = coreFs.createReadStream(localMap(normalizeRemotePath(remotePath)), {
             start: options?.start ?? 0
           })
           signal?.addEventListener('abort', () => stream.destroy(new Error('read aborted')), {
             once: true
           })
-          return stream
+          return stream as unknown as NetworkReadableStream
         },
         async resolvePlaybackUrl(): Promise<string | null> {
           return null
@@ -258,7 +263,7 @@ function createMountAdapterForProtocol(
           if (protocol === 'nfs') {
             if (mountPoint) {
               throwForMountResult(await runCommand('umount', [mountPoint]), '卸载')
-              await rm(mountPoint, { recursive: true, force: true }).catch(() => undefined)
+              await coreFsPromises.rm(mountPoint, { recursive: true, force: true }).catch(() => undefined)
               mountPoint = null
             }
           } else if (platform === 'win32') {

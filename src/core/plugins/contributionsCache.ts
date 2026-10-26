@@ -7,9 +7,10 @@
  * utility process, as long as the snapshot still matches the installed
  * version. Anything unexpected in the file simply cold-starts that plugin.
  */
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { coreFsPromises } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
 import type {
   TwilightMediaProviderCapability,
   TwilightMediaProviderMethod,
@@ -17,6 +18,8 @@ import type {
   TwilightUiContribution
 } from './types'
 import { isTwilightMediaProviderMethod, normalizeProviderUi } from './providerRouting.ts'
+
+const { mkdir, readFile, rename, rm, writeFile } = coreFsPromises
 
 export const PLUGIN_CONTRIBUTIONS_CACHE_FILE = 'plugin-contributions.json'
 export const MAX_PLUGIN_CONTRIBUTIONS_BYTES = 1024 * 1024
@@ -65,7 +68,7 @@ export async function loadPluginContributionsCache(
   } catch {
     return {}
   }
-  if (Buffer.byteLength(raw, 'utf-8') > MAX_PLUGIN_CONTRIBUTIONS_BYTES) return {}
+  if (PortableBuffer.byteLength(raw, 'utf-8') > MAX_PLUGIN_CONTRIBUTIONS_BYTES) return {}
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -91,7 +94,7 @@ export async function savePluginContributionsCache(
 ): Promise<void> {
   const document: CacheDocument = { schemaVersion: CACHE_SCHEMA_VERSION, plugins: cache }
   const json = JSON.stringify(document, null, 2)
-  if (Buffer.byteLength(json, 'utf-8') > MAX_PLUGIN_CONTRIBUTIONS_BYTES) {
+  if (PortableBuffer.byteLength(json, 'utf-8') > MAX_PLUGIN_CONTRIBUTIONS_BYTES) {
     throw new Error('Plugin contributions cache is too large to persist.')
   }
   await mkdir(dirname(filePath), { recursive: true })

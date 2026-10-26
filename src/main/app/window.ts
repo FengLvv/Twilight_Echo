@@ -28,7 +28,8 @@ import {
   destroyAfterglowAnchorWindow,
   getAfterglowAnchorHandle
 } from './afterglowAnchorWindow.ts'
-import { ClosePersistenceAttemptGate } from './closePersistence.ts'
+import { ClosePersistenceAttemptGate, closePersistenceDialogOptions } from './closePersistence.ts'
+import { resolveLocale } from '../../shared/i18n/locale.ts'
 import { isSafeExternalUrl } from '../security/externalUrl.ts'
 import { isTrustedIpcSenderUrl } from '../security/electronSecurity.ts'
 import type { RendererClosePersistenceOutcome } from '../../shared/closePersistence.ts'
@@ -131,22 +132,21 @@ function closeMainWindowAfterSuccessfulPersistence(win: BrowserWindow): void {
   runtime.closingAfterPlaybackSessionSave = false
 }
 
-async function showClosePersistenceFailure(
-  win: BrowserWindow,
-  error: Error
+export async function showClosePersistenceFailure(
+  win: BrowserWindow | null,
+  error: Error,
+  discarding = false
 ): Promise<'retry' | 'cancel' | 'force'> {
-  console.error('[persistence] Window close cancelled because renderer persistence failed:', error)
+  console.error('[persistence] Close persistence failed:', error)
   try {
-    const response = await dialog.showMessageBox(win, {
-      type: 'error',
-      title: 'Twilight Echo could not save your changes',
-      message: 'The window remains open so your playlist changes are not silently lost.',
-      detail: error.message,
-      buttons: ['Retry close', 'Keep window open', 'Quit without saving'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true
-    })
+    const options = closePersistenceDialogOptions(
+      resolveLocale(runtime.appSettings.language, app.getLocale()),
+      error,
+      discarding
+    )
+    const response = await (win && !win.isDestroyed()
+      ? dialog.showMessageBox(win, options)
+      : dialog.showMessageBox(options))
     // I3: 提供“仍然退出”逃生出口，避免保存持续失败时对话框循环卡住。
     if (response.response === 0) return 'retry'
     if (response.response === 2) return 'force'
@@ -273,9 +273,13 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
       return
     }
 
-    if (getCoreApplication() && !runtime.forceQuit) {
-      event.preventDefault()
-      app.quit()
+    if (getCoreApplication()) {
+      // Core application quit owns persistence, including repeated closes while
+      // its checkpoint or failure dialog is pending. Never start a second flush.
+      if (!runtime.closingAfterPlaybackSessionSave) {
+        event.preventDefault()
+        app.quit()
+      }
       return
     }
 

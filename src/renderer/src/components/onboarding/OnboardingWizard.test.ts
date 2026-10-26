@@ -25,7 +25,7 @@ test('app gates the wizard on the completion flag plus an empty library unless t
     app,
     /<OnboardingWizard[\s\S]*?v-if="showOnboarding"[\s\S]*?@finish="handleOnboardingFinish"[\s\S]*?\/>/
   )
-  assert.match(app, /await updateSettings\(result\.patch\)/)
+  assert.match(app, /await saveOnboardingSettings\(result\.patch,/)
 })
 
 test('the wizard hides the player bar and switches the title bar to close-only controls', () => {

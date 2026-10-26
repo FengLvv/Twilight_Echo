@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID } from '../../shared/portableCrypto.ts'
 import type { TwilightMediaProviderMethod } from './types.ts'
 
 export const PLUGIN_RPC_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/

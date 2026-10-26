@@ -61,7 +61,7 @@ export function platformMetadataApprovals(
 export function ncmLocalFallbackApprovals(
   enabled: boolean,
   approved: Record<string, MetadataUsage>
-) {
+): Record<string, MetadataUsage> {
   if (!enabled) return approved
   const local = { display: true, cache: true, crossSource: true, export: false }
   return { ...approved, ncm: approved.ncm ? intersectMetadataUsage(local, approved.ncm) : local }

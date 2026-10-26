@@ -422,6 +422,11 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       terms: '艺人 歌手 专辑 介绍 简体 繁体 中文 英文'
     },
     {
+      id: 'metadata-ncm-fallback',
+      title: '网易云资料兜底',
+      terms: '网易云 歌手 艺人 头像 图片 简介 本地 缓存'
+    },
+    {
       id: 'metadata-sources',
       title: '资料源',
       terms: '音乐库 MusicBrainz Wikipedia 平台 许可 介绍 补全'

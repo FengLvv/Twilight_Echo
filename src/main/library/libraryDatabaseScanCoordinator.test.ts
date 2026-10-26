@@ -7,6 +7,8 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
+import { createCipheriv } from 'node:crypto'
+import { PlatformIdentificationProvider } from '../../core/library/musicIdentificationProvider.ts'
 import type { NativeAudioMetadata } from '../../shared/audioEngineTypes.ts'
 import { LibraryDatabaseServiceClient } from './libraryDatabaseServiceClient.ts'
 import { LocalLibraryScanServiceClient } from './libraryScanServiceClient.ts'
@@ -142,8 +144,67 @@ test('actual workers narrowly stage legacy dates, including CUE inheritance, abs
     return next
   }))
   const identities = await database.getFileIdentities()
-  assert.ok(identities.filter((i) => !i.filePath.endsWith('0002.wav')).every((i) => i.metadataVersion === 1))
+  assert.ok(identities.filter((i) => !i.filePath.endsWith('0002.wav')).every((i) => i.metadataVersion === 2))
   assert.equal(identities.find((i) => i.filePath.endsWith('0002.wav'))!.metadataVersion, 0)
+})
+
+test('v1 caches automatically recover file-native identity without replacing curated fields or requiring reimport', { timeout: 30_000 }, async t => {
+  const { coordinator, database, root } = await fixture(t, 0)
+  const filePath = join(root, 'old.flac')
+  const cipher = createCipheriv('aes-128-ecb', Buffer.from("#14ljk_!\\]&0U<'("), null)
+  const native = { musicId: 101, albumId: 202, musicName: 'Tagged song', album: 'Tagged album',
+    duration: 123456, artist: [['Tagged artist', 303]] }
+  const comment = "163 key(Don't modify):" + Buffer.concat([
+    cipher.update('music:' + JSON.stringify(native)), cipher.final()
+  ]).toString('base64')
+  const stream = Buffer.alloc(38)
+  stream.writeUIntBE(34, 1, 3); stream.writeUInt16BE(4096, 4); stream.writeUInt16BE(4096, 6)
+  stream.writeBigUInt64BE((8000n << 44n) | (15n << 36n) | 987648n, 14)
+  const uint = (n: number) => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b }
+  const comments = ['TITLE=Tagged song', 'ARTIST=Tagged artist', 'ALBUM=Tagged album', `COMMENT=${comment}`]
+  const body = Buffer.concat([uint(0), uint(comments.length), ...comments.flatMap(text => {
+    const bytes = Buffer.from(text); return [uint(bytes.length), bytes]
+  })])
+  const header = Buffer.alloc(4); header[0] = 0x84; header.writeUIntBE(body.length, 1, 3)
+  writeFileSync(filePath, Buffer.concat([Buffer.from('fLaC'), stream, header, body]))
+  await coordinator.start('full', [root])
+  const initial = await database.queryTracks()
+  await database.patchTracks([{ id: initial.tracks[0].id, expectedVersion: initial.versions[initial.tracks[0].id],
+    patch: { title: 'My title', cover: 'my-cover', lyrics: 'my lyrics', rating: 5, identityTags: {} } }])
+  const sql = new DatabaseSync(join(root, 'music-library.sqlite'))
+  try { sql.exec("UPDATE files SET metadata_version=1,identity=json_set(identity,'$.metadataVersion',1)") }
+  finally { sql.close() }
+  while ((await database.catalogStatus()).localPending) await database.catalogAdvance()
+  const artist = (await database.catalogQuery({ kind: 'artist' })).items[0]
+  const provider = new PlatformIdentificationProvider('ncm', {
+    inventory: () => [{ id: 'ncm', enabled: true, supportedMethods: ['searchArtists'], configuration: 'anonymous' }],
+    search: async () => { throw Error('File-native identity must not need a name search') }
+  })
+  const schedule = { enabled: true, newImports: true, history: true,
+    providers: [{ id: provider.id, matcherVersion: provider.matcherVersion, kinds: ['artist' as const] }] }
+  while ((await database.identificationSchedule(schedule, 1000)).more) { /* bounded outbox */ }
+  const job = (await database.metadataJobs({})).items.find(j => j.entityId === artist.id)!
+  const work = await database.metadataClaim(1000)
+  assert.ok(work)
+  await database.metadataFinish(work, { state: 'failed', reason: 'metadata_response_invalid' }, 1000)
+  const before = (await database.queryTracks()).tracks[0]
+  await coordinator.start('startup', [root])
+  const after = (await database.queryTracks()).tracks[0]
+  assert.deepEqual({ ...after, identityTags: undefined }, { ...before, identityTags: undefined })
+  assert.equal((after.identityTags as { ncm?: { recordingId: string } }).ncm?.recordingId, '101')
+  assert.equal((await database.getFileIdentities())[0].metadataVersion, 2)
+  while ((await database.catalogStatus()).localPending) await database.catalogAdvance()
+  const input = await database.identificationInput(artist.id)
+  const result = await provider.recall(input, new AbortController().signal)
+  assert.equal(result.proposals[0].evidence.verification?.method, 'file_native')
+  while ((await database.identificationSchedule(schedule, 2000)).more) { /* automatic retry */ }
+  const retry = await database.metadataClaim(2000)
+  assert.ok(retry)
+  assert.ok(retry.job.generation > job.generation, 'changed observations restore a failed job')
+  await database.metadataFinish(retry, { state: 'identified', ...result }, 2000)
+  assert.equal((await database.identificationDetail(artist.id)).link?.state, 'confirmed')
+  const unchanged = await coordinator.start('startup', [root])
+  assert.equal(unchanged.progress.parsedFiles, 0, 'upgrade observations are read only once')
 })
 
 test('actual worker cancellation drops date staging while a mixed ordinary batch remains playable', { timeout: 30_000 }, async (t) => {
@@ -169,7 +230,7 @@ test('actual worker cancellation drops date staging while a mixed ordinary batch
   assert.deepEqual(old.versions, before.versions)
   const identities = await database.getFileIdentities()
   assert.ok(identities.filter((i) => !i.filePath.endsWith('new.wav')).every((i) => i.metadataVersion === 0))
-  assert.equal(identities.find((i) => i.filePath.endsWith('new.wav'))!.metadataVersion, 1)
+  assert.equal(identities.find((i) => i.filePath.endsWith('new.wav'))!.metadataVersion, 2)
   assert.ok((await database.queryTracks()).tracks.some((track) => track.filePath.endsWith('new.wav')))
   const sql = new DatabaseSync(join(root, 'music-library.sqlite'), { readOnly: true })
   try { assert.equal(sql.prepare('SELECT count(*) n FROM scan_release_dates').get()!.n, 0) }
@@ -228,7 +289,7 @@ test('actual ISO date-only work uses the native reader without expanding or repl
   assert.equal(result.progress.state, 'completed')
   assert.equal(reads, 1)
   assert.deepEqual((await database.queryTracks({ sort: 'insertion' })).tracks, tracks.map((track) => ({ ...track, releaseDate: '1999' })))
-  assert.equal((await database.getFileIdentities())[0].metadataVersion, 1)
+  assert.equal((await database.getFileIdentities())[0].metadataVersion, 2)
   downgradeDateMarkers(root)
   native = { error: 'Native ISO is unreadable' } as NativeAudioMetadata
   assert.equal((await coordinator.start('startup', [root])).progress.failedFiles, 1)
@@ -236,7 +297,7 @@ test('actual ISO date-only work uses the native reader without expanding or repl
   assert.ok((await database.queryTracks()).tracks.every((track) => track.releaseDate === '1999'))
   native = { isoTracks: [] } as unknown as NativeAudioMetadata
   assert.equal((await coordinator.start('startup', [root])).progress.failedFiles, 0)
-  assert.equal((await database.getFileIdentities())[0].metadataVersion, 1)
+  assert.equal((await database.getFileIdentities())[0].metadataVersion, 2)
   assert.ok((await database.queryTracks()).tracks.every((track) => !Object.hasOwn(track, 'releaseDate')))
   downgradeDateMarkers(root)
   const missingReader = new LibraryDatabaseScanCoordinator({ database, scanner, coverCacheDir: join(root, 'covers'), log() {} })

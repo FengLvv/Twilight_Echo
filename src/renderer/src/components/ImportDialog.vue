@@ -17,6 +17,7 @@ const musicStore = useMusicStore()
 const { settings, loaded: settingsLoaded, removeLibraryFolder, updateSettings } = useSettingsStore()
 const core = useCoreConnection()
 const automaticMetadata = ref(false)
+const metadataSetupPending = computed(() => settings.value.musicIdentification.setup === 'pending')
 const metadataPolicy = ref<EntityMetadataPolicyView | null>(null)
 const metadataError = ref('')
 const metadataSources = computed(() =>
@@ -132,22 +133,23 @@ async function startScan(): Promise<void> {
   databaseRequestPending.value = true
   scanError.value = ''
   try {
-    await updateSettings({
-      musicIdentification: {
-        ...settings.value.musicIdentification,
-        newImports: automaticMetadata.value,
-        ...(automaticMetadata.value && metadataSources.value.length
-          ? {
-              sources: [
-                ...new Set([
-                  ...settings.value.musicIdentification.sources,
-                  ...metadataSources.value.map((s) => s.provider)
-                ])
-              ].slice(0, 16)
-            }
-          : {})
-      }
-    })
+    if (!metadataSetupPending.value)
+      await updateSettings({
+        musicIdentification: {
+          ...settings.value.musicIdentification,
+          newImports: automaticMetadata.value,
+          ...(automaticMetadata.value && metadataSources.value.length
+            ? {
+                sources: [
+                  ...new Set([
+                    ...settings.value.musicIdentification.sources,
+                    ...metadataSources.value.map((s) => s.provider)
+                  ])
+                ].slice(0, 16)
+              }
+            : {})
+        }
+      })
     await musicStore.scanLibraryDirectories({ directories: foldersToScan, reason: 'import' })
     // The explicit scan owns the first import before folder watching can start.
     await updateSettings({
@@ -242,7 +244,11 @@ async function controlScan(command: 'pause' | 'resume' | 'cancel'): Promise<void
               </div>
             </div>
 
-            <section class="import-metadata" aria-label="导入后补全资料">
+            <section
+              v-if="!metadataSetupPending"
+              class="import-metadata"
+              aria-label="导入后补全资料"
+            >
               <label class="checkbox-label">
                 <input
                   v-model="automaticMetadata"

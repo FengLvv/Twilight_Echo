@@ -12,61 +12,107 @@ import vue from '@vitejs/plugin-vue'
 const require = createRequire(import.meta.url)
 const workspace = fileURLToPath(new URL('../../../../', import.meta.url))
 
-test('first import defers folder registration and saves the chosen metadata scope before scanning', { timeout: 60_000 }, async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'twilight-first-import-'))
-  try {
-    await writeFile(join(directory, 'entry.mjs'), runtime)
-    const { build } = await import('vite')
-    await build({ configFile: false, root: workspace, logLevel: 'error', plugins: [{
-      name: 'first-import-boundary', enforce: 'pre',
-      resolveId(source) {
-        if (/(?:^|\/)coreConnection(?:\.ts)?$/.test(source)) return '\0import-core'
-        if (/(?:^|\/)useSettingsStore(?:\.ts)?$/.test(source)) return '\0import-settings'
-        if (/(?:^|\/)useMusicStore(?:\.ts)?$/.test(source)) return '\0import-music'
-        return null
-      },
-      load(id) {
-        if (id === '\0import-core') return 'export const useCoreConnection=()=>window.importCore'
-        if (id === '\0import-settings') return 'export const useSettingsStore=()=>window.importSettings'
-        if (id === '\0import-music') return 'export const useMusicStore=()=>window.importMusic'
-        return null
-      }
-    }, vue()], resolve: { alias: {
-      '@renderer': join(workspace, 'src/renderer/src'), vue: require.resolve('vue/dist/vue.esm-bundler.js')
-    } }, define: { 'process.env.NODE_ENV': '"production"' }, build: {
-      outDir: join(directory, 'bundle'), minify: false,
-      lib: { entry: join(directory, 'entry.mjs'), name: 'ImportTest', formats: ['iife'], fileName: 'runtime' }
-    } })
-    const files = await readdir(join(directory, 'bundle'))
-    await writeFile(join(directory, 'index.html'), `<!doctype html><html><head><meta charset="utf-8"></head><body><div id="app"></div><script src="bundle/${files.find(f => f.endsWith('.js'))}"></script></body></html>`)
-    await writeFile(join(directory, 'runner.cjs'), `const {app,BrowserWindow}=require('electron');const path=require('node:path');app.setPath('userData',path.join(__dirname,'profile'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,webPreferences:{contextIsolation:false,backgroundThrottling:false}});try{await w.loadFile(path.join(__dirname,'index.html'));await w.webContents.executeJavaScript('window.runImportTests()');console.log('FIRST_IMPORT_OK');app.exit(0)}catch(e){console.error(e.stack);app.exit(1)}})`)
-    const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE
-    const result = await promisify(execFile)(require('electron'), [
-      ...(process.env.NO_SANDBOX === '1' ? ['--no-sandbox'] : []), join(directory, 'runner.cjs')
-    ], { windowsHide: true, env, timeout: 45_000, maxBuffer: 1024 * 1024 })
-    assert.match(result.stdout, /FIRST_IMPORT_OK/)
-  } finally {
-    assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep))
-    await rm(directory, { recursive: true, force: true })
+test(
+  'configured imports preserve their scope; first imports ask once after scanning with modal keyboard focus',
+  { timeout: 60_000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'twilight-first-import-'))
+    try {
+      await writeFile(join(directory, 'entry.mjs'), runtime)
+      const { build } = await import('vite')
+      await build({
+        configFile: false,
+        root: workspace,
+        logLevel: 'error',
+        plugins: [
+          {
+            name: 'first-import-boundary',
+            enforce: 'pre',
+            resolveId(source) {
+              if (/(?:^|\/)coreConnection(?:\.ts)?$/.test(source)) return '\0import-core'
+              if (/(?:^|\/)useSettingsStore(?:\.ts)?$/.test(source)) return '\0import-settings'
+              if (/(?:^|\/)useMusicStore(?:\.ts)?$/.test(source)) return '\0import-music'
+              return null
+            },
+            load(id) {
+              if (id === '\0import-core')
+                return 'export const useCoreConnection=()=>window.importCore'
+              if (id === '\0import-settings')
+                return 'export const useSettingsStore=()=>window.importSettings'
+              if (id === '\0import-music')
+                return 'export const useMusicStore=()=>window.importMusic'
+              return null
+            }
+          },
+          vue()
+        ],
+        resolve: {
+          alias: {
+            '@renderer': join(workspace, 'src/renderer/src'),
+            vue: require.resolve('vue/dist/vue.esm-bundler.js')
+          }
+        },
+        define: { 'process.env.NODE_ENV': '"production"' },
+        build: {
+          outDir: join(directory, 'bundle'),
+          minify: false,
+          lib: {
+            entry: join(directory, 'entry.mjs'),
+            name: 'ImportTest',
+            formats: ['iife'],
+            fileName: 'runtime'
+          }
+        }
+      })
+      const files = await readdir(join(directory, 'bundle'))
+      await writeFile(
+        join(directory, 'index.html'),
+        `<!doctype html><html><head><meta charset="utf-8"></head><body><div id="app"></div><script src="bundle/${files.find((f) => f.endsWith('.js'))}"></script></body></html>`
+      )
+      await writeFile(
+        join(directory, 'runner.cjs'),
+        `const {app,BrowserWindow}=require('electron');const path=require('node:path');app.setPath('userData',path.join(__dirname,'profile'));app.whenReady().then(async()=>{const w=new BrowserWindow({show:false,webPreferences:{contextIsolation:false,backgroundThrottling:false,offscreen:true}});try{await w.loadFile(path.join(__dirname,'index.html'));await w.webContents.executeJavaScript('window.runImportTests()');console.log('FIRST_IMPORT_OK');app.exit(0)}catch(e){console.error(e.stack);app.exit(1)}})`
+      )
+      const env = { ...process.env }
+      delete env.ELECTRON_RUN_AS_NODE
+      const result = await promisify(execFile)(
+        require('electron'),
+        [
+          ...(process.env.NO_SANDBOX === '1' ? ['--no-sandbox'] : []),
+          join(directory, 'runner.cjs')
+        ],
+        { windowsHide: true, env, timeout: 45_000, maxBuffer: 1024 * 1024 }
+      )
+      assert.match(result.stdout, /FIRST_IMPORT_OK/)
+    } finally {
+      assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep))
+      await rm(directory, { recursive: true, force: true })
+    }
   }
-})
+)
 
 const runtime = `
 import {createApp,h,ref,shallowRef,nextTick} from 'vue'
 import ImportDialog from '@renderer/components/ImportDialog.vue'
+import MusicMetadataSetupHost from '@renderer/components/music-metadata/MusicMetadataSetupHost.vue'
+import {defaultMusicIdentificationSettings} from '/src/shared/musicIdentificationSchedule.ts'
 const calls=[],settings=ref({libraryFolders:[],musicIdentification:{newImports:false,history:false,sources:['musicbrainz'],language:'zh-Hans'}})
-let scanFail=false,picker=null
+let scanFail=false,picker=null,hasMusic=false
 window.api={dialog:{openFolder:async options=>{calls.push(['picker',options]);return picker}}}
 window.importSettings={settings,loaded:ref(true),removeLibraryFolder:async()=>{},updateSettings:async patch=>{calls.push(['settings',structuredClone(patch)]);settings.value={...settings.value,...patch}}}
-window.importCore={state:shallowRef({epoch:'first-import'}),query:async(name)=>{
+window.importCore={state:shallowRef({epoch:'first-import',phase:'ready',libraryRevision:0,scan:{phase:'idle'}}),query:async(name)=>{
+ if(name==='catalog.query')return {total:hasMusic?1:0}
  if(name!=='metadata.entity.policy')throw Error(name)
  return {enabled:true,identity:true,introduction:true,reason:null,sources:[
   {provider:'platform.ncm',identification:[{kind:'artist',reason:null}],enrichment:[]},
   {provider:'discogs',identification:[{kind:'artist',reason:'discogs_token_required'}],enrichment:[]}
  ]}
 }}
-window.importMusic={libraryScanStatus:ref({state:'idle'}),scanLibraryDirectories:async request=>{calls.push(['scan',request]);if(scanFail)throw Error('test scan failure')}}
-const show=ref(true);createApp({render:()=>h(ImportDialog,{show:show.value})}).mount('#app')
+window.importMusic={libraryScanStatus:ref({state:'idle'}),scanLibraryDirectories:async request=>{
+ calls.push(['scan',request]);if(scanFail)throw Error('test scan failure')
+ hasMusic=true;window.importCore.state.value={...window.importCore.state.value,libraryRevision:window.importCore.state.value.libraryRevision+1}
+}}
+const show=ref(true);createApp({render:()=>[h(ImportDialog,{show:show.value}),h(MusicMetadataSetupHost,{suspended:false})]}).mount('#app')
 const settle=async()=>{await nextTick();await new Promise(r=>setTimeout(r,30));await nextTick()}
 const expect=(ok,m)=>{if(!ok)throw Error(m)}
 const click=async label=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label);expect(b&&!b.disabled,'unavailable '+label);b.click();await settle()}
@@ -91,5 +137,25 @@ window.runImportTests=async()=>{
  expect(calls.map(c=>c[0]).join(',')==='settings,scan','failed scan registered a new root')
  expect(document.querySelector('[role=alert]')?.textContent.includes('test scan failure'),'failure missing')
  expect(!settings.value.libraryFolders.includes('D:/Other'),'failed import changed watched roots')
+ show.value=false;hasMusic=false;scanFail=false
+ settings.value={libraryFolders:[],musicIdentification:defaultMusicIdentificationSettings()}
+ await settle();show.value=true;await settle()
+ expect(!document.querySelector('.import-metadata'),'first import still asks for a manual metadata checkbox')
+ expect(!document.querySelector('dialog.metadata-setup'),'prompt appeared before any music was imported')
+ picker='D:/First';await click('添加文件夹');calls.length=0
+ await click('检查并导入所选文件夹');await settle()
+ expect(calls.map(c=>c[0]).join(',')==='scan,settings','first import overwrote pending metadata preferences')
+ expect(settings.value.musicIdentification.setup==='pending'&&!settings.value.musicIdentification.newImports,'first import opted in without confirmation')
+ const prompt=document.querySelector('dialog.metadata-setup')
+ expect(prompt?.open,'post-import prompt did not open above the import window')
+ const enable=prompt.querySelector('.metadata-setup-enable'),decline=prompt.querySelector('button')
+ enable.focus();window.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',cancelable:true,bubbles:true}))
+ expect(document.activeElement===decline,'the underlying import dialog captured modal keyboard focus')
+ await click('开启自动补全');
+ for(let i=0;i<60&&document.querySelector('dialog.metadata-setup');i++)await settle()
+ expect(!document.querySelector('dialog.metadata-setup'),'confirmation remained open after save')
+ const accepted=settings.value.musicIdentification
+ expect(accepted.setup==='accepted'&&accepted.newImports&&accepted.history&&accepted.ncmLocalFallback,'confirmation did not enable all scopes and fallback')
+ expect(['musicbrainz','vocadb','theaudiodb','discogs','platform.ncm'].every(source=>accepted.sources.includes(source)),'confirmation omitted built-in sources')
 }
 `

@@ -72,7 +72,14 @@ export function createMediaSessionSentinel(
   options: MediaSessionSentinelOptions = {}
 ): MediaSessionSentinel {
   if (options.required === false) {
-    return { arm() {}, dispose() {} }
+    return {
+      arm() {
+        // This platform does not need a sentinel.
+      },
+      dispose() {
+        // The disabled sentinel owns no media element to release.
+      }
+    }
   }
   const createElement =
     options.createElement ??

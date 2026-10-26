@@ -1,3 +1,4 @@
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import type {
   LibraryTagJournalStatus,
   LibraryTagWorkerRequest
@@ -45,7 +46,7 @@ export async function runLibraryTagWorker(
         items: request.items.map(({ coverBase64, ...item }) => ({
           ...item,
           ...(coverBase64 !== undefined
-            ? { coverData: new Uint8Array(Buffer.from(coverBase64, 'base64')) }
+            ? { coverData: new Uint8Array(PortableBuffer.from(coverBase64, 'base64')) }
             : {})
         }))
       })

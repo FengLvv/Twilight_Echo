@@ -14,13 +14,23 @@ if (process.platform === 'win32') {
 const renderer = new URL('../src/renderer/src/', import.meta.url)
 registerHooks({
   resolve(specifier, context, nextResolve) {
-    if (!specifier.startsWith('@renderer/')) return nextResolve(specifier, context)
-    const path = specifier.slice('@renderer/'.length)
-    let url = new URL(path, renderer)
-    if (!extname(path)) {
-      url = new URL(`${path}.ts`, renderer)
-      if (!existsSync(url)) url = new URL(`${path}/index.ts`, renderer)
+    let resolved
+    if (specifier.startsWith('@renderer/')) {
+      const path = specifier.slice('@renderer/'.length)
+      let url = new URL(path, renderer)
+      if (!extname(path)) {
+        url = new URL(`${path}.ts`, renderer)
+        if (!existsSync(url)) url = new URL(`${path}/index.ts`, renderer)
+      }
+      resolved = nextResolve(url.href, context)
+    } else {
+      resolved = nextResolve(specifier, context)
     }
-    return nextResolve(url.href, context)
+    if (resolved.url.endsWith('.ts') && !resolved.format) {
+      return { ...resolved, format: 'module-typescript' }
+    }
+    return resolved
   }
 })
+
+await import('../src/adapters-node/index.ts')

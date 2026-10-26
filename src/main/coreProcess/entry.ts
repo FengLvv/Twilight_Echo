@@ -1,3 +1,4 @@
+import '../../adapters-node/index.ts'
 import { CoreMusicExplorationService } from '../../core/library/explorationService.ts'
 import { networkInterfaces } from 'node:os'
 import { CoreCastService } from '../../core/cast/service.ts'
@@ -60,6 +61,8 @@ import {
   type QueueWorkspaceDocument
 } from '../../shared/queueWorkspace.ts'
 import { createLocalLyricsLoader } from '../../core/lyrics/localLoader.ts'
+import { nodeLocalLyricsFilePort } from '../lyrics/loadLyrics.ts'
+import { nodeLyricsFileOperations } from '../lyrics/saveLyrics.ts'
 import { resolveLyricsAcrossProviders } from '../../core/lyrics/providerLyrics.ts'
 import { fetchAmlTtml } from '../../core/lyrics/amllTtml.ts'
 import {
@@ -141,14 +144,15 @@ import { CoreScanService } from '../../core/library/scanService.ts'
 import { CoreLibraryBackground } from '../../core/library/background.ts'
 import { CoreMetadataService } from '../../core/library/metadataService.ts'
 import { MusicBrainzWikiProvider, MusicBrainzDetailsProvider } from '../../core/library/entityMetadataProvider.ts'
-import { PublicMusicSource, publicArtworkApprovals } from '../../core/library/publicMusicSources.ts'
+import { PublicMusicSource } from '../../core/library/publicMusicSources.ts'
+import { metadataConfiguration } from './metadataConfiguration.ts'
 import { publicMetadataSources } from '../../shared/metadataProviders.ts'
 import { MusicBrainzIdentificationProvider, PlatformIdentificationProvider } from '../../core/library/musicIdentificationProvider.ts'
 import { resolveLocale } from '../../shared/i18n/locale.ts'
 import { IdentificationResponseCache } from '../../core/library/identificationResponseCache.ts'
-import { PlatformMetadataProvider, platformMetadataApprovals, ncmLocalFallbackApprovals } from '../../core/library/platformMetadataProvider.ts'
+import { PlatformMetadataProvider } from '../../core/library/platformMetadataProvider.ts'
 import { ncmMetadataIdentity } from '../../core/library/ncmMetadataIdentity.ts'
-import { PublicArtworkProvider, artworkUsageApproval } from '../../core/library/publicArtworkProvider.ts'
+import { PublicArtworkProvider } from '../../core/library/publicArtworkProvider.ts'
 import { CoreStatisticsService } from '../../core/listening/service.ts'
 import { CoreStatisticsRepository } from '../../core/listening/repository.ts'
 import { createLibraryListeningProjection } from '../../core/listening/libraryProjection.ts'
@@ -514,11 +518,14 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       getAppSettings: () => ({
         value: { onlineLyricsFallback: settings.read().onlineLyricsFallback }
       }),
-      loadLocalLyrics: createLocalLyricsLoader({
-        audioFile: (path, signal) => platform!.call('paths.authorizeAudioFile', { path }, signal),
-        directory: (path, signal) =>
-          platform!.call('paths.authorizeLibraryDirectory', { path }, signal)
-      }),
+      loadLocalLyrics: createLocalLyricsLoader(
+        {
+          audioFile: (path, signal) => platform!.call('paths.authorizeAudioFile', { path }, signal),
+          directory: (path, signal) =>
+            platform!.call('paths.authorizeLibraryDirectory', { path }, signal)
+        },
+        nodeLocalLyricsFilePort
+      ),
       resolveProviderLyrics: (track, signal) =>
         resolveLyricsAcrossProviders(
           (plugins?.listProviders() ?? []).map(
@@ -574,11 +581,19 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       )
     },
     importDraft: (signal) =>
-      importLyricDraft(() => platform!.call('lyrics.chooseImportFile', {}, signal), signal),
+      importLyricDraft(
+        () => platform!.call('lyrics.chooseImportFile', {}, signal),
+        {
+          readFile: (path) => readFile(path),
+          statSize: async (path) => (await stat(path)).size
+        },
+        signal
+      ),
     exportDraft: (contents, signal) =>
       exportLyricDraft(
         () => platform!.call('lyrics.chooseExportFile', {}, signal),
         contents,
+        nodeLyricsFileOperations,
         signal
       )
   })
@@ -1528,14 +1543,8 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
         provider.supportedMethods?.includes('searchSongs') &&
         isPluginProviderEnabled(provider.health)
     )
-  // Deployment opt-in is distinct from public-service eligibility and text licensing.
-  // No credentials, audio paths or library snapshots are sent by this adapter.
-  const entityMetadataPolicy = {
-    enabled: process.env.TWILIGHT_METADATA_ENABLED === '1',
-    publicServiceApproved: process.env.TWILIGHT_METADATA_PUBLIC_SERVICE_APPROVED === '1',
-    wikipediaText: process.env.TWILIGHT_METADATA_WIKIPEDIA_TEXT === '1',
-    contact: process.env.TWILIGHT_METADATA_CONTACT ?? 'https://github.com/Px-asen/Twilight_Echo'
-  }
+  const { entityPolicy: entityMetadataPolicy, publicArtworkPolicy, publicMusicPolicy,
+    platformTextUsage, platformArtworkUsage } = metadataConfiguration()
   const identificationPlatforms = () => (plugins?.listProviders() ?? []).map(provider => ({
     id: provider.id,
     enabled: isPluginProviderEnabled(provider.health),
@@ -1543,30 +1552,11 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     configuration: JSON.stringify([identificationInventoryRevision, plugins?.providerIdentityContext(provider.id)])
   }))
   const identificationResponses = new IdentificationResponseCache()
-  const ncmLocalFallback = process.env.TWILIGHT_METADATA_NCM_LOCAL_FALLBACK === '1'
-  const platformTextUsage = ncmLocalFallbackApprovals(ncmLocalFallback,
-    platformMetadataApprovals(process.env.TWILIGHT_METADATA_PLATFORM_USAGE))
-  const platformArtworkUsage = ncmLocalFallbackApprovals(ncmLocalFallback,
-    platformMetadataApprovals(process.env.TWILIGHT_METADATA_PLATFORM_ARTWORK_USAGE, 'TWILIGHT_METADATA_PLATFORM_ARTWORK_USAGE'))
-  const publicArtworkPolicy = { ...entityMetadataPolicy,
-    commonsImages: process.env.TWILIGHT_METADATA_COMMONS_IMAGES === '1',
-    caaUsage: artworkUsageApproval(process.env.TWILIGHT_METADATA_CAA_USAGE) }
   plugins?.on('provider-context', (id: string) => {
     identificationResponses.invalidate(`platform.${id}`)
     metadata.entities?.refreshIdentification(false, `platform.${id}`)
   })
   const musicbrainzIdentification = new MusicBrainzIdentificationProvider(() => entityMetadataPolicy)
-  const publicMusicPolicy = {
-    enabled: entityMetadataPolicy.enabled,
-    contact: entityMetadataPolicy.contact,
-    musicbrainzApproved: entityMetadataPolicy.publicServiceApproved,
-    vocadb: process.env.TWILIGHT_METADATA_VOCADB !== '0',
-    theaudiodb: process.env.TWILIGHT_METADATA_THEAUDIODB !== '0',
-    audioDbKey: process.env.TWILIGHT_METADATA_THEAUDIODB_KEY ?? (process.env.NODE_ENV === 'development' ? '123' : ''),
-    discogs: process.env.TWILIGHT_METADATA_DISCOGS !== '0',
-    discogsToken: process.env.TWILIGHT_METADATA_DISCOGS_TOKEN ?? '',
-    artwork: publicArtworkApprovals(process.env.TWILIGHT_METADATA_PUBLIC_ARTWORK_USAGE)
-  }
   const publicMusicProviders = publicMetadataSources.map(id => new PublicMusicSource(id, () => publicMusicPolicy))
   const legacyMusic = plugins ? createLegacyMusicLookupProvider({ plugins,
     // Only an explicit deployment prohibition changes the existing manual
@@ -1589,9 +1579,9 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
         configuration: () => provider.id === 'ncm'
           ? JSON.stringify(['public-metadata-v2', plugins!.providerMetadataContext(provider.id)])
           : plugins!.providerMetadataContext(provider.id),
-        usage: id => platformTextUsage[id] ?? null,
-        ...(platformArtworkUsage[provider.id] ? {
-          artworkUsage: (id: string) => platformArtworkUsage[id] ?? null
+        usage: id => platformTextUsage(settings.read().musicIdentification.ncmLocalFallback !== false)[id] ?? null,
+        ...(provider.id === 'ncm' || platformArtworkUsage()[provider.id] ? {
+          artworkUsage: (id: string) => platformArtworkUsage(settings.read().musicIdentification.ncmLocalFallback !== false)[id] ?? null
         } : {}),
         call: (id, method, externalId, signal) => plugins!.callProvider(id, method, [externalId], { signal }),
         ...(provider.id === 'ncm' ? {
@@ -1617,7 +1607,8 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       language: () => resolveLocale(settings.read().language, Intl.DateTimeFormat().resolvedOptions().locale) === 'en-US' ? 'en' : 'zh-Hans',
       now: Date.now,
       changed: () => application?.changed(),
-      failed: error => console.error('[core.metadata.entities]', error)
+        failed: error => console.error('[core.metadata.entities]', error),
+        taskFailed: (error, task) => console.error('[core.metadata.task]', task, error)
     },
     provider: {
       searchSongs: async (query, limit = 30, offset = 0, signal) => {

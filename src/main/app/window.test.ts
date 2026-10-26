@@ -1,11 +1,60 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { EventEmitter } from 'node:events'
+import { stripTypeScriptTypes } from 'node:module'
+import { runInNewContext } from 'node:vm'
 import type { BrowserWindow } from 'electron'
 import { installWindowCloseShortcut } from './windowShortcuts.ts'
 import test from 'node:test'
 import { restoreWindowSize } from './windowState.ts'
 import { getWindowBackgroundColor, syncWindowFrameAppearance } from './windowAppearance.ts'
+import { closePersistenceDialogOptions } from './closePersistence.ts'
+import { resolveLocale } from '../../shared/i18n/locale.ts'
+
+test('the shared quit failure dialog handles live, absent and destroyed main windows', async () => {
+  const source = await readFile(new URL('./window.ts', import.meta.url), 'utf8')
+  const calls: unknown[][] = []
+  let response = 0
+  const context = {
+    closePersistenceDialogOptions,
+    resolveLocale,
+    runtime: { appSettings: { language: 'zh-CN' } },
+    app: { getLocale: () => 'en-US' },
+    console: { error() {} },
+    dialog: {
+      showMessageBox: async (...args: unknown[]) => {
+        calls.push(args)
+        return { response }
+      }
+    },
+    showClosePersistenceFailure: undefined as
+      | undefined
+      | ((win: unknown, error: Error) => Promise<string>)
+  }
+  runInNewContext(
+    stripTypeScriptTypes(
+      source
+        .slice(
+          source.indexOf('export async function showClosePersistenceFailure'),
+          source.indexOf('export function getAppIconPath')
+        )
+        .replace(/^export /, '')
+    ),
+    context
+  )
+  const show = context.showClosePersistenceFailure!
+  const win = { isDestroyed: () => false }
+  const error = new Error('Core did not confirm final persistence')
+  assert.equal(await show(win, error), 'retry')
+  assert.equal(calls[0][0], win)
+  assert.equal((calls[0][1] as { title: string }).title, '退出前保存失败')
+  response = 2
+  assert.equal(await show(null, error), 'force')
+  assert.equal(calls[1].length, 1)
+  response = 1
+  assert.equal(await show({ isDestroyed: () => true }, error), 'cancel')
+  assert.equal(calls[2].length, 1)
+})
 
 test('Ctrl/Cmd+W obeys live preferences while suppressing the default menu close', () => {
   const webContents = new EventEmitter()

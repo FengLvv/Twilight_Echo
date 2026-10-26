@@ -1,4 +1,4 @@
-import type { EventEmitter } from 'node:events'
+import type { PortableBuffer } from '../../shared/portableBytes.ts'
 import type {
   TwilightMediaProviderMethod,
   TwilightPluginInstallEvidence,
@@ -6,12 +6,18 @@ import type {
 } from './types.ts'
 
 /** The manager owns plugin state; main only starts the registered host and shows UI. */
-export interface PluginHostProcess extends EventEmitter {
+export interface PluginHostProcess {
+  on(event: string | symbol, listener: (...args: any[]) => void): this
+  once(event: string | symbol, listener: (...args: any[]) => void): this
+  off(event: string | symbol, listener: (...args: any[]) => void): this
+  removeListener?(event: string | symbol, listener: (...args: any[]) => void): this
+  removeAllListeners?(event?: string | symbol): this
+  emit(event: string | symbol, ...args: any[]): boolean
   postMessage(message: unknown): void
   kill(): unknown
   terminate?(): Promise<void>
-  stdout?: { on(event: 'data', listener: (chunk: Buffer) => void): unknown } | null
-  stderr?: { on(event: 'data', listener: (chunk: Buffer) => void): unknown } | null
+  stdout?: { on(event: 'data', listener: (chunk: PortableBuffer) => void): unknown } | null
+  stderr?: { on(event: 'data', listener: (chunk: PortableBuffer) => void): unknown } | null
 }
 
 export interface PluginManagerPlatform {

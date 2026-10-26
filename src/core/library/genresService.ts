@@ -1,3 +1,4 @@
+import { deferMacrotask } from '../../shared/portableAsync.ts'
 import type {
   GenreDatabaseApi,
   GenreEdit,
@@ -76,7 +77,7 @@ export class CoreGenresService {
       this.observe(result.revision)
       this.dirty ||= result.pending
       if (this.dirty && !this.stopped)
-        await (this.options.yield?.() ?? new Promise<void>((done) => setImmediate(done)))
+        await (this.options.yield?.() ?? new Promise<void>((done) => deferMacrotask(done)))
     }
   }
   tree(query: GenreQuery) {

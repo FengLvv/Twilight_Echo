@@ -1,5 +1,6 @@
-import { copyFile, rename, rm, writeFile } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { extname } from '../../shared/portablePath.ts'
+import { coreAudioMetadata, coreFsPromises } from '../ports/index.ts'
 import { loadTaglib, type Taglib } from './taglib.ts'
 import type {
   ProviderDownloadQuality,
@@ -34,7 +35,7 @@ export function downloadLyricFiles(raw: unknown): Array<{ suffix: string; text: 
     ['wordLyrics', '.word.lrc']
   ]) {
     const text = value[key]
-    if (typeof text !== 'string' || !text.trim() || Buffer.byteLength(text) > 1024 * 1024) continue
+    if (typeof text !== 'string' || !text.trim() || PortableBuffer.byteLength(text) > 1024 * 1024) continue
     const wordSuffix = /<tt[\s>]/i.test(text)
       ? '.ttml'
       : /^\[\d+,\d+\]/m.test(text)
@@ -62,7 +63,7 @@ export async function prepareDownloadedMetadata(options: {
   const warnings: string[] = []
   let actualQuality: ProviderDownloadQuality | null = null
   try {
-    const { parseFile } = await import('music-metadata')
+    const { parseFile } = coreAudioMetadata.musicMetadata
     const metadata = await parseFile(partPath, { skipCovers: true, duration: false })
     actualQuality = detectedDownloadQuality(metadata.format)
   } catch {
@@ -83,7 +84,7 @@ export async function prepareDownloadedMetadata(options: {
     const { ByteVector, File, Picture, PictureType } = loadTaglib()
     let media: Taglib.File | undefined
     try {
-      await copyFile(partPath, taggedPath)
+      await coreFsPromises.copyFile(partPath, taggedPath)
       let cover: Uint8Array | undefined
       let coverType = ''
       if (track.cover?.startsWith('twilight-media://image/')) {
@@ -120,13 +121,13 @@ export async function prepareDownloadedMetadata(options: {
       media.save()
       media.dispose()
       media = undefined
-      await rename(taggedPath, partPath)
+      await coreFsPromises.rename(taggedPath, partPath)
     } catch {
       signal.throwIfAborted()
       warnings.push('此文件未能补写标签，已保留原始音频')
     } finally {
       media?.dispose()
-      await rm(taggedPath, { force: true })
+      await coreFsPromises.rm(taggedPath, { force: true })
     }
   }
   return {
@@ -143,7 +144,7 @@ export async function saveDownloadedLyrics(
   const stem = targetPath.slice(0, -extname(targetPath).length)
   try {
     for (const lyric of lyrics)
-      await writeFile(`${stem}${lyric.suffix}`, lyric.text, { encoding: 'utf8', flag: 'wx' })
+      await coreFsPromises.writeFile(`${stem}${lyric.suffix}`, lyric.text, { encoding: 'utf8', flag: 'wx' })
     return null
   } catch {
     return '部分歌词未保存（同名文件已存在或目录不可写），已有文件已保留'

@@ -21,10 +21,10 @@ export class CoreSleepTimer {
     settings(): SleepTimerSettings
     now(): number
     timers: {
-      setInterval(callback: () => void, ms: number): NodeJS.Timeout
-      clearInterval(timer: NodeJS.Timeout): void
-      setTimeout(callback: () => void, ms: number): NodeJS.Timeout
-      clearTimeout(timer: NodeJS.Timeout): void
+      setInterval(callback: () => void, ms: number): ReturnType<typeof setInterval>
+      clearInterval(timer: ReturnType<typeof setInterval>): void
+      setTimeout(callback: () => void, ms: number): ReturnType<typeof setTimeout>
+      clearTimeout(timer: ReturnType<typeof setTimeout>): void
     }
     playback: {
       read(): { state: string; volume: number }

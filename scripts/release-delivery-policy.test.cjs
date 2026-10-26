@@ -10,6 +10,17 @@ const { preparePackagedAudioStaging } = require('./packaged-audio-staging.cjs')
 
 const root = path.resolve(__dirname, '..')
 
+test('package verification follows the selected output directory rather than a running older build', () => {
+  const { packageOutputDirectory } = require('./build-app-package.cjs')
+  assert.equal(packageOutputDirectory(['--win']), path.join(root, 'dist'))
+  assert.equal(
+    packageOutputDirectory(['--win', '--config.directories.output=dist/audio-tail-fix']),
+    path.join(root, 'dist', 'audio-tail-fix')
+  )
+  const isolated = path.join(os.tmpdir(), 'twilight-package-output')
+  assert.equal(packageOutputDirectory(['--config.directories.output', isolated]), isolated)
+})
+
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8')
 }

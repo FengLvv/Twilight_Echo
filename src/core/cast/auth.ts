@@ -1,4 +1,5 @@
-import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomBytes, randomInt, timingSafeEqual } from '../../shared/portableCrypto.ts'
 import {
   REMOTE_COMMAND_WINDOW_MS,
   REMOTE_MAX_COMMANDS_PER_WINDOW,
@@ -22,8 +23,8 @@ export function generateRemoteToken(): string {
 }
 
 export function safeEqualText(a: string, b: string): boolean {
-  const left = Buffer.from(a)
-  const right = Buffer.from(b)
+  const left = PortableBuffer.from(a)
+  const right = PortableBuffer.from(b)
   if (left.length !== right.length) return false
   return timingSafeEqual(left, right)
 }

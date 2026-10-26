@@ -16,6 +16,7 @@ export {
   normalizePcmToDsdMode,
   normalizeOutputConfig
 } from '../../shared/audioOutputConfig.ts'
+import { deferMacrotask } from '../../shared/portableAsync.ts'
 import type {
   AudioDeviceOption,
   AudioEngineQueueItem,
@@ -23,6 +24,7 @@ import type {
   AudioOutputId,
   AudioOutputOption,
   AudioProcessingSettings,
+  CorePlatformId,
   EqualizerBand,
   EqualizerFilterType,
   EqMode,
@@ -167,22 +169,24 @@ export const DEFAULT_AUDIO_ENGINE_SCHEDULER: AudioEngineScheduler = {
   now: () => Date.now(),
   setInterval: (callback, delayMs) => setInterval(callback, delayMs),
   clearInterval: (handle) => clearInterval(handle),
-  setImmediate: (callback) => setImmediate(callback)
+  setImmediate: (callback) => {
+    deferMacrotask(callback)
+  }
 }
 
 export function isAudioOutputId(output: unknown): output is AudioOutputId {
   return output === 'wasapi' || output === 'asio' || output === 'coreaudio' || output === 'alsa'
 }
 
-export function getAudioOutputOptions(platform: NodeJS.Platform): AudioOutputOption[] {
+export function getAudioOutputOptions(platform: CorePlatformId): AudioOutputOption[] {
   return AUDIO_OUTPUT_OPTIONS.filter((option) => option.platform === platform)
 }
 
-export function getDefaultAudioOutput(platform: NodeJS.Platform): AudioOutputId {
+export function getDefaultAudioOutput(platform: CorePlatformId): AudioOutputId {
   return getAudioOutputOptions(platform)[0]?.id ?? 'alsa'
 }
 
-export function normalizeAudioOutput(output: unknown, platform: NodeJS.Platform): AudioOutputId {
+export function normalizeAudioOutput(output: unknown, platform: CorePlatformId): AudioOutputId {
   const options = getAudioOutputOptions(platform)
   if (isAudioOutputId(output) && options.some((option) => option.id === output)) return output
   return getDefaultAudioOutput(platform)
@@ -434,7 +438,7 @@ export function createPlaybackInfoFanoutSignature(
     .join(PLAYBACK_FANOUT_FIELD_SEPARATOR)
 }
 
-export function supportsAudioExclusive(output: AudioOutputId, platform: NodeJS.Platform): boolean {
+export function supportsAudioExclusive(output: AudioOutputId, platform: CorePlatformId): boolean {
   return getAudioOutputOptions(platform).some(
     (option) => option.id === output && option.supportsExclusive
   )

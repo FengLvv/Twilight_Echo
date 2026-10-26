@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { coreFsPromises } from '../ports/index.ts'
+import { join } from '../../shared/portablePath.ts'
 
 const ENTRY_ID_PATTERN = /^[0-9a-f]{64}$/
 
@@ -52,7 +52,7 @@ export async function readCoverDataUrl(
   if (!ENTRY_ID_PATTERN.test(entryId)) return null
   for (const [extension, mime] of Object.entries(COVER_MIME_BY_EXTENSION)) {
     try {
-      const data = await readFile(join(coverCacheRoot, `${entryId}.${extension}`))
+      const data = await coreFsPromises.readFile(join(coverCacheRoot, `${entryId}.${extension}`))
       return `data:${mime};base64,${data.toString('base64')}`
     } catch {
       // 尝试下一个扩展名

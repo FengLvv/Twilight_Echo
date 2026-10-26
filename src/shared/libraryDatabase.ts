@@ -271,6 +271,8 @@ export interface LibraryScanCommit {
     metadataReused?: boolean
     /** Narrow legacy-date read; never replaces logical tracks. Published only at successful finish. */
     releaseDateOnly?: true
+    /** Raw observations from the same upgrade read; no display-field replacement. */
+    observations?: import('./localLibraryObservations.ts').LocalLibraryTagObservations
     /** An absent value on a successful date-only read clears an obsolete date. */
     releaseDate?: string
   }>

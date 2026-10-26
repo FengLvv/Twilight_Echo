@@ -7,8 +7,8 @@ import {
 export interface SleepTimerServiceOptions {
   now?: () => number
   publish?: (kind: 'status' | 'trigger', state: SleepTimerState | null) => void
-  setInterval?: (callback: () => void, ms: number) => NodeJS.Timeout
-  clearInterval?: (timer: NodeJS.Timeout) => void
+  setInterval?: (callback: () => void, ms: number) => ReturnType<typeof setInterval>
+  clearInterval?: (timer: ReturnType<typeof setInterval>) => void
   owner?: 'main' | 'core'
 }
 
@@ -20,14 +20,14 @@ export interface SleepTimerShutdownOwner {
 
 export class SleepTimerService {
   private state: SleepTimerState | null = null
-  private timer: NodeJS.Timeout | null = null
+  private timer: ReturnType<typeof setInterval> | null = null
   private triggerRevision = 0
   private armedAt = 0
   private shutdownOwner: SleepTimerShutdownOwner | null = null
   private readonly now: () => number
   private readonly notify: (kind: 'status' | 'trigger', state: SleepTimerState | null) => void
-  private readonly schedule: (callback: () => void, ms: number) => NodeJS.Timeout
-  private readonly cancelInterval: (timer: NodeJS.Timeout) => void
+  private readonly schedule: (callback: () => void, ms: number) => ReturnType<typeof setInterval>
+  private readonly cancelInterval: (timer: ReturnType<typeof setInterval>) => void
   private readonly owner: 'main' | 'core'
 
   constructor(options: SleepTimerServiceOptions = {}) {

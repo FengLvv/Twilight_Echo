@@ -81,11 +81,26 @@ export interface AudioProcessingSettings {
   crossfadeContent?: 'conservative' | 'all' | 'live'
 }
 
+export type CorePlatformId =
+  | 'aix'
+  | 'android'
+  | 'darwin'
+  | 'freebsd'
+  | 'haiku'
+  | 'ios'
+  | 'linux'
+  | 'netbsd'
+  | 'openbsd'
+  | 'sunos'
+  | 'win32'
+  | 'cygwin'
+  | (string & {})
+
 export interface AudioOutputOption {
   id: AudioOutputId
   label: string
   description: string
-  platform: NodeJS.Platform
+  platform: CorePlatformId
   supportsExclusive: boolean
 }
 

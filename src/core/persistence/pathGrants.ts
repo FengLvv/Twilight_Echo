@@ -1,5 +1,5 @@
-import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { getSep, isAbsolute, relative, resolve } from '../../shared/portablePath.ts'
+import { coreFsPromises, coreProcess } from '../ports/index.ts'
 
 export type GrantedPathKind = 'any' | 'directory' | 'file'
 
@@ -10,8 +10,8 @@ export async function resolveCanonicalExistingPath(
   if (typeof targetPath !== 'string' || !targetPath.trim()) {
     throw new Error('Path is required')
   }
-  const canonicalPath = await realpath(resolve(targetPath))
-  const info = await stat(canonicalPath)
+  const canonicalPath = await coreFsPromises.realpath(resolve(targetPath))
+  const info = await coreFsPromises.stat(canonicalPath)
   if (kind === 'directory' && !info.isDirectory()) {
     throw new Error('Path is not a directory')
   }
@@ -23,12 +23,12 @@ export async function resolveCanonicalExistingPath(
 
 export function isCanonicalPathInside(rootPath: string, targetPath: string): boolean {
   const rel = relative(rootPath, targetPath)
-  return rel === '' || (!!rel && !isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
+  return rel === '' || (!!rel && !isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${getSep()}`))
 }
 
 export function lexicalPathKey(targetPath: string): string {
   const normalized = resolve(targetPath)
-  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+  return coreProcess.platform === 'win32' ? normalized.toLowerCase() : normalized
 }
 
 export class CanonicalPathGrantSet {

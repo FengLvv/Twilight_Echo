@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join } from '../../shared/portablePath.ts'
 import type { AppSettings } from '../../shared/appSettings.ts'
 import type { CoreAutoMixCapabilities } from '../../shared/coreAutoMix.ts'
 import type { CorePlatformOperations } from '../../shared/corePlatform.ts'

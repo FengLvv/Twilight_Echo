@@ -227,26 +227,9 @@ void assertDecoderReportsDsdFallbackWhenSupported() {
 }
 
 #if defined(TAE_HAS_FFMPEG)
-// A 90-byte, stereo/44.1kHz FLAC containing exactly 8820 silent samples.
-// Kept inline so the regression needs neither music files nor a CLI encoder.
-void assertFlacTailHandling(bool appendInvalidFrame, bool incomplete, bool knownLength) {
-  const std::string hex =
-      "664c6143000000221200120000000e0000100ac442f00000227442b1eafdf0fc632f"
-      "46230ad0497a29bf8400000e0600000066666d70656700000000fff85918006b0000"
-      "00000000108afff8791801107364000000000000d405";
-  std::vector<uint8_t> bytes;
-  for (size_t i = 0; i < hex.size(); i += 2)
-    bytes.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16)));
-  if (!knownLength) { bytes[21] &= 0xf0; bytes[22] = bytes[23] = bytes[24] = bytes[25] = 0; }
-  if (incomplete) bytes.resize(74); // Keep only the first 4608-sample frame.
-  if (appendInvalidFrame) {
-    // A valid frame header with an invalid subframe type causes receive_frame
-    // to return INVALIDDATA, just like the tail packets in issue #164.
-    const std::array<uint8_t, 14> invalid{0xff, 0xf8, 0x59, 0x18, 0x00, 0x6b, 0x04, 0, 0, 0, 0, 0, 0x10, 0x8a};
-    bytes.insert(bytes.end(), invalid.begin(), invalid.end());
-  }
-  TempAudioFixture fixture(std::filesystem::temp_directory_path() / "twilight-flac-tail-regression.flac");
-  { std::ofstream out(fixture.path(), std::ios::binary); out.write(reinterpret_cast<const char*>(bytes.data()), bytes.size()); }
+void assertFlacTailHandling(bool appendInvalidFrame, bool incomplete, bool knownLength, bool seek = false) {
+  const auto fixture = writeFlacTailFixture(
+      "twilight-flac-tail-regression.flac", appendInvalidFrame, incomplete, knownLength);
   FFmpegDecoder decoder;
   std::string error;
   assert(decoder.open(fixture.string(), &error));
@@ -255,6 +238,7 @@ void assertFlacTailHandling(bool appendInvalidFrame, bool incomplete, bool known
   target.sampleFormat = AudioSampleFormat::Float32Interleaved;
   target.bitDepth = 32;
   assert(decoder.setOutputFormat(target, &error));
+  if (seek) assert(decoder.seek(0, &error));
   size_t total = 0;
   std::vector<float> pcm(512 * 2);
   while (const size_t count = decoder.readFrames(pcm.data(), 512, &error)) total += count;
@@ -268,6 +252,76 @@ void assertFlacTailHandling(bool appendInvalidFrame, bool incomplete, bool known
     assert(decoder.eof());
     assert(total == 19200); // Includes the resampler's buffered tail.
   }
+}
+
+void assertFlacTailAfterSeekMatchesCleanAudio() {
+  const auto clean = writeFlacTailFixture("twilight-flac-seek-clean.flac", false, false, true, 40);
+  const auto trailing = writeFlacTailFixture("twilight-flac-seek-tail.flac", true, false, true, 40);
+  for (const bool precise : {false, true}) {
+    FFmpegDecoder reference, decoder;
+    std::string error;
+    assert(reference.open(clean.string(), &error));
+    assert(decoder.open(trailing.string(), &error));
+    AudioFormat target = reference.outputFormat();
+    target.sampleRate = 96000;
+    target.sampleFormat = AudioSampleFormat::Float32Interleaved;
+    target.bitDepth = 32;
+    assert(reference.setOutputFormat(target, &error));
+    assert(decoder.setOutputFormat(target, &error));
+    // Seek forward, replay after EOF, then rewind. Old counts, EOF and
+    // resampler history must not survive a seek.
+    for (const double seconds : {4.15, 3.12, 0.0}) {
+      std::vector<float> expected, actual;
+      for (auto* current : {&reference, &decoder}) {
+        error.clear();
+        const bool sought = precise ? current->seekOutputFrame(static_cast<uint64_t>(seconds * target.sampleRate), &error)
+                                    : current->seek(seconds, &error);
+        if (!sought) std::cerr << "FLAC seek failed: " << seconds << " precise=" << precise << " " << error << '\n';
+        assert(sought);
+        auto& output = current == &reference ? expected : actual;
+        std::vector<float> block(512 * 2);
+        while (const size_t count = current->readFrames(block.data(), 512, &error))
+          output.insert(output.end(), block.begin(), block.begin() + count * 2);
+        if (!error.empty()) std::cerr << "FLAC seek tail: " << seconds << " precise=" << precise << " " << error << '\n';
+        assert(error.empty());
+        assert(current->eof());
+      }
+      assert(!expected.empty());
+      assert(actual == expected);
+      const size_t fullOutputFrames = (188532ULL * target.sampleRate + 44099) / 44100;
+      if (precise) assert(actual.size() / 2 == fullOutputFrames - static_cast<size_t>(seconds * target.sampleRate));
+    }
+  }
+}
+
+void assertFlacSeekDoesNotHideMissingSamples() {
+  const auto fixture = writeFlacTailFixture("twilight-flac-seek-incomplete.flac", true, false, true, 40);
+  // Declare one more source sample than the valid frames actually contain.
+  // Even this tiny deficit must remain an error rather than a duration heuristic.
+  {
+    std::fstream file(fixture.path(), std::ios::in | std::ios::out | std::ios::binary);
+    file.seekp(25);
+    file.put(0x75);
+    assert(file.good());
+  }
+  FFmpegDecoder decoder;
+  std::string error;
+  assert(decoder.open(fixture.string(), &error));
+  auto format = decoder.outputFormat();
+  format.sampleFormat = AudioSampleFormat::Float32Interleaved;
+  format.bitDepth = 32;
+  assert(decoder.setOutputFormat(format, &error));
+  assert(decoder.seek(4.15, &error));
+  std::vector<float> block(512 * 2);
+  size_t total = 0;
+  while (const auto count = decoder.readFrames(block.data(), 512, &error)) total += count;
+  assert(total > 0);
+  assert(!error.empty());
+  assert(!decoder.eof());
+  const auto failure = error;
+  error.clear();
+  assert(decoder.readFrames(block.data(), 512, &error) == 0);
+  assert(error == failure);
 }
 
 void assertDecoderReportsWavPackDsdBeforePcmConversion() {
@@ -614,6 +668,9 @@ int main(int argc,char** argv) {
     assertFlacTailHandling(true, false, true);
     assertFlacTailHandling(true, true, true);
     assertFlacTailHandling(true, false, false);
+    assertFlacTailHandling(true, false, true, true);
+    assertFlacTailAfterSeekMatchesCleanAudio();
+    assertFlacSeekDoesNotHideMissingSamples();
     return 0;
   }
   if (argc == 3 && std::string(argv[1]) == "--network-open-timeout-probe") {
@@ -643,6 +700,9 @@ int main(int argc,char** argv) {
   assertFlacTailHandling(true, false, true);
   assertFlacTailHandling(true, true, true);
   assertFlacTailHandling(true, false, false);
+  assertFlacTailHandling(true, false, true, true);
+  assertFlacTailAfterSeekMatchesCleanAudio();
+  assertFlacSeekDoesNotHideMissingSamples();
   assertDecoderReportsPcm("twilight-fixture-s24.wav", 24);
   assertDecoderReportsPcm("twilight-fixture-s32.wav", 32);
   assertDecoderCancellationCanBeResetBeforeSeek();

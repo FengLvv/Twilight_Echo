@@ -105,7 +105,7 @@ import { DEFAULT_GENRE_SEPARATORS, normalizeGenreSeparators } from '../../shared
 import { normalizeStartupExperience } from '../../shared/pluginExperience.ts'
 import { normalizeEqualizerAutoPreamp } from '../../shared/equalizerPreferences.ts'
 
-import type { OutputConfig } from '../../shared/audioEngineTypes.ts'
+import type { CorePlatformId, OutputConfig } from '../../shared/audioEngineTypes.ts'
 export const DEFAULT_DESKTOP_LYRICS: DesktopLyricsSettings = DEFAULT_DESKTOP_LYRICS_SETTINGS
 
 export const DEFAULT_MUSIC_CACHE_POLICY: MusicCachePolicySettings = {
@@ -284,7 +284,7 @@ const BASE_SETTINGS: AppSettings = {
   remoteControlPort: 0
 }
 
-export function createDefaultSettings(platform: NodeJS.Platform): AppSettings {
+export function createDefaultSettings(platform: CorePlatformId): AppSettings {
   return structuredClone({
     ...BASE_SETTINGS,
     audioOutput: normalizeAudioOutput(undefined, platform)
@@ -294,7 +294,7 @@ export function createDefaultSettings(platform: NodeJS.Platform): AppSettings {
 const DEFAULT_SETTINGS = BASE_SETTINGS
 
 export interface SettingsEnvironment {
-  platform: NodeJS.Platform
+  platform: CorePlatformId
   defaultCachePath: string
   resolvePath(path: string): string
 }

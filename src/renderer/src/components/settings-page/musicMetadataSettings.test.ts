@@ -80,17 +80,25 @@ test('settings controls persist separate scopes, actual sources and optional lan
   await model.source('platform.ncm', true)
   await model.language('zh-Hant')
   assert.deepEqual(new CoreSettingsRepository(options).read().musicIdentification, {
+    ...defaultMusicIdentificationSettings(),
     newImports: true,
     history: true,
-    sources: ['platform.ncm'],
+    setup: 'accepted',
+    sources: defaultMusicIdentificationSettings().sources.filter(
+      (source) => source !== 'musicbrainz'
+    ),
     language: 'zh-Hant'
   })
   await model.language(undefined)
   await model.scope('history')
   assert.deepEqual(new CoreSettingsRepository(options).read().musicIdentification, {
+    ...defaultMusicIdentificationSettings(),
     newImports: true,
     history: false,
-    sources: ['platform.ncm']
+    setup: 'accepted',
+    sources: defaultMusicIdentificationSettings().sources.filter(
+      (source) => source !== 'musicbrainz'
+    )
   })
   assert.equal(model.state.value.notice, '已保存')
 })
@@ -103,6 +111,38 @@ test('available identification does not promise text permission and public MB re
   assert.ok(ncm.descriptions.some((s) => s.includes('识别可用：艺人、具体发行')))
   assert.ok(ncm.descriptions.some((s) => s.includes('缓存权限尚未获批')))
   assert.equal(options.find((s) => s.provider === 'platform.removed')!.available, false)
+})
+
+test('one-click setup selects every source and the NCM toggle is persistent without removing identity search', async (t) => {
+  let settings = defaultMusicIdentificationSettings()
+  const model = createMusicMetadataSettings({
+    current: () => settings,
+    save: async (next) => {
+      settings = next
+    },
+    policy: async () => policy()
+  })
+  t.after(model.dispose)
+  await model.refresh()
+  await model.enableAll()
+  assert.equal(settings.setup, 'accepted')
+  assert.equal(settings.newImports, true)
+  assert.equal(settings.history, true)
+  assert.equal(settings.ncmLocalFallback, true)
+  assert.ok(
+    settings.sources.includes('platform.disabled'),
+    'selection is saved even while a source is unavailable'
+  )
+  await model.ncmFallback()
+  assert.equal(settings.ncmLocalFallback, false)
+  assert.ok(
+    settings.sources.includes('platform.ncm'),
+    'existing identity source choice remains usable'
+  )
+  await model.source('platform.ncm', false)
+  await model.ncmFallback()
+  assert.equal(settings.ncmLocalFallback, true)
+  assert.equal(settings.sources.filter((source) => source === 'platform.ncm').length, 1)
 })
 
 test('unavailable and removed sources remain selected until explicitly unchecked; unavailable sources cannot be newly enabled', async (t) => {
@@ -254,6 +294,7 @@ test('all controls are discoverable in the original library settings group and u
     'metadata-new-imports',
     'metadata-history',
     'metadata-language',
+    'metadata-ncm-fallback',
     'metadata-sources'
   ]) {
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.id === id)!

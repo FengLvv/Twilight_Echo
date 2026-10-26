@@ -1,3 +1,5 @@
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+
 interface IdentificationQuery {
   provider: string
   context: string
@@ -79,7 +81,7 @@ export class IdentificationResponseCache {
           controller.signal.throwIfAborted()
           const response = { value: structuredClone(loaded.value), retrievedAt: this.options.now() }
           if (loaded.retention) {
-            const bytes = Buffer.byteLength(JSON.stringify(response))
+            const bytes = PortableBuffer.byteLength(JSON.stringify(response))
             if (bytes <= this.options.maxResponseBytes && bytes <= this.options.maxBytes) {
               this.prune()
               this.cached.set(key, {

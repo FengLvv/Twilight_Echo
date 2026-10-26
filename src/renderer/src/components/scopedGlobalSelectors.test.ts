@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { compileStyle } from '@vue/compiler-sfc'
+import { compileStyle, parse } from '@vue/compiler-sfc'
 
 const scopedStyleFiles = [
+  './AppearancePreviewScene.vue',
   './DspRackPage.vue',
   './EqualizerPage.vue',
   './equalizer/OpraEqPanel.vue',
@@ -39,6 +40,42 @@ test('scoped component styles keep descendants inside global theme selectors', (
       source,
       /:global\([^\r\n)]+\)\s+[^,{\r\n]+[,{]/,
       `${relativePath} contains a global ancestor whose scoped descendant will be dropped by Vue`
+    )
+  }
+})
+
+test('compiled appearance preview styles never target the document root', () => {
+  const filename = 'AppearancePreviewScene.vue'
+  const source = readFileSync(new URL(`./${filename}`, import.meta.url), 'utf8')
+  const { descriptor } = parse(source, { filename })
+  const style = descriptor.styles.find((entry) => entry.scoped)
+  assert.ok(style, 'appearance preview must keep its styles scoped')
+  const result = compileStyle({
+    source: style.content,
+    filename,
+    id: 'data-v-appearance-preview-regression',
+    scoped: true
+  })
+  assert.deepEqual(result.errors, [])
+  const root = result.rawResult?.root
+  assert.ok(root)
+  root.walkRules((rule) => {
+    for (const selector of rule.selectors) {
+      assert.doesNotMatch(
+        selector,
+        /^\s*(?:html|body)(?:\[[^\]]+\])*\s*$/,
+        `preview rule escaped onto the document root: ${rule.toString()}`
+      )
+    }
+  })
+  for (const [attribute, target] of [
+    ["data-te-player-layout='minimal'", 'appearance-preview-player-lyrics'],
+    ["data-te-player-custom-background='on'", 'appearance-preview-player-backdrop']
+  ]) {
+    const selector = `html[${attribute}] .${target}[data-v-appearance-preview-regression]`
+    assert.ok(
+      result.code.includes(`${selector} {\n  display: none;`),
+      `${attribute} must hide only its scoped preview element`
     )
   }
 })

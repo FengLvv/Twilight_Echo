@@ -78,7 +78,11 @@ import { setupNetworkSourceIpc } from '../network/networkIpc.ts'
 import { installElectronSecurity } from '../security/electronSecurity.ts'
 import { createRemoteMediaRequestHandler } from '../security/remoteMediaGrants.ts'
 import { destroyTelemetry, initializeTelemetry } from '../analytics/index.ts'
-import { createWindow, requestRendererPlaybackSessionSave } from './window'
+import {
+  createWindow,
+  requestRendererPlaybackSessionSave,
+  showClosePersistenceFailure
+} from './window'
 import { createCoreApplication } from './coreApplicationRuntime.ts'
 import { getCoreApplication } from './coreApplication.ts'
 import {
@@ -565,15 +569,39 @@ function startDesktopApp(owner: 'legacy' | 'core'): void {
         destroyTrayPlayerWindow()
         destroyMiniPlayerWindow()
         coreQuitWork = (async () => {
-          if (!runtime.closingAfterPlaybackSessionSave) await requestRendererPlaybackSessionSave()
-          await core.shutdown()
-          coreQuitComplete = true
-          runtime.closingAfterPlaybackSessionSave = true
-          app.quit()
-        })().catch((error) => {
-          runtime.forceQuit = false
+          let rendererSaved = runtime.closingAfterPlaybackSessionSave
+          let discard = false
+          while (true) {
+            try {
+              if (discard) await core.forceShutdown()
+              else {
+                if (!rendererSaved) {
+                  await requestRendererPlaybackSessionSave()
+                  rendererSaved = true
+                }
+                await core.shutdown()
+              }
+              coreQuitComplete = true
+              runtime.closingAfterPlaybackSessionSave = true
+              app.quit()
+              return
+            } catch (error) {
+              const choice = await showClosePersistenceFailure(
+                runtime.mainWindow,
+                error instanceof Error ? error : new Error(String(error)),
+                discard
+              )
+              if (choice === 'cancel') {
+                runtime.forceQuit = false
+                return
+              }
+              // Once discard is chosen, retries only reclaim owned processes;
+              // they must not return to the failed persistence path.
+              if (choice === 'force') discard = true
+            }
+          }
+        })().finally(() => {
           coreQuitWork = null
-          dialog.showErrorBox('退出前保存失败', `应用保持运行，可重试退出。\n${String(error)}`)
         })
         return
       }

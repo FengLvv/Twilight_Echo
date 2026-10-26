@@ -1,10 +1,13 @@
-import { readFile } from 'node:fs/promises'
-import { statSync } from 'node:fs'
-import { join } from 'node:path'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { join } from '../../shared/portablePath.ts'
 import { isSecureValueEnvelope, isSensitiveStorageKey } from '../../shared/secureValue.ts'
 import type { SecureValueEnvelope } from '../../shared/secureValue.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import { writeJsonFileAtomic } from '../persistence/jsonFile.ts'
+
+const { readFile } = coreFsPromises
+const { statSync } = coreFs
 
 export interface PluginSettingsCryptography {
   protect(value: unknown, scope: string): Promise<SecureValueEnvelope> | SecureValueEnvelope
@@ -27,10 +30,21 @@ export class PluginSettingsRepository {
    * Inspect only filesystem metadata, never decrypt or fingerprint credentials. */
   identityContext(storagePath: string): string {
     try {
-      const stat = statSync(pluginSettingsPath(storagePath), { bigint: true })
-      return JSON.stringify([stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].map(String))
+      const stat = statSync(pluginSettingsPath(storagePath), { bigint: true }) as unknown as Record<
+        string,
+        unknown
+      >
+      return JSON.stringify(
+        [
+          stat.dev,
+          stat.ino,
+          stat.size,
+          stat.mtimeNs ?? stat.mtimeMs,
+          stat.ctimeNs ?? stat.ctimeMs
+        ].map(String)
+      )
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent'
+      if ((error as { code?: string }).code === 'ENOENT') return 'absent'
       throw error
     }
   }
@@ -57,7 +71,7 @@ export class PluginSettingsRepository {
     return this.run(storagePath, async () => {
       const name = normalizeKey(key)
       const json = JSON.stringify(value)
-      if (json !== undefined && Buffer.byteLength(json) > 512 * 1024)
+      if (json !== undefined && PortableBuffer.byteLength(json) > 512 * 1024)
         throw new Error('plugin setting value is too large')
       const settings = await this.read(storagePath)
       // Leave other encrypted values intact, including credentials unavailable
@@ -103,17 +117,17 @@ export class PluginSettingsRepository {
     try {
       raw = await readFile(pluginSettingsPath(storagePath), 'utf8')
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      if ((error as { code?: string }).code === 'ENOENT') return {}
       throw error
     }
-    if (Buffer.byteLength(raw) > MAX_FILE_BYTES) return {}
+    if (PortableBuffer.byteLength(raw) > MAX_FILE_BYTES) return {}
     const parsed = tryParseJsonWithNestingLimit(raw)
     return parsed.ok && isRecord(parsed.value) ? parsed.value : {}
   }
 
   private write(storagePath: string, settings: Record<string, unknown>): void {
     const json = JSON.stringify(settings, null, 2)
-    if (Buffer.byteLength(json) > MAX_FILE_BYTES)
+    if (PortableBuffer.byteLength(json) > MAX_FILE_BYTES)
       throw new Error('plugin settings file is too large')
     writeJsonFileAtomic(
       pluginSettingsPath(storagePath),

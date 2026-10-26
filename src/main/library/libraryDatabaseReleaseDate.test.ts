@@ -69,7 +69,7 @@ test('unchanged legacy files stage only dates and publish dates with markers at 
   const after = db.getTracksByIds(['track-0'])
   assert.deepEqual(after.tracks, [{ ...before.tracks[0], releaseDate: '2001-03' }])
   assert.equal(after.versions['track-0'], before.versions['track-0'] + 1)
-  assert.equal(db.sql.prepare('SELECT metadata_version FROM files').get()!.metadata_version, 1)
+  assert.equal(db.sql.prepare('SELECT metadata_version FROM files').get()!.metadata_version, 2)
   assert.equal(db.getMetadata().revision, metadata.revision + 1)
 })
 
@@ -109,7 +109,7 @@ test('absent dates complete once while failed reads retain the old date and stay
   assert.equal(Object.hasOwn(db.getTracksByIds(['track-0']).tracks[0], 'releaseDate'), false)
   assert.equal(db.getTracksByIds(['track-1']).tracks[0].releaseDate, '1980')
   assert.deepEqual(db.sql.prepare('SELECT metadata_version,status FROM files ORDER BY file_key').all().map((r) => ({ ...r })), [
-    { metadata_version: 1, status: 'complete' }, { metadata_version: 0, status: 'complete' }
+    { metadata_version: 2, status: 'complete' }, { metadata_version: 0, status: 'complete' }
   ])
   const retry = start(db, root, identities, 'retry')
   assert.deepEqual(retry.identities, [identities[1]])
@@ -238,7 +238,7 @@ test('pause retains staged dates; restart recovery discards staging and retries 
   } finally { recovered.close() }
 })
 
-test('v28 upgrades preserve library content and ordinary checkpoints in a backed-up v29 migration', (t) => {
+test('v28 upgrades preserve library content and ordinary checkpoints in a backed-up v30 migration', (t) => {
   const { db, root, path, identities } = fixture(t)
   db.startScan({ id: 'legacy-job', mode: 'startup', roots: [root] })
   db.recordScanFiles('legacy-job', identities)
@@ -248,7 +248,7 @@ test('v28 upgrades preserve library content and ordinary checkpoints in a backed
   db.close()
   const upgraded = new LibraryDatabase(path)
   try {
-    assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()!.user_version, 29)
+    assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
     assert.deepEqual(upgraded.getTracksByIds(['track-0']), before)
     assert.deepEqual(upgraded.getMetadata(), metadata)
     assert.equal(upgraded.getLatestScanJob()!.state, 'running')
@@ -283,6 +283,27 @@ test('trusted JSON v0 indexes retain the narrow date-only lane after migration',
     assert.deepEqual(db.getTracksByIds(['legacy']).tracks, [{ ...track, releaseDate: '2001' }])
     assert.equal(db.sql.prepare('SELECT status FROM files').get()!.status, 'complete')
   } finally { db.close() }
+})
+
+test('v29 upgrade preserves the live library and snapshots the old schema before adding raw-observation staging', t => {
+  const { db, path, root, identities } = fixture(t)
+  const before = db.getTracksByIds(['track-0'])
+  db.sql.exec('ALTER TABLE scan_release_dates DROP COLUMN observations; PRAGMA user_version=29')
+  db.close()
+  const upgraded = new LibraryDatabase(path)
+  try {
+    assert.deepEqual(upgraded.getTracksByIds(['track-0']), before)
+    assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
+    assert.ok(upgraded.sql.prepare('PRAGMA table_info(scan_release_dates)').all().some(c => c.name === 'observations'))
+    assert.deepEqual(start(upgraded, root, identities).releaseDateFilePaths, [identities[0].filePath])
+    const backups = readdirSync(root).filter(name => name.includes('.v29-backup-'))
+    assert.equal(backups.length, 1)
+    const backup = new DatabaseSync(join(root, backups[0]), { readOnly: true })
+    try {
+      assert.equal(backup.prepare('PRAGMA user_version').get()!.user_version, 29)
+      assert.equal(backup.prepare('PRAGMA table_info(scan_release_dates)').all().some(c => c.name === 'observations'), false)
+    } finally { backup.close() }
+  } finally { upgraded.close() }
 })
 
 test('a failed finalization rolls back all dates, markers and checkpoints together', (t) => {

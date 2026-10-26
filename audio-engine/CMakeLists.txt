@@ -8,7 +8,13 @@ option(TAE_ENABLE_WASAPI "Enable the Windows WASAPI backend" ON)
 option(TAE_ENABLE_ASIO "Enable the Windows x64 ASIO compatibility backend" ON)
 option(TAE_ENABLE_COREAUDIO "Enable the macOS CoreAudio backend" ON)
 option(TAE_ENABLE_ALSA "Enable the Linux ALSA backend" ON)
+option(TAE_ENABLE_OBOE "Enable Android Oboe output backend" OFF)
+option(TAE_ENABLE_IOS_AUDIOUNIT "Enable iOS AudioUnit output backend" OFF)
 option(TAE_ENABLE_MINIAUDIO "Enable the miniaudio Shared/default PCM provider PoC" OFF)
+
+if(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(TAE_BUILD_NAPI OFF CACHE BOOL "Build the Node-API bridge" FORCE)
+endif()
 
 if(TAE_BUILD_TESTS)
   enable_testing()
@@ -39,31 +45,47 @@ set(TAE_WASAPI_AVAILABLE OFF)
 set(TAE_ASIO_AVAILABLE OFF)
 set(TAE_COREAUDIO_AVAILABLE OFF)
 set(TAE_ALSA_AVAILABLE OFF)
+set(TAE_OBOE_AVAILABLE OFF)
+set(TAE_IOS_AUDIOUNIT_AVAILABLE OFF)
 set(TAE_MINIAUDIO_AVAILABLE OFF)
-if(WIN32 AND TAE_ENABLE_ASIO AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(TAE_ASIO_AVAILABLE ON)
-elseif(WIN32 AND TAE_ENABLE_ASIO)
-  message(WARNING "ASIO compatibility backend is supported only in Windows x64 builds.")
-endif()
-if(WIN32 AND TAE_ENABLE_WASAPI)
-  set(TAE_WASAPI_AVAILABLE ON)
-endif()
-if(WIN32 AND TAE_ENABLE_MINIAUDIO)
-  set(TAE_MINIAUDIO_AVAILABLE ON)
-elseif(TAE_ENABLE_MINIAUDIO)
-  message(WARNING "miniaudio PoC is currently limited to Windows WASAPI Shared/default PCM builds.")
-endif()
-if(APPLE AND TAE_ENABLE_COREAUDIO)
-  set(TAE_COREAUDIO_AVAILABLE ON)
-endif()
-if(UNIX AND NOT APPLE AND TAE_ENABLE_ALSA)
-  find_package(ALSA QUIET)
-  if(ALSA_FOUND)
-    set(TAE_ALSA_AVAILABLE ON)
-  else()
-    message(WARNING "ALSA development libraries were not found; ALSA backend will be disabled.")
-    set(TAE_ENABLE_ALSA OFF CACHE BOOL "Enable the Linux ALSA backend" FORCE)
+
+if(ANDROID)
+  if(TAE_ENABLE_OBOE)
+    set(TAE_OBOE_AVAILABLE ON)
   endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  if(TAE_ENABLE_IOS_AUDIOUNIT)
+    set(TAE_IOS_AUDIOUNIT_AVAILABLE ON)
+  endif()
+elseif(WIN32)
+  if(TAE_ENABLE_ASIO AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(TAE_ASIO_AVAILABLE ON)
+  elseif(TAE_ENABLE_ASIO)
+    message(WARNING "ASIO compatibility backend is supported only in Windows x64 builds.")
+  endif()
+  if(TAE_ENABLE_WASAPI)
+    set(TAE_WASAPI_AVAILABLE ON)
+  endif()
+  if(TAE_ENABLE_MINIAUDIO)
+    set(TAE_MINIAUDIO_AVAILABLE ON)
+  endif()
+elseif(APPLE)
+  if(TAE_ENABLE_COREAUDIO)
+    set(TAE_COREAUDIO_AVAILABLE ON)
+  endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR (UNIX AND NOT APPLE AND NOT ANDROID))
+  if(TAE_ENABLE_ALSA)
+    find_package(ALSA QUIET)
+    if(ALSA_FOUND)
+      set(TAE_ALSA_AVAILABLE ON)
+    else()
+      message(WARNING "ALSA development libraries were not found; ALSA backend will be disabled.")
+      set(TAE_ENABLE_ALSA OFF CACHE BOOL "Enable the Linux ALSA backend" FORCE)
+    endif()
+  endif()
+endif()
+if(NOT WIN32 AND TAE_ENABLE_MINIAUDIO)
+  message(WARNING "miniaudio PoC is currently limited to Windows WASAPI Shared/default PCM builds.")
 endif()
 
 set(TAE_ENGINE_SOURCES
@@ -271,6 +293,37 @@ if(TAE_ALSA_AVAILABLE)
   target_link_libraries(twilight_audio_engine PRIVATE ${ALSA_LIBRARIES})
 endif()
 
+if(TAE_OBOE_AVAILABLE)
+  target_sources(twilight_audio_engine PRIVATE
+    output/android/OboeOutputBackend.cpp
+  )
+  target_compile_definitions(twilight_audio_engine PRIVATE TAE_ENABLE_OBOE=1)
+  if(ANDROID)
+    target_link_libraries(twilight_audio_engine PRIVATE aaudio log)
+  endif()
+  find_package(oboe QUIET)
+  if(oboe_FOUND)
+    target_link_libraries(twilight_audio_engine PRIVATE oboe::oboe)
+  endif()
+  find_library(ANDROID_OPENSLES_LIB OpenSLES)
+  if(ANDROID_OPENSLES_LIB)
+    target_link_libraries(twilight_audio_engine PRIVATE ${ANDROID_OPENSLES_LIB})
+  endif()
+endif()
+
+if(TAE_IOS_AUDIOUNIT_AVAILABLE)
+  target_sources(twilight_audio_engine PRIVATE
+    output/ios/IosAudioUnitBackend.cpp
+  )
+  target_compile_definitions(twilight_audio_engine PRIVATE TAE_ENABLE_IOS_AUDIOUNIT=1)
+  target_link_libraries(twilight_audio_engine PRIVATE
+    "-framework AudioToolbox"
+    "-framework AVFoundation"
+    "-framework CoreAudio"
+    "-framework CoreFoundation"
+  )
+endif()
+
 if(TAE_BUILD_NAPI)
   if(APPLE)
     set(TAE_NAPI_RPATH "@loader_path")
@@ -317,6 +370,8 @@ if(TAE_ALSA_AVAILABLE)
 else()
   message(STATUS "  ALSA: ${TAE_ALSA_AVAILABLE}")
 endif()
+message(STATUS "  Android Oboe: ${TAE_OBOE_AVAILABLE}")
+message(STATUS "  iOS AudioUnit: ${TAE_IOS_AUDIOUNIT_AVAILABLE}")
 message(STATUS "  FFmpeg: ${FFMPEG_FOUND}")
 message(STATUS "  libebur128: ${TAE_EBUR128_AVAILABLE}")
 message(STATUS "  Default Shared PCM provider: ${TAE_DEFAULT_PCM_PROVIDER}")
@@ -569,6 +624,8 @@ if(TAE_BUILD_TESTS)
 
   add_executable(twilight_platform_backend_smoke
     tests/platform_backend_smoke.cpp
+    output/android/OboeOutputBackend.cpp
+    output/ios/IosAudioUnitBackend.cpp
     core/AudioTypes.cpp
   )
   target_include_directories(twilight_platform_backend_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -875,11 +932,14 @@ if(TAE_BUILD_TESTS)
   # controlled callback pump. Real-device scheduling remains an opt-in smoke.
   add_executable(twilight_audio_performance_gate
     tests/audio_performance_gate.cpp
+    tests/AudioFixtureLibrary.cpp
     core/AudioBuffer.cpp
     core/AudioPipeline.cpp
     core/DsdMuteGuard.cpp
     core/AudioTypes.cpp
     core/DiagnosticLog.cpp
+    core/TwilightAudioEngine.cpp
+    metadata/AudioMetadataService.cpp
     analysis/BpmAnalyzer.cpp
     analysis/LoudnessAnalyzer.cpp
     decoder/DopPacker.cpp
@@ -910,6 +970,7 @@ if(TAE_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
+  target_compile_definitions(twilight_audio_performance_gate PRIVATE TAE_BUILDING_LIBRARY=1)
   # NDEBUG is stripped from every test target at the end of this block.
   target_link_libraries(twilight_audio_performance_gate PRIVATE ${CMAKE_DL_LIBS})
   target_sources(twilight_audio_performance_gate PRIVATE automix-native/AutoMixAdapter.cpp)
@@ -940,6 +1001,9 @@ if(TAE_BUILD_TESTS)
   add_test(NAME twilight_audio_pcm_transparency
     COMMAND twilight_audio_performance_gate --verify-neutral-pcm)
   set_tests_properties(twilight_audio_pcm_transparency PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
+  add_test(NAME twilight_audio_flac_tail_continuation
+    COMMAND twilight_audio_performance_gate --verify-flac-tail)
+  set_tests_properties(twilight_audio_flac_tail_continuation PROPERTIES TIMEOUT 20 SKIP_RETURN_CODE 77)
 
   add_executable(twilight_dst_decoder_tests
     tests/dst_decoder_tests.cpp

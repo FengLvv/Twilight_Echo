@@ -1,6 +1,6 @@
-import { copyFile, open, rename, rm, stat } from 'node:fs/promises'
-import { basename, dirname, extname, join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { basename, dirname, extname, join } from '../../shared/portablePath.ts'
 import { MAX_IMPORTED_LYRICS_BYTES, validateImportedLyrics } from './importLyrics.ts'
 
 export interface LyricsSaveDialogResult {
@@ -21,30 +21,6 @@ export interface LyricsFileOperations {
   remove(filePath: string): Promise<void>
 }
 
-const fileOperations: LyricsFileOperations = {
-  async exists(filePath) {
-    try {
-      await stat(filePath)
-      return true
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
-      throw error
-    }
-  },
-  copy: copyFile,
-  async writeSynced(filePath, contents) {
-    const handle = await open(filePath, 'w', 0o600)
-    try {
-      await handle.writeFile(contents, 'utf8')
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-  },
-  replace: rename,
-  remove: async (filePath) => await rm(filePath, { force: true })
-}
-
 /**
  * Renderer code never supplies a filesystem path. The main process receives
  * one only from its Save dialog and commits it with a recoverable replacement.
@@ -52,14 +28,14 @@ const fileOperations: LyricsFileOperations = {
 export async function saveLyricsFromDialog(
   result: LyricsSaveDialogResult,
   contents: string,
-  operations: LyricsFileOperations = fileOperations
+  operations: LyricsFileOperations
 ): Promise<SavedLyricsFile | null> {
   if (result.canceled || !result.filePath) return null
   const filePath = result.filePath
   if (extname(filePath).toLowerCase() !== '.lrc') {
     throw new Error('Lyrics must be saved with an .lrc extension')
   }
-  if (Buffer.byteLength(contents, 'utf8') > MAX_IMPORTED_LYRICS_BYTES) {
+  if (PortableBuffer.byteLength(contents, 'utf8') > MAX_IMPORTED_LYRICS_BYTES) {
     throw new Error('Lyrics exceed the 1 MiB limit')
   }
   const normalized = validateImportedLyrics(filePath, contents)
@@ -69,7 +45,7 @@ export async function saveLyricsFromDialog(
 export async function writeLyricsAtomically(
   filePath: string,
   contents: string,
-  operations: LyricsFileOperations = fileOperations
+  operations: LyricsFileOperations
 ): Promise<SavedLyricsFile> {
   const backupPath = `${filePath}.bak`
   const temporaryPath = join(dirname(filePath), `.${basename(filePath)}.${randomUUID()}.tmp`)

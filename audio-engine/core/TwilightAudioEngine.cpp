@@ -294,7 +294,7 @@ std::string backendCapabilitiesJson() {
       "CoreAudio Hog Mode exclusive is only available in macOS builds with TAE_ENABLE_COREAUDIO");
 #endif
 
-#if defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
   append("alsa", "Linux ALSA 输出", true, true, false, false, "plugin", "default");
 #else
   append(
@@ -307,6 +307,14 @@ std::string backendCapabilitiesJson() {
       "plugin",
       "default",
       "ALSA is only available in Linux builds with TAE_ENABLE_ALSA and ALSA development libraries");
+#endif
+
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+  append("oboe", "Android Oboe 输出", true, true, false, false, "shared", "default");
+#endif
+
+#if defined(__APPLE__) && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+  append("audiounit", "iOS AudioUnit 输出", true, true, false, false, "shared", "default");
 #endif
 
   json << "]";
@@ -2133,7 +2141,13 @@ std::string TwilightAudioEngine::enumerateBackendsJson() const {
   append("coreaudio", "苹果系统音频", false);
   append("coreaudio-exclusive", "独占输出 (Hog Mode)", true);
 #endif
-#if defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+  append("oboe", "Android Oboe 输出", false);
+#endif
+#if defined(__APPLE__) && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+  append("audiounit", "iOS AudioUnit 输出", false);
+#endif
+#if defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
   append("alsa", "Linux ALSA 输出", false);
 #endif
   json << "]";

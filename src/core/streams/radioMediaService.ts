@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { join } from '../../shared/portablePath.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 
 import {
   DEFAULT_RADIO_STATIONS,
@@ -107,13 +108,7 @@ export class RadioMediaService {
         console.warn('[radio] scheduled podcast refresh failed:', error)
       })
     }, this.refreshIntervalMs)
-    if (
-      typeof this.refreshTimer === 'object' &&
-      this.refreshTimer &&
-      'unref' in this.refreshTimer
-    ) {
-      this.refreshTimer.unref()
-    }
+    ;(this.refreshTimer as { unref?: () => void } | null)?.unref?.()
   }
 
   stopScheduledRefresh(): void {
@@ -422,7 +417,7 @@ async function defaultFetchFeed(
   if (lengthHeader && Number(lengthHeader) > MAX_FEED_FETCH_BYTES) {
     throw new Error('Podcast feed response is too large')
   }
-  const buffer = Buffer.from(await response.arrayBuffer())
+  const buffer = PortableBuffer.from(await response.arrayBuffer())
   if (buffer.byteLength > MAX_FEED_FETCH_BYTES) {
     throw new Error('Podcast feed response is too large')
   }

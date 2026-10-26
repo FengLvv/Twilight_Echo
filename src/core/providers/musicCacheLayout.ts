@@ -1,5 +1,6 @@
-import { lstat, mkdir, readdir, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { coreFsPromises } from '../ports/index.ts'
+const { lstat, mkdir, readdir, rm } = coreFsPromises
+import { join, resolve } from '../../shared/portablePath.ts'
 import { clearUnpinnedCache } from '../network/networkCache.ts'
 
 import { MANAGED_MUSIC_CACHE_DIRECTORY_NAMES } from '../../shared/musicCacheLayout.ts'

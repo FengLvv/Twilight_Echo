@@ -1,12 +1,15 @@
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
-import type { IncomingMessage } from 'node:http'
-import { isIPv6 } from 'node:net'
+import { coreHttp, coreHttps, coreNet, type PortableIncomingMessage } from '../../ports/index.ts'
+import { PortableBuffer } from '../../../shared/portableBytes.ts'
 import { buildNetworkEntryId, normalizeRemotePath } from '../networkPath.ts'
 import { NetworkResumeUnsupported, NetworkSourceFailure } from '../errors.ts'
 import { entryKind } from '../entryKinds.ts'
 import type { NetworkEntry, NetworkSourceProfile } from '../../../shared/networkSources.ts'
-import type { NetworkAuth, NetworkSourceAdapter, NetworkSourceSession } from './types.ts'
+import type {
+  NetworkAuth,
+  NetworkReadableStream,
+  NetworkSourceAdapter,
+  NetworkSourceSession
+} from './types.ts'
 
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308])
 const MAX_REDIRECTS = 5
@@ -119,12 +122,12 @@ function authHeader(auth: NetworkAuth): string | undefined {
   // 空口令在部分服务端是合法配置，不能因为 falsy 而静默降级为匿名。
   if (auth.kind !== 'password') return undefined
   const username = auth.username ?? ''
-  return `Basic ${Buffer.from(`${username}:${auth.password}`).toString('base64')}`
+  return `Basic ${PortableBuffer.from(`${username}:${auth.password}`).toString('base64')}`
 }
 
 /** IPv6 字面量必须加方括号，否则无法拼进 URL。 */
 function hostForUrl(host: string): string {
-  if (host.includes(':') && !host.startsWith('[') && isIPv6(host)) return `[${host}]`
+  if (host.includes(':') && !host.startsWith('[') && coreNet.isIPv6(host)) return `[${host}]`
   return host
 }
 
@@ -182,7 +185,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
         signal: AbortSignal | undefined,
         body: string | undefined,
         includeAuth: boolean
-      ): Promise<IncomingMessage> {
+      ): Promise<PortableIncomingMessage> {
         return new Promise((resolve, reject) => {
           let parsed: URL
           try {
@@ -195,15 +198,14 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
             reject(new NetworkSourceFailure('network', '远程服务器返回了不支持的重定向协议'))
             return
           }
-          const requestFn: typeof httpRequest =
-            parsed.protocol === 'https:' ? httpsRequest : httpRequest
+          const requestFn = parsed.protocol === 'https:' ? coreHttps.request : coreHttp.request
           const finalHeaders: Record<string, string> = {
             ...(includeAuth && authorization ? { Authorization: authorization } : {}),
             ...headers
           }
           // PROPFIND 带 body；显式 Content-Length 兼容不接受 chunked 的旧服务端。
           if (body !== undefined) {
-            finalHeaders['Content-Length'] = String(Buffer.byteLength(body, 'utf8'))
+            finalHeaders['Content-Length'] = String(PortableBuffer.byteLength(body, 'utf8'))
           }
           const req = requestFn(url, { method, headers: finalHeaders, signal }, (res) =>
             resolve(res)
@@ -226,7 +228,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
             clearConnectTimer()
             if (err instanceof NetworkSourceFailure) {
               reject(err)
-            } else if ((err as NodeJS.ErrnoException).code === 'ABORT_ERR') {
+            } else if ((err as { code?: string })?.code === 'ABORT_ERR') {
               reject(new NetworkSourceFailure('timeout', '网络请求超时'))
             } else {
               reject(new NetworkSourceFailure('network', `网络请求失败：${err.message}`))
@@ -243,7 +245,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
         headers: Record<string, string>,
         signal?: AbortSignal,
         body?: string
-      ): Promise<{ res: IncomingMessage; url: string }> {
+      ): Promise<{ res: PortableIncomingMessage; url: string }> {
         let url = buildUrl(remotePath)
         let currentMethod = method
         let currentBody = body
@@ -259,7 +261,8 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
           )
           const status = res.statusCode ?? 0
           const location = res.headers.location
-          if (!location || !REDIRECT_STATUSES.has(status)) return { res, url }
+          const locationStr = Array.isArray(location) ? location[0] : location
+          if (!locationStr || !REDIRECT_STATUSES.has(status)) return { res, url }
           // Drain the redirect body so the keep-alive socket can be reused.
           res.resume()
           if (redirect >= MAX_REDIRECTS) {
@@ -267,7 +270,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
           }
           let next: URL
           try {
-            next = new URL(location, url)
+            next = new URL(locationStr, url)
           } catch {
             throw new NetworkSourceFailure('network', '远程服务器返回了无效的重定向地址')
           }
@@ -294,7 +297,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
         }
       }
 
-      function throwForStatus(res: IncomingMessage, remotePath: string): void {
+      function throwForStatus(res: PortableIncomingMessage, remotePath: string): void {
         const status = res.statusCode
         if (!status || (status >= 200 && status < 300)) return
         // 消费/丢弃错误响应体，避免 keep-alive 连接被挂起的 body 卡住。
@@ -316,18 +319,18 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
       }
 
       async function collectBody(
-        res: IncomingMessage,
+        res: PortableIncomingMessage,
         limitBytes = DEFAULT_RESPONSE_LIMIT_BYTES
       ): Promise<string> {
-        const chunks: Buffer[] = []
+        const chunks: PortableBuffer[] = []
         let total = 0
-        for await (const chunk of res) {
-          const buffer = Buffer.from(chunk)
+        for await (const chunk of res as unknown as AsyncIterable<Uint8Array>) {
+          const buffer = PortableBuffer.from(chunk)
           total += buffer.length
           if (total > limitBytes) throw new NetworkSourceFailure('network', '目录响应过大')
           chunks.push(buffer)
         }
-        return Buffer.concat(chunks).toString('utf8')
+        return PortableBuffer.concat(chunks).toString('utf8')
       }
 
       function entriesFromMultistatus(
@@ -393,12 +396,14 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
           remotePath: string,
           signal?: AbortSignal,
           options?: { start?: number }
-        ): Promise<NodeJS.ReadableStream> {
+        ): Promise<NetworkReadableStream> {
           const headers: Record<string, string> =
             options?.start != null && options.start > 0 ? { Range: `bytes=${options.start}-` } : {}
           const { res } = await perform('GET', remotePath, headers, signal)
           if (options?.start != null && options.start > 0) {
-            const range = /^bytes (\d+)-(\d+)\/(\d+|\*)$/i.exec(res.headers['content-range'] ?? '')
+            const contentRange = res.headers['content-range']
+            const rangeText = Array.isArray(contentRange) ? contentRange[0] : (contentRange ?? '')
+            const range = /^bytes (\d+)-(\d+)\/(\d+|\*)$/i.exec(rangeText)
             if (
               res.statusCode === 200 ||
               res.statusCode === 416 ||
@@ -410,7 +415,7 @@ export function createWebDavAdapter(): NetworkSourceAdapter {
             }
           }
           throwForStatus(res, remotePath)
-          return res
+          return res as unknown as NetworkReadableStream
         },
         async resolvePlaybackUrl(remotePath: string): Promise<string | null> {
           // 匿名 WebDAV 可直接 URL 播放；带认证时 URL 无法携带凭据，必须走缓存下载。

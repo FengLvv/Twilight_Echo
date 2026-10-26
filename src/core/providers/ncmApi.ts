@@ -1,4 +1,4 @@
-import type { Server } from 'node:http'
+import type { NcmBindableServer as Server } from './ncmServerBinding.ts'
 import { getListeningPort, waitForListeningPort } from './ncmServerBinding.ts'
 import { redactSensitiveText } from '../../shared/errors/redactSensitiveText.ts'
 export const NCM_API_HOST = '127.0.0.1'
@@ -11,8 +11,8 @@ export interface NcmApiRequestOptions {
   signal?: AbortSignal
   idempotencyKey?: string
 }
-export interface NcmApiServiceOptions {
-  startServer(): Promise<Server>
+export interface NcmApiServiceOptions<TServer extends Server = Server> {
+  startServer(): Promise<TServer | any>
   fetch?: (
     url: string,
     init: { signal: AbortSignal; headers: Record<string, string> }
@@ -39,17 +39,17 @@ function shouldTimestampNcmApiPath(path: string): boolean {
 }
 
 /** Owns the existing provider API listener, not a new Core control protocol. */
-export class NcmApiService {
-  private server: Server | null = null
+export class NcmApiService<TServer extends Server = Server> {
+  private server: TServer | null = null
   private starting: Promise<void> | null = null
   private stopping = false
   private readonly requests = new Set<AbortController>()
   private readonly pending = new Set<Promise<unknown>>()
-  private readonly options: NcmApiServiceOptions
-  constructor(options: NcmApiServiceOptions) {
+  private readonly options: NcmApiServiceOptions<TServer>
+  constructor(options: NcmApiServiceOptions<TServer>) {
     this.options = options
   }
-  getServer(): Server | null {
+  getServer(): TServer | null {
     return this.server
   }
   ensure(): Promise<void> {

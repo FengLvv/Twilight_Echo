@@ -1,5 +1,6 @@
-import { basename, extname } from 'node:path'
 import { parseAutoEqCsv, type ImportedFrequencyResponse } from '../../shared/frequencyResponse.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { basename, extname } from '../../shared/portablePath.ts'
 
 export const MAX_IMPORTED_FREQUENCY_RESPONSE_BYTES = 5 * 1024 * 1024
 
@@ -16,7 +17,7 @@ export function validateFrequencyResponseImportPath(filePath: string): void {
 
 export function validateFrequencyResponseImportText(filePath: string, contents: string): void {
   validateFrequencyResponseImportPath(filePath)
-  if (Buffer.byteLength(contents, 'utf-8') > MAX_IMPORTED_FREQUENCY_RESPONSE_BYTES) {
+  if (PortableBuffer.byteLength(contents, 'utf-8') > MAX_IMPORTED_FREQUENCY_RESPONSE_BYTES) {
     throw new Error('Imported frequency response exceeds the 5 MiB limit')
   }
   if (!contents.trim() || /\0/.test(contents) || contents.includes('\uFFFD')) {

@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join } from '../../shared/portablePath.ts'
 import type { LibraryDatabaseApi, LibraryTrackRecord } from '../../shared/libraryDatabase.ts'
 import type { LibrarySelectionApi } from '../../shared/librarySelection.ts'
 import type { TrackData } from '../../shared/track.ts'

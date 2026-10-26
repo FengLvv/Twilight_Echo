@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { coreAudioMetadata, coreFsPromises } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { join } from '../../shared/portablePath.ts'
 import { downloadEntryToCache } from './networkCache.ts'
 import { coverExtension } from './networkCover.ts'
 import type { NetworkSourceSession } from './adapters/types.ts'
@@ -7,14 +8,15 @@ import type { NetworkEntry, NetworkEntryMetadata } from '../../shared/networkSou
 
 interface ParsedEntry {
   metadata: NetworkEntryMetadata
-  cover: Buffer | undefined
+  cover: PortableBuffer | undefined
   coverFormat: string | undefined
 }
 
 async function parseCachedEntry(cacheFilePath: string): Promise<ParsedEntry | null> {
   try {
-    const { parseFile } = await import('music-metadata')
-    const parsed = await parseFile(cacheFilePath, { duration: false })
+    const parsed = await coreAudioMetadata.musicMetadata.parseFile(cacheFilePath, {
+      duration: false
+    })
     const common = parsed.common
     const format = parsed.format
     const picture = common.picture?.[0]
@@ -31,7 +33,7 @@ async function parseCachedEntry(cacheFilePath: string): Promise<ParsedEntry | nu
     if (Object.values(metadata).every((value) => value === undefined)) return null
     return {
       metadata,
-      cover: picture?.data ? Buffer.from(picture.data) : undefined,
+      cover: picture?.data ? PortableBuffer.from(picture.data) : undefined,
       coverFormat: picture?.format
     }
   } catch {
@@ -41,7 +43,7 @@ async function parseCachedEntry(cacheFilePath: string): Promise<ParsedEntry | nu
 
 export async function saveEntryCover(
   entryId: string,
-  cover: Buffer | undefined,
+  cover: Uint8Array | undefined,
   coverMime: string | undefined,
   coverCacheRoot: string
 ): Promise<string | undefined> {
@@ -50,8 +52,8 @@ export async function saveEntryCover(
   // 防止污染/穿越 cover-cache 目录。
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(entryId)) return undefined
   const target = join(coverCacheRoot, `${entryId}.${coverExtension(coverMime)}`)
-  await mkdir(coverCacheRoot, { recursive: true })
-  await writeFile(target, cover)
+  await coreFsPromises.mkdir(coverCacheRoot, { recursive: true })
+  await coreFsPromises.writeFile(target, cover)
   return target
 }
 

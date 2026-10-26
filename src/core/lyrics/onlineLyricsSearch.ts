@@ -3,6 +3,7 @@
  * No auth required. Ranking reuses the same title/artist/duration heuristics as
  * local metadata matching so results stay consistent with library enrichment.
  */
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import type {
   OnlineLyricsCandidate,
@@ -265,7 +266,7 @@ export async function searchOnlineLyrics(
       throw new Error(`LRCLIB search failed with HTTP ${response.status}`)
     }
     const text = await response.text()
-    if (Buffer.byteLength(text, 'utf-8') > MAX_ONLINE_LYRICS_BYTES) {
+    if (PortableBuffer.byteLength(text, 'utf-8') > MAX_ONLINE_LYRICS_BYTES) {
       throw new Error('Online lyrics response exceeds size limit')
     }
     const parsed = parseJsonWithNestingLimit(text) as unknown

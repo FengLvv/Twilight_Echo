@@ -1,8 +1,10 @@
-import { existsSync } from 'node:fs'
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
-import { isDeepStrictEqual } from 'node:util'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { isDeepStrictEqual } from '../../shared/portableAsync.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+
+const { existsSync } = coreFs
+const { mkdir, readFile, rm, stat, writeFile } = coreFsPromises
 
 interface AnalysisCacheFile<Analysis> {
   version: 1

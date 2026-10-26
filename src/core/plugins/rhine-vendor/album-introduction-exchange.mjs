@@ -1,6 +1,9 @@
-import { createHash } from 'node:crypto'
-import { constants, promises as fs } from 'node:fs'
-import path from 'node:path'
+import { createHash } from '../../../shared/portableCrypto.ts'
+import { PortableBuffer } from '../../../shared/portableBytes.ts'
+import path from '../../../shared/portablePath.ts'
+import { coreFs, coreFsPromises as fs } from '../../ports/index.ts'
+
+const { constants } = coreFs
 
 export const INTRODUCTION_EXCHANGE_LIMIT = 4 * 1024 * 1024
 const TASK_FORMAT = 'rhine-album-introductions-task'
@@ -130,7 +133,7 @@ export async function readIntroductionRevisionProofs(dataDir, wanted) {
       const before = await handle.stat()
       if (!before.isFile() || before.nlink !== 1 || before.size > INTRODUCTION_HISTORY_LIMITS.fileBytes || totalBytes + before.size > INTRODUCTION_HISTORY_LIMITS.totalBytes) continue
       totalBytes += before.size
-      const bytes = Buffer.alloc(before.size + 1)
+      const bytes = PortableBuffer.alloc(before.size + 1)
       let read = 0
       while (read < bytes.length) {
         const { bytesRead } = await handle.read(bytes, read, bytes.length - read, read)
@@ -170,7 +173,7 @@ export function createIntroductionTask(albums, { scope = 'missing', albumId } = 
 
 export function validateIntroductionResult(value) {
   let bytes
-  try { bytes = Buffer.byteLength(JSON.stringify(value)) } catch { throw failure('结果必须是有效 JSON') }
+  try { bytes = PortableBuffer.byteLength(JSON.stringify(value)) } catch { throw failure('结果必须是有效 JSON') }
   if (bytes > INTRODUCTION_EXCHANGE_LIMIT) throw Object.assign(failure('结果超过 4 MiB，请分批导入'), { status: 413 })
   object(value, ['format', 'version', 'albums'], '结果文件')
   if (value.format !== RESULT_FORMAT || value.version !== 1 || !Array.isArray(value.albums) || value.albums.length > 10000) throw failure('需要 rhine-album-introductions-result、version: 1 和 albums 数组（最多 10000 项）')

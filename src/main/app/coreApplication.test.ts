@@ -37,6 +37,10 @@ function fixture() {
       events.push('shutdown')
       await shutdownWork
     },
+    forceShutdown: async () => {
+      events.push('forceShutdown')
+      await shutdownWork
+    },
     connect: (identity: CoreClientIdentity) => clients.push(identity),
     disconnect: (id: string) => {
       events.push(`disconnect:${id}`)
@@ -186,4 +190,22 @@ test('a rejected final checkpoint leaves the supervised application attached for
   assert.equal(f.events.includes('windows:dispose'), false)
   await f.application.retry()
   assert.equal(f.events.at(-1), 'retry')
+})
+
+test('explicit discard skips pending settings writes and detaches only after process reclamation', async () => {
+  const f = fixture()
+  f.holdSettings()
+  const release = f.holdShutdown()
+  const shutdown = f.application.forceShutdown()
+  await turn()
+  assert.deepEqual(f.events, ['forceShutdown'])
+  assert.equal(f.supervisor.listenerCount('client-message'), 1)
+  release()
+  await shutdown
+  assert.deepEqual(f.events, [
+    'forceShutdown',
+    'windows:dispose',
+    `disconnect:${f.clients[0].id}`,
+    'system:invalidate'
+  ])
 })
