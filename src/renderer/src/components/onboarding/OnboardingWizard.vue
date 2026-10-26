@@ -16,14 +16,14 @@ import {
   resolveFinishAction,
   useOnboardingFlow,
   type OnboardingFinishAction,
+  type OnboardingSettingsPatch,
   type OnboardingStepId,
   type OnboardingUsage
 } from './useOnboardingFlow'
 import { useSettingsStore } from '@renderer/stores/useSettingsStore'
-import type { AppSettings } from '@renderer/types/settings'
 
 export interface OnboardingFinishResult {
-  patch: Partial<AppSettings>
+  patch: OnboardingSettingsPatch
   action: OnboardingFinishAction
   /** StepStreaming CTA: open the plugin market after the wizard closes. */
   openPluginMarket: boolean

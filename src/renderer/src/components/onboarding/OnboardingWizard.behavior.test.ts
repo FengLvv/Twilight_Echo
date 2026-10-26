@@ -13,7 +13,7 @@ import { build } from 'vite'
 const require = createRequire(import.meta.url)
 const workspace = fileURLToPath(new URL('../../../../../', import.meta.url))
 
-test('welcome wizard keeps page-specific choices, close-only chrome, audition and summary edits in Electron', async () => {
+test('welcome wizard keeps choices, audition and retryable Core-backed saves in Electron', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'twilight-onboarding-'))
   try {
     const fixture = fileURLToPath(new URL('./onboarding.fixture.mjs', import.meta.url))

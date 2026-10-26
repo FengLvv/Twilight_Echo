@@ -1,4 +1,5 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import type { CoreSettingsPatch } from '../../../../shared/coreSettings.ts'
 import type {
   AppSettings,
   CloseWindowBehavior,
@@ -29,6 +30,7 @@ export type OnboardingStepId =
   | 'finish'
 export type OnboardingDirection = 'forward' | 'back'
 export type OnboardingFinishAction = 'local' | 'streaming' | 'streaming-login'
+export type OnboardingSettingsPatch = CoreSettingsPatch & { audioExclusiveMode?: boolean }
 
 const DEFAULT_ONBOARDING_CACHE_POLICY: MusicCachePolicySettings = {
   cover: true,
@@ -124,8 +126,8 @@ export function resolveVisibleSteps(usage: OnboardingUsage | null): OnboardingSt
 export function buildSettingsPatch(
   choices: OnboardingChoices,
   visitedSteps: ReadonlySet<OnboardingStepId> = new Set(resolveVisibleSteps(choices.usage))
-): Partial<AppSettings> {
-  const patch: Partial<AppSettings> = { onboardingCompleted: true }
+): OnboardingSettingsPatch {
+  const patch: OnboardingSettingsPatch = { onboardingCompleted: true }
   if (choices.usage === null) return patch
   if (visitedSteps.has('usage'))
     patch.startupHomePage = choices.usage === 'streaming' ? 'streaming' : 'local'
