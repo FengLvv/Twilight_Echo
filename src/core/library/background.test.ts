@@ -119,7 +119,10 @@ test('Linux fallback shutdown joins an in-flight poll without rearming a timer',
     directoryOf: dirname,
     platform: 'linux',
     now: () => new Date(),
-    failed: assert.fail
+    failed: assert.fail,
+    watch: (() => {
+      throw Object.assign(new Error('inotify watch limit reached'), { code: 'ENOSPC' })
+    }) as typeof watch
   })
   t.after(() => background.shutdown())
   background.activate()
