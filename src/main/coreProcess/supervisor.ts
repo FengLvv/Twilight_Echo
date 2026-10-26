@@ -76,6 +76,7 @@ export class CoreSupervisor extends EventEmitter {
   private readonly platformRequests = new Map<string, AbortController>()
   private failureInProgress: Promise<void> | null = null
   private shutdownReply: { id: string; resolve(): void; reject(error: Error): void } | null = null
+  private shutdownCheckpoint: Promise<void> | null = null
 
   private readonly options: CoreSupervisorOptions
   constructor(options: CoreSupervisorOptions) {
@@ -116,8 +117,10 @@ export class CoreSupervisor extends EventEmitter {
         this.handleMessage(child, epoch, message)
       })
       child.on('exit', (code) => {
-        if (this.child === child && !this.stopping)
-          void this.fail(new Error(`Core exited (${code})`))
+        if (this.child !== child) return
+        const error = new Error(`Core exited (${code})`)
+        if (this.stopping || this.shutdownCheckpoint) this.shutdownReply?.reject(error)
+        else void this.fail(error)
       })
       child.on('error', (error) => {
         if (this.child === child && !this.stopping) void this.fail(asError(error))
@@ -136,7 +139,7 @@ export class CoreSupervisor extends EventEmitter {
     // Core may need a database reopen or an outstanding platform result to
     // finish its shutdown checkpoint. Public requests are already gated.
     if (
-      this.stopping &&
+      (this.stopping || this.shutdownCheckpoint) &&
       ![
         'core:shutdown-complete',
         'core:service-close',
@@ -144,6 +147,7 @@ export class CoreSupervisor extends EventEmitter {
         'core:platform',
         'core:platform-cancel',
         'core:settings',
+        'core:client-message',
         'core:fatal'
       ].includes(raw.kind)
     )
@@ -206,6 +210,7 @@ export class CoreSupervisor extends EventEmitter {
         break
       }
       case 'core:client-message': {
+        if ((this.stopping || this.shutdownCheckpoint) && raw.message?.kind !== 'response') return
         if (raw.message?.epoch !== epoch || !this.clients.has(raw.clientId)) return
         if (raw.message.kind === 'response') {
           const pending = this.pending.get(raw.message.requestId)
@@ -397,7 +402,8 @@ export class CoreSupervisor extends EventEmitter {
       !this.initialized ||
       (this.phase !== 'ready' && !initializationRequest) ||
       !this.child ||
-      this.stopping
+      this.stopping ||
+      this.shutdownCheckpoint
     )
       throw Object.assign(new Error('Core is not ready'), { code: 'NOT_READY' })
     if (request.epoch !== this.epoch)
@@ -467,7 +473,8 @@ export class CoreSupervisor extends EventEmitter {
   }
   private fail(error: Error): Promise<void> {
     if (this.failureInProgress) return this.failureInProgress
-    const allowAutomaticRestart = !this.stopping
+    const allowAutomaticRestart = !this.stopping && !this.shutdownCheckpoint
+    this.shutdownReply?.reject(error)
     // Invalidate before any await; old commands cannot cross into a new epoch.
     const child = this.child
     const coreExit = this.coreExit
@@ -616,12 +623,29 @@ export class CoreSupervisor extends EventEmitter {
       if (this.failureInProgress) await this.failureInProgress
       if (this.child && this.initialized) {
         const child = this.child
-        await deadline(
-          new Promise<void>((resolve, reject) => {
+        if (!this.shutdownCheckpoint) {
+          const checkpoint = new Promise<void>((resolve, reject) => {
             const id = randomUUID()
             this.shutdownReply = { id, resolve, reject }
             child.postMessage({ kind: 'core:shutdown', requestId: id })
-          }),
+          })
+          this.shutdownCheckpoint = checkpoint
+          void checkpoint.then(
+            () => {
+              if (this.shutdownCheckpoint === checkpoint) this.shutdownReply = null
+            },
+            () => {
+              if (this.shutdownCheckpoint === checkpoint) {
+                this.shutdownReply = null
+                this.shutdownCheckpoint = null
+              }
+            }
+          )
+        }
+        // A timeout leaves the checkpoint running. A retry joins its eventual
+        // ACK instead of invoking Core teardown a second time.
+        await deadline(
+          this.shutdownCheckpoint,
           this.options.requestTimeoutMs ?? 30_000,
           'Core did not confirm final persistence'
         )
@@ -637,9 +661,49 @@ export class CoreSupervisor extends EventEmitter {
           'Core termination not confirmed'
         )
       this.coreExit = null
+      this.shutdownCheckpoint = null
       this.setPhase('stopped')
     } finally {
-      this.shutdownReply = null
+      this.stopping = false
+    }
+  }
+
+  /** Explicit discard: skip persistence, but still join all owned process exits. */
+  async forceShutdown(): Promise<void> {
+    if (this.stopping) throw new Error('Core shutdown already in progress')
+    this.stopping = true
+    const error = new Error('Core stopped without final persistence')
+    this.platformLifetime.abort(error)
+    this.clearReadyTimer()
+    this.readyReject?.(error)
+    this.readyResolve = this.readyReject = null
+    this.startPromise = null
+    this.shutdownReply?.reject(error)
+    this.shutdownReply = null
+    this.shutdownCheckpoint = null
+    try {
+      if (this.failureInProgress) await this.failureInProgress
+      const child = this.child
+      this.child = null
+      this.epoch = null
+      for (const pending of [...this.pending.values()]) {
+        pending.dispose()
+        pending.reject(Object.assign(new Error(error.message), { code: 'OUTCOME_UNKNOWN' }))
+      }
+      if (child) terminateProcess(child)
+      await Promise.all([
+        this.stopPeers(),
+        this.coreExit
+          ? deadline(
+              this.coreExit,
+              this.options.stopTimeoutMs ?? 2000,
+              'Core termination not confirmed'
+            )
+          : Promise.resolve()
+      ])
+      this.coreExit = null
+      this.setPhase('stopped')
+    } finally {
       this.stopping = false
     }
   }

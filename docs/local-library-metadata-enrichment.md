@@ -49,6 +49,23 @@ changed identification evidence and explicit online requery can create new work.
 Task totals include per-source lookups and retained history, not song counts or missing
 field counts. Use **资料覆盖明细** for actual missing fields.
 
+### Existing Libraries Recover Their Original Identification Tags
+
+Upgrading does not require removing or reimporting songs. The startup scan upgrades old
+file metadata caches from version 1 to version 2 by rereading raw identification tags and
+NetEase native recording/release/artist references. It publishes those observations only
+after the scan succeeds, using the existing file-version and library-scope fences. Changed
+evidence automatically reschedules previous failed identity tasks and continues enrichment.
+Track IDs, displayed names, lyrics, artwork and personal fields remain unchanged; explicit
+manual identification observations remain authoritative. CUE and ISO segment identities
+are kept separate from their containing file. Successfully upgraded files are not reread
+on the next unchanged startup. Unreadable files remain retryable.
+
+The SQLite worker backs up schema 29 before migrating to schema 30. Cached biographies
+remain in SQLite; permitted metadata images remain in `music-cache/cover-cache/metadata-artwork`
+while cover caching is enabled. They can display after a restart without redownloading.
+Ambiguous identities still require review; a same-name search is not automatic confirmation.
+
 ## Library Organization And One-Click Completion
 
 Open **音乐库整理** from the local library's tools menu. **需要你决定** lists unresolved

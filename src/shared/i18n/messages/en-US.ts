@@ -600,7 +600,8 @@ export const EN_US_MESSAGES: Record<string, string> = {
   'error.audio.queue_load_failed': 'Could not load the playback queue: {detail}',
   'error.audio.play_mode_sync_failed': 'Could not sync the play mode: {detail}',
   'error.audio.play_mode_switch_failed': 'Could not switch the play mode: {detail}',
-  'error.audio.decode_failed': 'Audio could not be read or decoded. Check the file integrity or source availability.',
+  'error.audio.decode_failed':
+    'Audio could not be read or decoded. Check the file integrity or source availability.',
 
   // ══ Network errors ═══════════════════════════════════════════════════════
   'error.network.timeout': 'The network request timed out',
@@ -611,6 +612,18 @@ export const EN_US_MESSAGES: Record<string, string> = {
   // ══ Generic error fallbacks ══════════════════════════════════════════════
   'error.generic.unknown': 'An unknown error occurred',
   'error.generic.withDetail': '{action} failed: {detail}',
+
+  'app.closePersistence.title': 'Twilight Echo could not save your changes',
+  'app.closePersistence.message': 'Not all changes have been confirmed saved.',
+  'app.closePersistence.detail':
+    'Retry saving or keep the window open. Quitting without saving may lose recent queue, playlist or settings changes.',
+  'app.closePersistence.retry': 'Retry quit',
+  'app.closePersistence.keepOpen': 'Keep window open',
+  'app.closePersistence.discard': 'Quit without saving',
+  'app.closePersistence.cleanup.title': 'Quit is not complete',
+  'app.closePersistence.cleanup.message': 'Background services have not confirmed they stopped.',
+  'app.closePersistence.cleanup.detail':
+    'Retry quitting or keep the window open. You have chosen to skip unfinished saves.',
 
   // ══ Diagnostics panel ════════════════════════════════════════════════════
   'diagnostics.panel.title': 'Output status diagnostics',

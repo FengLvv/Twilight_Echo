@@ -15,17 +15,21 @@ test('the production entry starts the independent Core owner', async () => {
 })
 function deferred() {
   let resolve!: () => void
-  const promise = new Promise<void>((yes) => {
+  let reject!: (error: Error) => void
+  const promise = new Promise<void>((yes, no) => {
     resolve = yes
+    reject = no
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 async function fixture() {
   const source = await readFile(new URL('./lifecycle.ts', import.meta.url), 'utf8')
   const events: string[] = []
   const startup = deferred(),
     navigation = deferred(),
-    checkpoint = deferred()
+    checkpoint = deferred(),
+    reclamation = deferred()
+  const failures: Array<{ error: Error; respond(choice: 'retry' | 'cancel' | 'force'): void }> = []
   let installed = false,
     quitAllowed = false
   const core = {
@@ -37,6 +41,11 @@ async function fixture() {
       events.push('core:shutdown')
       await checkpoint.promise
       events.push('core:saved')
+    },
+    forceShutdown: async () => {
+      events.push('core:force')
+      await reclamation.promise
+      events.push('core:reclaimed')
     }
   }
   const runtime = {
@@ -103,6 +112,8 @@ async function fixture() {
       events.push('navigation:save')
       await navigation.promise
     },
+    showClosePersistenceFailure: (_win: unknown, error: Error) =>
+      new Promise((respond) => failures.push({ error, respond })),
     dialog: {
       showErrorBox: (_title: string, error: string) => {
         throw Error(error)
@@ -158,6 +169,8 @@ async function fixture() {
     startup,
     navigation,
     checkpoint,
+    reclamation,
+    failures,
     get quitAllowed() {
       return quitAllowed
     }
@@ -224,6 +237,7 @@ test('window close preferences still distinguish tray/mini hiding from explicit 
   const runtime = {
     mainWindow: win,
     forceQuit: false,
+    closingAfterPlaybackSessionSave: false,
     appSettings: { closeWindowBehavior: 'quit' }
   }
   const context = {
@@ -239,6 +253,9 @@ test('window close preferences still distinguish tray/mini hiding from explicit 
     },
     showMiniPlayer: () => {
       mini++
+    },
+    closeMainWindowAfterPlaybackSessionSave: () => {
+      throw new Error('Core close must not enter the legacy window persistence gate')
     }
   }
   runInNewContext(
@@ -264,6 +281,97 @@ test('window close preferences still distinguish tray/mini hiding from explicit 
   assert.equal(quit, 1)
   assert.equal(hidden, 0)
   assert.equal(prevented, 2)
+  // While Core shutdown or its failure dialog is pending, another close must
+  // still go to the application owner, even with a tray preference.
+  runtime.forceQuit = true
+  win.emit('close', event)
+  win.emit('close', event)
+  assert.equal(quit, 3)
+  assert.equal(prevented, 4)
+  assert.equal(mini, 1)
+  runtime.closingAfterPlaybackSessionSave = true
+  win.emit('close', event)
+  assert.equal(quit, 3)
+  assert.equal(prevented, 4)
+})
+
+test('failed Core quit presents one choice, cancels safely and allows a later quit attempt', async () => {
+  const f = await fixture()
+  f.app.quit()
+  f.navigation.resolve()
+  await turn()
+  f.checkpoint.reject(new Error('Core did not confirm final persistence'))
+  await turn()
+  assert.equal(f.failures.length, 1)
+  assert.match(f.failures[0].error.message, /final persistence/)
+  f.app.quit()
+  f.app.quit()
+  await turn()
+  assert.equal(f.failures.length, 1)
+  assert.equal(f.events.filter((event) => event === 'core:shutdown').length, 1)
+  f.failures[0].respond('cancel')
+  await turn()
+  assert.equal(f.runtime.forceQuit, false)
+  assert.equal(f.quitAllowed, false)
+  f.checkpoint.promise = Promise.resolve()
+  f.app.quit()
+  await turn()
+  assert.equal(f.quitAllowed, true)
+})
+
+test('retry keeps the quit owner and does not repeat a successful renderer save', async () => {
+  const f = await fixture()
+  f.app.quit()
+  f.navigation.resolve()
+  await turn()
+  f.checkpoint.reject(new Error('checkpoint failed'))
+  await turn()
+  f.checkpoint.promise = Promise.resolve()
+  f.failures[0].respond('retry')
+  await turn()
+  assert.equal(f.events.filter((event) => event === 'navigation:save').length, 1)
+  assert.equal(f.events.filter((event) => event === 'core:shutdown').length, 2)
+  assert.equal(f.quitAllowed, true)
+})
+
+test('quit without saving bypasses persistence once and waits for owned process reclamation', async () => {
+  const f = await fixture()
+  f.app.quit()
+  f.navigation.resolve()
+  await turn()
+  f.checkpoint.reject(new Error('Core did not confirm final persistence'))
+  await turn()
+  f.failures[0].respond('force')
+  await turn()
+  f.app.quit()
+  assert.equal(f.events.filter((event) => event === 'core:force').length, 1)
+  assert.equal(f.events.filter((event) => event === 'core:shutdown').length, 1)
+  assert.equal(f.quitAllowed, false)
+  f.reclamation.resolve()
+  await turn()
+  assert.equal(f.quitAllowed, true)
+  assert.equal(f.runtime.closingAfterPlaybackSessionSave, true)
+  assert.ok(f.events.indexOf('core:reclaimed') < f.events.indexOf('app:quit'))
+})
+
+test('discard remains available when renderer saving fails, and cleanup retry never re-enters saving', async () => {
+  const f = await fixture()
+  f.app.quit()
+  f.navigation.reject(new Error('Timed out waiting for renderer persistence'))
+  await turn()
+  f.failures[0].respond('force')
+  await turn()
+  f.reclamation.reject(new Error('Core termination not confirmed'))
+  await turn()
+  assert.equal(f.quitAllowed, false)
+  assert.equal(f.failures.length, 2)
+  f.reclamation.promise = Promise.resolve()
+  f.failures[1].respond('retry')
+  await turn()
+  assert.equal(f.events.filter((event) => event === 'navigation:save').length, 1)
+  assert.equal(f.events.filter((event) => event === 'core:shutdown').length, 0)
+  assert.equal(f.events.filter((event) => event === 'core:force').length, 2)
+  assert.equal(f.quitAllowed, true)
 })
 
 test('unexpected main renderer destruction preserves Core and rebinds SMTC to a renderer-free anchor', async () => {

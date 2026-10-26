@@ -939,6 +939,7 @@ if(TAE_BUILD_TESTS)
     core/AudioTypes.cpp
     core/DiagnosticLog.cpp
     core/TwilightAudioEngine.cpp
+    metadata/AudioMetadataService.cpp
     analysis/BpmAnalyzer.cpp
     analysis/LoudnessAnalyzer.cpp
     decoder/DopPacker.cpp
@@ -969,6 +970,7 @@ if(TAE_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
+  target_compile_definitions(twilight_audio_performance_gate PRIVATE TAE_BUILDING_LIBRARY=1)
   # NDEBUG is stripped from every test target at the end of this block.
   target_link_libraries(twilight_audio_performance_gate PRIVATE ${CMAKE_DL_LIBS})
   target_sources(twilight_audio_performance_gate PRIVATE automix-native/AutoMixAdapter.cpp)

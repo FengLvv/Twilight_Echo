@@ -200,7 +200,7 @@ TempAudioFixture writePcmWavFixture(const PcmWavFixtureSpec& spec) {
 }
 
 TempAudioFixture writeFlacTailFixture(
-    const std::string& name, bool appendInvalidFrame, bool incomplete, bool knownLength) {
+    const std::string& name, bool appendInvalidFrame, bool incomplete, bool knownLength, int fullFrames) {
   // Stereo/44.1 kHz FLAC: 8820 silent samples in two frames (4608 + 4212).
   const std::string hex =
       "664c6143000000221200120000000e0000100ac442f00000227442b1eafdf0fc632f"
@@ -209,11 +209,38 @@ TempAudioFixture writeFlacTailFixture(
   std::vector<uint8_t> bytes;
   for (size_t i = 0; i < hex.size(); i += 2)
     bytes.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16)));
+  const auto firstFrame = std::vector<uint8_t>(bytes.begin() + 60, bytes.begin() + 74);
+  const auto lastFrame = std::vector<uint8_t>(bytes.begin() + 74, bytes.end());
+  bytes.resize(60);
+  // Longer streams give FFmpeg's raw-FLAC binary seek enough frame headers.
+  // Frame numbers stay below 128, so their UTF-8 representation is one byte.
+  const auto appendFrame = [&bytes](std::vector<uint8_t> frame, uint8_t number, size_t headerCrcIndex) {
+    frame[4] = number;
+    uint8_t crc8 = 0;
+    for (size_t i = 0; i < headerCrcIndex; ++i) {
+      crc8 ^= frame[i];
+      for (int bit = 0; bit < 8; ++bit) crc8 = (crc8 << 1) ^ ((crc8 & 0x80) ? 0x07 : 0);
+    }
+    frame[headerCrcIndex] = crc8;
+    uint16_t crc16 = 0;
+    for (size_t i = 0; i < frame.size() - 2; ++i) {
+      crc16 ^= static_cast<uint16_t>(frame[i]) << 8;
+      for (int bit = 0; bit < 8; ++bit) crc16 = (crc16 << 1) ^ ((crc16 & 0x8000) ? 0x8005 : 0);
+    }
+    frame[frame.size() - 2] = static_cast<uint8_t>(crc16 >> 8);
+    frame.back() = static_cast<uint8_t>(crc16);
+    bytes.insert(bytes.end(), frame.begin(), frame.end());
+  };
+  for (int i = 0; i < fullFrames; ++i) appendFrame(firstFrame, static_cast<uint8_t>(i), 5);
+  if (!incomplete) appendFrame(lastFrame, static_cast<uint8_t>(fullFrames), 7);
+  const uint64_t sampleCount = static_cast<uint64_t>(fullFrames) * 4608 + 4212;
+  bytes[21] = (bytes[21] & 0xf0) | static_cast<uint8_t>(sampleCount >> 32);
+  for (int i = 0; i < 4; ++i) bytes[22 + i] = static_cast<uint8_t>(sampleCount >> ((3 - i) * 8));
+  std::fill(bytes.begin() + 26, bytes.begin() + 42, 0); // Unset optional PCM MD5.
   if (!knownLength) {
     bytes[21] &= 0xf0;
     bytes[22] = bytes[23] = bytes[24] = bytes[25] = 0;
   }
-  if (incomplete) bytes.resize(74);
   if (appendInvalidFrame) {
     // Valid frame header, invalid subframe: receive_frame returns INVALIDDATA.
     const std::array<uint8_t, 14> invalid{0xff, 0xf8, 0x59, 0x18, 0x00, 0x6b, 0x04, 0, 0, 0, 0, 0, 0x10, 0x8a};

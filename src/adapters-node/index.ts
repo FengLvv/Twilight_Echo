@@ -1,6 +1,6 @@
 import * as nodeFs from 'node:fs'
 import * as nodeFsPromises from 'node:fs/promises'
-import * as nodeStream from 'node:stream'
+import { Readable, Writable, PassThrough, Transform, Duplex } from 'node:stream'
 import { finished as nodeFinished, pipeline as nodePipeline } from 'node:stream/promises'
 import * as nodeOs from 'node:os'
 import * as nodeHttp from 'node:http'
@@ -51,11 +51,11 @@ export function createNodeCorePorts(): CorePorts {
   const fsPromisesPort: CoreFsPromisesPort = nodeFsPromises as unknown as CoreFsPromisesPort
   const fsPort: CoreFsPort = nodeFs as unknown as CoreFsPort
   const streamPort: CoreStreamPort = {
-    Readable: nodeStream.Readable as unknown as CoreStreamPort['Readable'],
-    Writable: nodeStream.Writable as unknown as CoreStreamPort['Writable'],
-    PassThrough: nodeStream.PassThrough as unknown as CoreStreamPort['PassThrough'],
-    Transform: nodeStream.Transform as unknown as CoreStreamPort['Transform'],
-    Duplex: nodeStream.Duplex as unknown as CoreStreamPort['Duplex'],
+    Readable: Readable as unknown as CoreStreamPort['Readable'],
+    Writable: Writable as unknown as CoreStreamPort['Writable'],
+    PassThrough: PassThrough as unknown as CoreStreamPort['PassThrough'],
+    Transform: Transform as unknown as CoreStreamPort['Transform'],
+    Duplex: Duplex as unknown as CoreStreamPort['Duplex'],
     pipeline: nodePipeline as unknown as CoreStreamPort['pipeline'],
     finished: nodeFinished as unknown as CoreStreamPort['finished']
   }

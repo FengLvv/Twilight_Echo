@@ -670,7 +670,7 @@ export class LibraryDatabaseEntityMetadata {
   private automaticBlock(job: EntityMetadataJob, request?: IdentificationScheduleRequest): string | null {
     const automatic = this.automatic(job)
     if (!automatic) return null
-    if (!automatic.live) return 'not_library_member'
+    if (!automatic.live) return this.pendingAutomaticConsumer(job) ? 'catalog_projection_pending' : 'not_library_member'
     if (!request) return null
     const permitted = request.enabled &&
       (request.newImports && automatic.origin === 'new' || request.history && automatic.historical)
@@ -680,6 +680,22 @@ export class LibraryDatabaseEntityMetadata {
       : request.enrichment?.language === job.language && request.enrichment.providers.some(p =>
           p.id === job.provider && p.context === (job.providerContext ?? '') && p.kinds.includes(job.entityKind!))
     return permitted && provider ? null : job.type === 'identify' ? 'automatic_identification_disabled' : 'automatic_enrichment_disabled'
+  }
+  private pendingAutomaticConsumer(job: EntityMetadataJob): boolean {
+    // A present local track awaiting projection is not a removed library member.
+    // Keep the existing input/membership fences, but defer instead of cancelling
+    // permanently when a display-only refresh will leave the input unchanged.
+    return !!this.sql.prepare(`SELECT 1 FROM metadata_demands d
+      JOIN metadata_identification_schedule a ON a.demand_id=d.batch_id
+      JOIN catalog_entity_sources b ON b.entity_id=a.entity_id
+      JOIN catalog_sources s ON s.id=b.source_id
+      JOIN catalog_memberships m ON m.source_id=s.id
+      JOIN tracks t ON t.id=s.track_id JOIN catalog_pending p ON p.track_id=t.id
+      WHERE d.job_id=? AND s.provider='local' AND s.availability<>'missing'
+      AND (?='identify' AND a.entity_id=? OR ?='enrich' AND EXISTS(
+        SELECT 1 FROM metadata_identity_links l WHERE l.entity_id=a.entity_id
+          AND l.target_id=? AND l.state='confirmed')) LIMIT 1`)
+      .get(job.id, job.type, job.entityId, job.type, job.entityId)
   }
   private requeryBlock(job: EntityMetadataJob, request?: IdentificationScheduleRequest): boolean {
     if (!job.requeryConsumers?.length || this.requeryConsumerValid(job)) return false
@@ -720,11 +736,15 @@ export class LibraryDatabaseEntityMetadata {
           continue
         }
         const configuration = this.sql.prepare("SELECT value FROM metadata_identification_schedule_state WHERE key='configuration'").get()?.value
+        const automaticBlock = this.automaticBlock(previous, configuration ? JSON.parse(String(configuration)) : undefined)
+        if (automaticBlock === 'catalog_projection_pending') {
+          this.save({ ...previous, nextAttemptAt: now + 100, updatedAt: now })
+          continue
+        }
         if (this.requeryBlock(previous, configuration ? JSON.parse(String(configuration)) : undefined)) {
           this.save({ ...previous, state: 'cancelled', generation: previous.generation + 1, reason: 'input_changed', updatedAt: now })
           continue
         }
-        const automaticBlock = this.automaticBlock(previous, configuration ? JSON.parse(String(configuration)) : undefined)
         if (automaticBlock) {
           this.save({ ...previous, state: automaticBlock === 'not_library_member' ? 'cancelled' : 'blocked',
             generation: previous.generation + 1, reason: automaticBlock, updatedAt: now })
@@ -777,6 +797,13 @@ export class LibraryDatabaseEntityMetadata {
           | undefined
       )
       if (!job || job.state !== 'running' || job.generation !== work.job.generation) return false
+      const automaticBlock = this.automaticBlock(job, automation)
+      if (automaticBlock === 'catalog_projection_pending') {
+        this.save({ ...job, state: 'queued', generation: job.generation + 1,
+          attempts: Math.max(0, job.attempts - 1), nextAttemptAt: now + 100,
+          reason: null, updatedAt: now })
+        return false
+      }
       if (this.requeryBlock(job, automation)) {
         this.save({ ...job, state: 'cancelled', generation: job.generation + 1, reason: 'input_changed', updatedAt: now })
         return false
@@ -800,7 +827,6 @@ export class LibraryDatabaseEntityMetadata {
         return true
       }
       if (result.state === 'legacy_result') throw new Error('Invalid legacy result target')
-      const automaticBlock = this.automaticBlock(job, automation)
       if (automaticBlock) result = { state: 'blocked', reason: automaticBlock }
       let current = ''
       try {

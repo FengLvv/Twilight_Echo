@@ -2,6 +2,7 @@
 #include "../core/TwilightAudioEngine.h"
 #include "../dsp/Vst3BridgeProcessor.h"
 #include "../output/IOutputBackend.h"
+#include "../output/OutputBackendFactory.h"
 #include "../automix-native/AutoMixAdapter.h"
 #include "../automix-native/am_hash.h"
 #include "../decoder/FFmpegDecoder.h"
@@ -807,11 +808,9 @@ bool pumpCallback(const std::shared_ptr<ControlledBackendState> &backend,
   return containsAudio;
 }
 
-// Capture the production float callback without a device or muted software
-// volume. This checks ordinary playback, before any transition is submitted.
 int verifyFlacTailContinuation() {
   using namespace twilight::audio::test;
-  const auto first = writeFlacTailFixture("twilight-continuation-tail.flac", true);
+  const auto first = writeFlacTailFixture("twilight-continuation-tail.flac", true, false, true, 40);
   const auto next = writePcmWavFixture({"twilight-continuation-next.wav", 44100, 2, 16, 88200, false});
   g_pcmSharedFormat = true; // Match FLAC 44.1 kHz -> shared output 48 kHz.
   for (const bool gapless : {false, true}) {
@@ -831,8 +830,8 @@ int verifyFlacTailContinuation() {
       const std::string queue = "[{\"id\":\"first\",\"source\":\"" + json_utils::escape(first.string()) +
           "\"},{\"id\":\"next\",\"source\":\"" + json_utils::escape(next.string()) + "\"}]";
       assert(engine.loadQueue(queue, 0) == TAE_RESULT_OK);
-      assert(engine.play(first.string(), seekMode == 1 ? .15 : 0) == TAE_RESULT_OK);
-      if (seekMode == 2) assert(engine.seek(.15) == TAE_RESULT_OK);
+      assert(engine.play(first.string(), seekMode == 1 ? 4.15 : 0) == TAE_RESULT_OK);
+      if (seekMode == 2) assert(engine.seek(4.15) == TAE_RESULT_OK);
       const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
       bool advanced = false;
       while (std::chrono::steady_clock::now() < deadline && errors.load() == 0) {
@@ -852,7 +851,7 @@ int verifyFlacTailContinuation() {
         if (json_utils::fieldString(info, "source") == next.string() &&
             json_utils::fieldNumber(info, "queueIndex") == 1) {
           assert(json_utils::fieldString(info, "state") == "playing");
-          assert(json_utils::fieldNumber(info, "trackSerial") == 1);
+          assert(json_utils::fieldNumber(json_utils::fieldObject(info, "naturalBoundaries"), "trackSerial") == 1);
           advanced = true;
           break;
         }
@@ -870,6 +869,8 @@ int verifyFlacTailContinuation() {
   return 0;
 }
 
+// Capture the production float callback without a device or muted software
+// volume. This checks ordinary playback, before any transition is submitted.
 int verifyPcmTransparency(const std::filesystem::path& manifestPath) {
   std::ifstream manifest(manifestPath);
   const std::string json{std::istreambuf_iterator<char>(manifest), {}};
@@ -1230,6 +1231,15 @@ void writeScenarioJson(std::ostream& out, const ScenarioReport& report, bool tra
 }  // namespace
 
 namespace twilight::audio {
+
+// Keep device discovery/provider selection on the same controlled route as
+// the callback pump. Decoding, metadata, queue and engine clock remain real.
+std::string defaultBackendId() { return "controlled-pump"; }
+bool isOutputBackendAvailable(const std::string&) { return true; }
+PcmOutputProviderStatus validatePcmOutputProviderForBackend(const std::string&, std::string*) {
+  return PcmOutputProviderStatus::Ready;
+}
+std::string enumeratePlatformDevicesJson() { return "[]"; }
 
 std::unique_ptr<IOutputBackend> createOutputBackend(const std::string&, std::string*) {
   return std::make_unique<ControlledPumpBackend>();

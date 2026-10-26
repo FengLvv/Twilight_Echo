@@ -515,7 +515,7 @@ export function applyEqConfigPatch(
 }
 
 export function aggregateLibraryCollections(
-  tracks: readonly Array<{
+  tracks: ReadonlyArray<{
     id: string
     title?: string
     artist?: string

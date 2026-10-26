@@ -550,6 +550,17 @@ export const ZH_CN_MESSAGES: Record<string, string> = {
   'error.generic.unknown': '发生未知错误',
   'error.generic.withDetail': '{action}失败：{detail}',
 
+  'app.closePersistence.title': '退出前保存失败',
+  'app.closePersistence.message': '尚未确认所有更改已保存。',
+  'app.closePersistence.detail':
+    '可重试保存或保留窗口。不保存退出可能丢失最近的队列、歌单或设置更改。',
+  'app.closePersistence.retry': '重试退出',
+  'app.closePersistence.keepOpen': '保留窗口',
+  'app.closePersistence.discard': '不保存退出',
+  'app.closePersistence.cleanup.title': '退出尚未完成',
+  'app.closePersistence.cleanup.message': '后台服务尚未确认停止。',
+  'app.closePersistence.cleanup.detail': '可重试退出或保留窗口。已选择跳过未完成的保存。',
+
   // ── 诊断面板 ──────────────────────────────────────────────────────────────
   'diagnostics.panel.title': '输出状态诊断',
   'diagnostics.panel.perfect': '输出链已验证为逐位直通',
