@@ -61,6 +61,11 @@ manual identification observations remain authoritative. CUE and ISO segment ide
 are kept separate from their containing file. Successfully upgraded files are not reread
 on the next unchanged startup. Unreadable files remain retryable.
 
+Automatic jobs wait while a present local track is being re-projected into the catalog.
+A cover/lyrics refresh does not cancel its identity or biography demand as if the track
+had left the library. In-flight results wait for fresh claim/input checks before publication;
+actual removals and changed identification evidence retain their existing commit fences.
+
 The SQLite worker backs up schema 29 before migrating to schema 30. Cached biographies
 remain in SQLite; permitted metadata images remain in `music-cache/cover-cache/metadata-artwork`
 while cover caching is enabled. They can display after a restart without redownloading.

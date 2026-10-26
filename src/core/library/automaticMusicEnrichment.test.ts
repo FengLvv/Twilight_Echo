@@ -210,6 +210,28 @@ test('unconfirmed same-name sources never fetch details; confirmed local and str
   assert.equal(db.metadataDetail(entity(db, 'local', 'release'), 'zh-Hans').introduction, null)
 })
 
+for (const running of [false, true])
+  test(`${running ? 'running' : 'queued'} automatic biography work survives a pending local catalog projection`, t => {
+    const db = fixture(t), id = entity(db)
+    confirm(db, id)
+    drain(db)
+    const original = db.metadataJobs({}).items[0]
+    const work = running ? db.metadataClaim(2000)! : null
+    const version = db.getTracksByIds(['local']).versions.local
+    db.patchTracks([{ id: 'local', expectedVersion: version, patch: { lyrics: 'Updated local lyrics' } }])
+    if (work) assert.equal(db.metadataFinish(work, completed(), 2001, configuration()), false)
+    else assert.equal(db.metadataClaim(2000), null)
+    assert.equal(db.metadataJobs({ jobId: original.id }).items[0].state, 'queued')
+    assert.equal(db.metadataDetail(id, 'zh-Hans').introduction, null)
+    while (db.catalogStatus().localPending) db.catalogAdvance()
+    drain(db, configuration(), 2101)
+    const resumed = db.metadataClaim(2101)!
+    assert.equal(resumed.job.id, original.id)
+    if (work) assert.equal(db.metadataFinish(work, completed(), 2102, configuration()), false)
+    assert.equal(db.metadataFinish(resumed, completed(), 2102, configuration()), true)
+    assert.equal(db.metadataDetail(id, 'zh-Hans').introduction!.value, '介绍')
+  })
+
 test('pending first-import consent prevents automatic requests even with enabled scope switches; accepting resumes the durable scheduler', async t => {
   const db = fixture(t), id = entity(db)
   confirm(db, id)

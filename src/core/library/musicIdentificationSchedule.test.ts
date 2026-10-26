@@ -167,6 +167,46 @@ test('uncommitted local catalog pages wait for the complete generation, then rep
   assert.equal(db.metadataJobs({ entityId: artist }).items[0].generation, 2)
 })
 
+for (const running of [false, true])
+  test(`${running ? 'running' : 'queued'} automatic identification waits for a display-only local projection without losing its demand`, (t) => {
+    const db = new LibraryDatabase(':memory:')
+    t.after(() => db.close())
+    seed(db)
+    const request = config({ providers: [{ ...provider, kinds: ['artist'] }] })
+    drain(db, request)
+    const original = db.metadataJobs({}).items[0]
+    const input = db.identificationInput(original.entityId)
+    const work = running ? db.metadataClaim(1000)! : null
+    const version = db.getTracksByIds(['local-1']).versions['local-1']
+    db.patchTracks([{ id: 'local-1', expectedVersion: version, patch: { cover: 'cover://new' } }])
+    assert.equal(db.catalogStatus().localPending, true)
+    if (work) assert.equal(db.metadataFinish(work, empty, 1001, request), false)
+    else assert.equal(db.metadataClaim(1000), null)
+    const waiting = db.metadataJobs({ jobId: original.id }).items[0]
+    assert.equal(waiting.state, 'queued')
+    assert.equal(waiting.attempts, 0)
+    assert.equal(db.sql.prepare('SELECT count(*) n FROM metadata_demands WHERE job_id=?').get(original.id)!.n, 1)
+    while (db.catalogStatus().localPending) db.catalogAdvance()
+    assert.equal(db.identificationInput(original.entityId).version, input.version)
+    drain(db, request, 1101)
+    const resumed = db.metadataClaim(1101)!
+    assert.equal(resumed.job.id, original.id)
+    if (work) assert.equal(db.metadataFinish(work, empty, 1102, request), false)
+    assert.equal(db.metadataFinish(resumed, empty, 1102, request), true)
+    assert.equal(db.metadataJobs({ jobId: original.id }).items[0].state, 'completed')
+  })
+
+test('a truly removed local track still cancels automatic identification before projection catches up', (t) => {
+  const db = new LibraryDatabase(':memory:')
+  t.after(() => db.close())
+  seed(db)
+  drain(db)
+  db.replaceDocument({ version: 2, revision: 2, folders: [], exclusions: [], tracks: [] })
+  assert.equal(db.catalogStatus().localPending, true)
+  assert.equal(db.metadataClaim(1000), null)
+  assert.ok(db.metadataJobs({}).items.every(job => job.state === 'cancelled' && job.reason === 'not_library_member'))
+})
+
 test('history demand, fixed horizon and cursor publish atomically and resume across reopen without including later entities', (t) => {
   const { path } = fixture(t)
   let db = new LibraryDatabase(path)
