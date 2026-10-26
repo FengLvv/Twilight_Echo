@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 
@@ -10,6 +11,14 @@ const ENTRY = path.join(ROOT, 'src/core/portableSlice.ts')
 const OUT_DIR = path.join(ROOT, 'dist/portable-core')
 const OUT_FILE = path.join(OUT_DIR, 'music-core.js')
 const LOCK_FILE = path.join(OUT_DIR, 'core-lock.json')
+
+function resolveGitCommitSha() {
+  try {
+    return execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim()
+  } catch {
+    return '65688cccf919cbf36d900e92fd0a06eb4fb557c0'
+  }
+}
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
@@ -64,7 +73,7 @@ async function main() {
 
   const lockMetadata = {
     upstream: 'https://github.com/Px-asen/Twilight_Echo',
-    commit: '65688cccf919cbf36d900e92fd0a06eb4fb557c0',
+    commit: resolveGitCommitSha(),
     musicCoreVersion: pkg.version ?? '1.4.0-perview',
     audioCoreVersion: '0.1.0',
     protocolVersion: 1,
@@ -77,17 +86,19 @@ async function main() {
 
   fs.writeFileSync(LOCK_FILE, `${JSON.stringify(lockMetadata, null, 2)}\n`, 'utf8')
 
-  const androidTargets = [
-    path.join(ROOT, 'sdk/android-app'),
-    path.resolve(ROOT, '../Twilight_Echo_Android')
-  ]
-  for (const androidAppRoot of androidTargets) {
-    if (fs.existsSync(androidAppRoot)) {
-      const androidAssetsCoreDir = path.join(androidAppRoot, 'runtime-host/src/main/assets/core')
-      fs.mkdirSync(androidAssetsCoreDir, { recursive: true })
-      fs.copyFileSync(OUT_FILE, path.join(androidAssetsCoreDir, 'music-core.js'))
-      fs.copyFileSync(LOCK_FILE, path.join(androidAssetsCoreDir, 'core-lock.json'))
-      fs.copyFileSync(LOCK_FILE, path.join(androidAppRoot, 'core-lock.json'))
+  if (process.env.SKIP_ANDROID_SYNC !== '1') {
+    const androidTargets = [
+      path.join(ROOT, 'sdk/android-app'),
+      path.resolve(ROOT, '../Twilight_Echo_Android')
+    ]
+    for (const androidAppRoot of androidTargets) {
+      if (fs.existsSync(androidAppRoot)) {
+        const androidAssetsCoreDir = path.join(androidAppRoot, 'runtime-host/src/main/assets/core')
+        fs.mkdirSync(androidAssetsCoreDir, { recursive: true })
+        fs.copyFileSync(OUT_FILE, path.join(androidAssetsCoreDir, 'music-core.js'))
+        fs.copyFileSync(LOCK_FILE, path.join(androidAssetsCoreDir, 'core-lock.json'))
+        fs.copyFileSync(LOCK_FILE, path.join(androidAppRoot, 'core-lock.json'))
+      }
     }
   }
 

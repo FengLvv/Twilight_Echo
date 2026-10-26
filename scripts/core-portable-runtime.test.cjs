@@ -583,3 +583,153 @@ test('Portable MusicCore Phase 2: Local Library Collections, Search, Playlists/F
 
   await host.shutdown()
 })
+
+test('Portable MusicCore Phase 3: Custom Playlists CRUD, Album/Artist Collections, EQ/DSP Presets, and Embedded Host Bridge in zero-Node sandbox', async () => {
+  const portableCore = loadPortableCoreInIsolatedSandbox()
+  const ports = createFakePorts()
+
+  // 1. Test createPortableMusicCoreHost Phase 3 capabilities + persistence
+  const host = portableCore.createPortableMusicCoreHost({
+    epoch: 'epoch-phase3-1',
+    platform: 'android',
+    clock: ports.clock,
+    sessionStore: ports.sessionStore,
+    audioEngine: ports.audioEngine,
+    initialTracks: [
+      {
+        id: 'track-301',
+        filePath: 'content://media/external/audio/media/301',
+        title: 'Amber Horizon',
+        artist: 'Aether Ensemble',
+        album: 'Echoes of Dusk',
+        duration: 240,
+      },
+      {
+        id: 'track-302',
+        filePath: 'content://media/external/audio/media/302',
+        title: 'Silver Rain',
+        artist: 'Aether Ensemble',
+        album: 'Echoes of Dusk',
+        duration: 200,
+      },
+      {
+        id: 'track-303',
+        filePath: 'content://media/external/audio/media/303',
+        title: 'Midnight Pulse',
+        artist: 'Kairo',
+        album: 'Solstice',
+        duration: 180,
+      },
+    ],
+  })
+
+  await host.initialize()
+
+  // Collections aggregation
+  const collections = host.getLibraryCollections()
+  assert.equal(collections.albums.length, 2)
+  assert.equal(collections.artists.length, 2)
+  const duskAlbum = collections.albums.find((a) => a.title === 'Echoes of Dusk')
+  assert.ok(duskAlbum)
+  assert.equal(duskAlbum.trackCount, 2)
+  assert.equal(duskAlbum.totalDurationSec, 440)
+
+  // Custom Playlists CRUD
+  const createdPl = host.createCustomPlaylist('Late Night Hi-Res', ['track-301'])
+  assert.equal(createdPl.name, 'Late Night Hi-Res')
+  assert.deepEqual(Array.from(createdPl.trackIds), ['track-301'])
+  assert.equal(createdPl.trackCount, 1)
+
+  const addedPl = host.addTracksToCustomPlaylist(createdPl.id, ['track-302', 'track-303'])
+  assert.equal(addedPl.trackCount, 3)
+
+  const renamedPl = host.renameCustomPlaylist(createdPl.id, 'Audiophile Reference')
+  assert.equal(renamedPl.name, 'Audiophile Reference')
+
+  const removedPl = host.removeTrackFromCustomPlaylist(createdPl.id, 'track-302')
+  assert.deepEqual(Array.from(removedPl.trackIds), ['track-301', 'track-303'])
+  assert.equal(removedPl.trackCount, 2)
+
+  // Equalizer / DSP Configuration
+  const updatedEq = host.setEqConfig({
+    enabled: true,
+    preset: 'Vocal',
+    preampDb: -1.5,
+    bitPerfect: false,
+    gapless: true,
+  })
+  assert.equal(updatedEq.enabled, true)
+  assert.equal(updatedEq.preset, 'Vocal')
+  assert.equal(updatedEq.preampDb, -1.5)
+  assert.equal(updatedEq.bandsDb.length, 10)
+  assert.equal(updatedEq.bandsDb[4], 4.0)
+
+  await host.shutdown()
+
+  // Verify Embedded Bridge (`bootHost` + `handleRequest` + `onAudioEngineEvent`) in isolated sandbox
+  const bootRes = JSON.parse(
+    portableCore.bootHost(JSON.stringify({ epoch: 'epoch-embedded-bridge-1', protocolVersion: 1 })),
+  )
+  assert.equal(bootRes.ok, true)
+  assert.equal(bootRes.epoch, 'epoch-embedded-bridge-1')
+
+  // Create playlist via embedded handleRequest
+  const createCmdRes = JSON.parse(
+    portableCore.handleRequest(
+      JSON.stringify({
+        kind: 'command',
+        requestId: 'req-emb-pl-1',
+        epoch: 'epoch-embedded-bridge-1',
+        name: 'playlists.create',
+        payload: {
+          name: 'Commute Favorites',
+          trackIds: ['track-twilight-overture', 'track-solstice-drift'],
+        },
+      }),
+    ),
+  )
+  assert.equal(createCmdRes.ok, true)
+  assert.equal(createCmdRes.value.snapshot.playlists.length, 1)
+  assert.equal(createCmdRes.value.snapshot.playlists[0].name, 'Commute Favorites')
+  assert.equal(createCmdRes.value.snapshot.playlists[0].trackCount, 2)
+
+  // Query collections via embedded handleRequest
+  const colQueryRes = JSON.parse(
+    portableCore.handleRequest(
+      JSON.stringify({
+        kind: 'query',
+        requestId: 'req-emb-col-1',
+        epoch: 'epoch-embedded-bridge-1',
+        name: 'library.collections',
+        payload: {},
+      }),
+    ),
+  )
+  assert.equal(colQueryRes.ok, true)
+  assert.equal(colQueryRes.value.albums.length, 3)
+  assert.equal(colQueryRes.value.artists.length, 3)
+
+  // Configure EQ via embedded handleRequest
+  const eqCmdRes = JSON.parse(
+    portableCore.handleRequest(
+      JSON.stringify({
+        kind: 'command',
+        requestId: 'req-emb-eq-1',
+        epoch: 'epoch-embedded-bridge-1',
+        name: 'audio.setEq',
+        payload: {
+          enabled: true,
+          preset: 'Bass Boost',
+          preampDb: -2.0,
+          bitPerfect: false,
+          gapless: true,
+        },
+      }),
+    ),
+  )
+  assert.equal(eqCmdRes.ok, true)
+  assert.equal(eqCmdRes.value.snapshot.eqConfig.enabled, true)
+  assert.equal(eqCmdRes.value.snapshot.eqConfig.preset, 'Bass Boost')
+  assert.equal(eqCmdRes.value.snapshot.eqConfig.bandsDb[0], 5.5)
+  assert.equal(eqCmdRes.value.snapshot.playback.outputPerfect, false)
+})
