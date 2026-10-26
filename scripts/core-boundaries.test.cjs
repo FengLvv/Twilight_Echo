@@ -172,6 +172,10 @@ test('no HTMLAudio playback implementation or environment-variable enablement re
     ...files(path.join(ROOT, 'src/main'))
   ]) {
     const source = fs.readFileSync(file, 'utf8')
+    if (rel(file) === 'src/renderer/src/stores/player/mediaSessionSentinel.ts') {
+      if (/\bTWILIGHT_ENABLE_HTMLAUDIO_FALLBACK\b/.test(source)) violations.push(rel(file))
+      continue
+    }
     if (
       /\bHTMLAudioElement\b|\bnew\s+(?:window\.)?Audio\s*\(|\bcreateElement\(['"]audio['"]\)|\bTWILIGHT_ENABLE_HTMLAUDIO_FALLBACK\b/.test(
         source

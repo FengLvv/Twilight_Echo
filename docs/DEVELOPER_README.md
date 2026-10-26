@@ -264,6 +264,7 @@ Linux 播放条的 CSS 毛玻璃回退服从减少透明度、高对比度和强
 - 最近播放、排行榜和 Dashboard 榜单等只需要前 N 项的选择器使用 store 内的有界 top-N 收集，避免在 SFC 内为整张历史表创建 `entries/filter/sort/slice/map` 中间链。
 - 播放 tick 会写入的统计状态使用 `shallowRef` 加显式 `triggerRef` 提交，更新单条统计时不要复制整张历史表。
 - 迷你播放器 / 托盘 / SMTC 共用的状态快照分两路发布：曲目、传输、收藏等元数据变化立即发；`currentTime` 只在整秒变化时经 ≥500ms 节流发（各窗口按采样时间自行外推），快照不携带歌词，主进程再按渲染签名去重后才调用原生 SMTC。不要把 `currentTime` 直接加回即时 watch。
+- Linux 的系统媒体控制走 Chromium 的 MPRIS 桥接，而该桥接**只对由 HTMLMediaElement 支撑的 MediaSession 生效**。原生 ALSA 引擎出声时渲染层并不持有媒体元素，导出的 `org.mpris.MediaPlayer2` 会是一个能力全为 false、metadata 只有 `mpris:length: 0` 的空壳，桌面媒体控件和 `playerctl` 都无法控制播放。因此 Linux 上额外 arm 一个常驻静音元素（`mediaSessionSentinel.ts`）：`muted` 必须保持 false（muted 的元素不注册 MPRIS），静音靠 `volume = 0` 加静音 PCM 源实现。有该哨兵时渲染层即使不拥有会话也要发布 metadata 与 action handler，否则名字虽在但仍是空壳；原生引擎仍独占音频设备，Windows/macOS 有原生会话时不 arm。
 - 播放栏 / 均衡器电平表的 60ms 可视化轮询按消费者引用计数启动：读取 `visualizationData` 的组件挂载时 `acquireVisualizationConsumer()`、卸载时释放，计数为 0 不发共享轮询 IPC；store 轮询不请求 oscilloscope / spectrogram。参数 EQ 的高分辨率频谱和完整可视化面板各自按可见状态请求数据。性能设置中的“歌词页底部动态频谱”开关默认开启；关闭后不挂载紧凑播放栏频谱并释放其轮询消费者，播放控制栏保持可用。
 - 完整可视化面板在 BPM 和时长之间显示曲目的来源（本地、NCM、网络源、电台、播客或其他 provider），不猜测曲风。音频属性先用与当前曲目音源匹配的原生播放信息补齐编码、采样率、源声道数、位深与码率，缺项回退到曲目元数据；文件大小沿用曲库记录。原生解码器对有损音频报告的位深可能是解码后的样本位深，面板不把它当作源文件位深。原生信息迟到时只更新音频属性，不重置实时 BPM。
 - 搜索热路径避免为每首歌创建临时字段数组，优先短路判断，并尽量只保留当前页需要渲染的结果。
