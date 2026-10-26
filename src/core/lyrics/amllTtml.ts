@@ -1,5 +1,6 @@
 import { PortableBuffer } from '../../shared/portableBytes.ts'
-import type { PortableIncomingHttpHeaders } from '../ports/index.ts'
+
+export type PortableIncomingHttpHeaders = Record<string, string | string[] | undefined>
 
 export const AMLL_TTML_TIMEOUT_MS = 8_000
 export const AMLL_TTML_MAX_BYTES = 2 * 1024 * 1024

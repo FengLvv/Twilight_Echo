@@ -1,6 +1,13 @@
 import { basename, extname, join } from '../../shared/portablePath.ts'
-import { coreAudioMetadata, coreFsPromises } from '../ports/index.ts'
 import { decodeLyrics } from '../../shared/lyricsEncoding.ts'
+
+export interface LocalLyricsFilePort {
+  readFile(path: string): Promise<Uint8Array>
+  parseAudioFileMetadata?(
+    filePath: string,
+    options: { skipCovers: boolean; duration: boolean }
+  ): Promise<EmbeddedLyricsMetadata>
+}
 
 // music-metadata's TimestampFormat.milliseconds; imported lazily, so the value is inlined.
 const MILLISECOND_TIMESTAMPS = 2
@@ -76,17 +83,18 @@ export function extractEmbeddedLyrics(metadata: EmbeddedLyricsMetadata): string 
 export async function loadLocalLyrics(
   directory: string,
   fileName: string,
-  filePath: string | null
+  filePath: string | null,
+  io: LocalLyricsFilePort
 ): Promise<string | null> {
   const lrcPath = join(directory, `${basename(fileName, extname(fileName))}.lrc`)
-  const lyrics = await coreFsPromises
+  const lyrics = await io
     .readFile(lrcPath)
     .then((bytes) => decodeLyrics(bytes).text)
     .catch(() => null)
   if (lyrics) return lyrics
-  if (!filePath) return null
-  const { parseFile } = coreAudioMetadata.musicMetadata
-  return await parseFile(filePath, { skipCovers: true, duration: false })
+  if (!filePath || !io.parseAudioFileMetadata) return null
+  return await io
+    .parseAudioFileMetadata(filePath, { skipCovers: true, duration: false })
     .then(extractEmbeddedLyrics)
     .catch(() => null)
 }
@@ -94,11 +102,12 @@ export async function loadLocalLyrics(
 export async function loadLocalCompanionLyrics(
   directory: string,
   fileName: string,
-  kind: 'translated' | 'romanized'
+  kind: 'translated' | 'romanized',
+  io: Pick<LocalLyricsFilePort, 'readFile'>
 ): Promise<string | null> {
   const suffix = kind === 'translated' ? '_trans' : '_roma'
   const lrcPath = join(directory, `${basename(fileName, extname(fileName))}${suffix}.lrc`)
-  const lyrics = await coreFsPromises
+  const lyrics = await io
     .readFile(lrcPath)
     .then((bytes) => decodeLyrics(bytes).text)
     .catch(() => null)

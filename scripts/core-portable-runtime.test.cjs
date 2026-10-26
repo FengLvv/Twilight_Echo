@@ -738,4 +738,40 @@ test('Portable MusicCore Phase 3: Custom Playlists CRUD, Album/Artist Collection
   assert.equal(eqCmdRes.value.snapshot.eqConfig.preset, 'Bass Boost')
   assert.equal(eqCmdRes.value.snapshot.eqConfig.bandsDb[0], 5.5)
   assert.equal(eqCmdRes.value.snapshot.playback.outputPerfect, false)
+
+  // Import synced LRC lyrics and query audioDevice route via embedded handleRequest
+  const importLrcRes = JSON.parse(
+    portableCore.handleRequest(
+      JSON.stringify({
+        kind: 'command',
+        requestId: 'req-emb-lrc-1',
+        epoch: 'epoch-embedded-bridge-1',
+        name: 'lyrics.importLrc',
+        payload: {
+          trackId: 'track-twilight-overture',
+          lrcText: '[00:01.50]First synced line\n[00:01.50]第一行翻译\n[00:08.00]Second synced line',
+        },
+      }),
+    ),
+  )
+  assert.equal(importLrcRes.ok, true)
+  assert.equal(importLrcRes.value.snapshot.currentLyrics.source, 'imported')
+  assert.equal(importLrcRes.value.snapshot.currentLyrics.synced, true)
+  assert.equal(importLrcRes.value.snapshot.currentLyrics.lines.length, 2)
+  assert.equal(importLrcRes.value.snapshot.currentLyrics.lines[0].timeMs, 1500)
+  assert.equal(importLrcRes.value.snapshot.currentLyrics.lines[0].translation, '第一行翻译')
+
+  const routeQueryRes = JSON.parse(
+    portableCore.handleRequest(
+      JSON.stringify({
+        kind: 'query',
+        requestId: 'req-emb-route-1',
+        epoch: 'epoch-embedded-bridge-1',
+        name: 'audioDevice.getRoute',
+        payload: {},
+      }),
+    ),
+  )
+  assert.equal(routeQueryRes.ok, true)
+  assert.equal(typeof routeQueryRes.value.routeType, 'string')
 })

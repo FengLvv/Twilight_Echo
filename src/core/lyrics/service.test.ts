@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CoreLyricsService, type CoreLyricsOptions } from './service.ts'
 import { VersionedDataStore } from '../persistence/versionedDataStore.ts'
 import { createLocalLyricsLoader } from './localLoader.ts'
 import { importLyricDraft, exportLyricDraft } from './files.ts'
+import { nodeLocalLyricsFilePort } from '../../main/lyrics/loadLyrics.ts'
+import { nodeLyricsFileOperations } from '../../main/lyrics/saveLyrics.ts'
 import {
   DEFAULT_LYRICS_MANAGEMENT,
   isLyricsManagementDocument,
@@ -145,16 +147,19 @@ test('local sidecars load from authorized audio paths without a renderer-derived
   await writeFile(join(f.root, 'disc_trans.lrc'), '[00:01]Translation')
   await writeFile(join(f.root, 'disc_roma.lrc'), '[00:01]Romanization')
   const calls: string[] = []
-  const load = createLocalLyricsLoader({
-    audioFile: async (path) => {
-      calls.push(path)
-      assert.equal(path, audio)
-      return path
+  const load = createLocalLyricsLoader(
+    {
+      audioFile: async (path) => {
+        calls.push(path)
+        assert.equal(path, audio)
+        return path
+      },
+      directory: async () => {
+        throw Error('Must derive from authorized audio file')
+      }
     },
-    directory: async () => {
-      throw Error('Must derive from authorized audio file')
-    }
-  })
+    nodeLocalLyricsFilePort
+  )
   const second = await fixture(t, { sources: { loadLocalLyrics: load } })
   second.service.observe({
     ...track('local'),
@@ -288,18 +293,32 @@ test('retry scheduling belongs to Core and is released on shutdown, not to a win
 test('lyric file drafts preserve import validation, encoding and recoverable atomic export without accepting client paths', async (t) => {
   const f = await fixture(t)
   const file = join(f.root, 'lyrics.lrc')
+  const draftIo = {
+    readFile: (path: string) => readFile(path),
+    statSize: async (path: string) => (await stat(path)).size
+  }
   await writeFile(file, '[00:01]Before')
-  assert.equal(await importLyricDraft(async () => file), '[00:01]Before')
-  assert.equal(await exportLyricDraft(async () => file, '[00:02]After'), file)
+  assert.equal(await importLyricDraft(async () => file, draftIo), '[00:01]Before')
+  assert.equal(
+    await exportLyricDraft(async () => file, '[00:02]After', nodeLyricsFileOperations),
+    file
+  )
   assert.equal(await readFile(file + '.bak', 'utf8'), '[00:01]Before')
   assert.equal(await readFile(file, 'utf8'), '[00:02]After')
-  assert.equal(await importLyricDraft(async () => null), null)
+  assert.equal(await importLyricDraft(async () => null, draftIo), null)
   await assert.rejects(
-    exportLyricDraft(async () => file, 'not LRC'),
+    exportLyricDraft(async () => file, 'not LRC', nodeLyricsFileOperations),
     /timestamp/
   )
   const controller = new AbortController()
   controller.abort()
-  await assert.rejects(exportLyricDraft(async () => file, '[00:03]Cancelled', controller.signal))
+  await assert.rejects(
+    exportLyricDraft(
+      async () => file,
+      '[00:03]Cancelled',
+      nodeLyricsFileOperations,
+      controller.signal
+    )
+  )
   assert.equal(await readFile(file, 'utf8'), '[00:02]After')
 })

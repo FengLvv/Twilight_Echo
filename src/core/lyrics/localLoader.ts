@@ -1,12 +1,19 @@
 import { basename, dirname } from '../../shared/portablePath.ts'
 import type { LyricsLoaderOptions } from './loader.ts'
-import { loadLocalLyrics, loadLocalCompanionLyrics } from './loadLyrics.ts'
+import {
+  loadLocalLyrics,
+  loadLocalCompanionLyrics,
+  type LocalLyricsFilePort
+} from './loadLyrics.ts'
 
 /** Paths come only from the authoritative track and retain main's library grants. */
-export function createLocalLyricsLoader(paths: {
-  audioFile(path: string, signal: AbortSignal): Promise<string>
-  directory(path: string, signal: AbortSignal): Promise<string>
-}): LyricsLoaderOptions['loadLocalLyrics'] {
+export function createLocalLyricsLoader(
+  paths: {
+    audioFile(path: string, signal: AbortSignal): Promise<string>
+    directory(path: string, signal: AbortSignal): Promise<string>
+  },
+  io: LocalLyricsFilePort
+): LyricsLoaderOptions['loadLocalLyrics'] {
   return async (track, kind, signal) => {
     signal.throwIfAborted()
     const file = track.filePath ? await paths.audioFile(track.filePath, signal) : null
@@ -15,8 +22,8 @@ export function createLocalLyricsLoader(paths: {
     const fileName = basename(track.fileName)
     const result =
       kind === 'original'
-        ? await loadLocalLyrics(directory, fileName, file)
-        : await loadLocalCompanionLyrics(directory, fileName, kind)
+        ? await loadLocalLyrics(directory, fileName, file, io)
+        : await loadLocalCompanionLyrics(directory, fileName, kind, io)
     signal.throwIfAborted()
     return result
   }

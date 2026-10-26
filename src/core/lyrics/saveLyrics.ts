@@ -1,7 +1,6 @@
 import { PortableBuffer } from '../../shared/portableBytes.ts'
 import { randomUUID } from '../../shared/portableCrypto.ts'
 import { basename, dirname, extname, join } from '../../shared/portablePath.ts'
-import { coreFsPromises } from '../ports/index.ts'
 import { MAX_IMPORTED_LYRICS_BYTES, validateImportedLyrics } from './importLyrics.ts'
 
 export interface LyricsSaveDialogResult {
@@ -22,30 +21,6 @@ export interface LyricsFileOperations {
   remove(filePath: string): Promise<void>
 }
 
-const fileOperations: LyricsFileOperations = {
-  async exists(filePath) {
-    try {
-      await coreFsPromises.stat(filePath)
-      return true
-    } catch (error: unknown) {
-      if ((error as { code?: string } | null)?.code === 'ENOENT') return false
-      throw error
-    }
-  },
-  copy: (source, destination) => coreFsPromises.copyFile(source, destination),
-  async writeSynced(filePath, contents) {
-    const handle = await coreFsPromises.open(filePath, 'w', 0o600)
-    try {
-      await coreFsPromises.writeFile(handle, contents, 'utf8')
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-  },
-  replace: (source, destination) => coreFsPromises.rename(source, destination),
-  remove: async (filePath) => await coreFsPromises.rm(filePath, { force: true })
-}
-
 /**
  * Renderer code never supplies a filesystem path. The main process receives
  * one only from its Save dialog and commits it with a recoverable replacement.
@@ -53,7 +28,7 @@ const fileOperations: LyricsFileOperations = {
 export async function saveLyricsFromDialog(
   result: LyricsSaveDialogResult,
   contents: string,
-  operations: LyricsFileOperations = fileOperations
+  operations: LyricsFileOperations
 ): Promise<SavedLyricsFile | null> {
   if (result.canceled || !result.filePath) return null
   const filePath = result.filePath
@@ -70,7 +45,7 @@ export async function saveLyricsFromDialog(
 export async function writeLyricsAtomically(
   filePath: string,
   contents: string,
-  operations: LyricsFileOperations = fileOperations
+  operations: LyricsFileOperations
 ): Promise<SavedLyricsFile> {
   const backupPath = `${filePath}.bak`
   const temporaryPath = join(dirname(filePath), `.${basename(filePath)}.${randomUUID()}.tmp`)

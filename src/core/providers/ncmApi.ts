@@ -1,4 +1,4 @@
-import type { PortableHttpServer as Server } from '../ports/index.ts'
+import type { NcmBindableServer as Server } from './ncmServerBinding.ts'
 import { getListeningPort, waitForListeningPort } from './ncmServerBinding.ts'
 import { redactSensitiveText } from '../../shared/errors/redactSensitiveText.ts'
 export const NCM_API_HOST = '127.0.0.1'

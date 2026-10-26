@@ -61,6 +61,8 @@ import {
   type QueueWorkspaceDocument
 } from '../../shared/queueWorkspace.ts'
 import { createLocalLyricsLoader } from '../../core/lyrics/localLoader.ts'
+import { nodeLocalLyricsFilePort } from '../lyrics/loadLyrics.ts'
+import { nodeLyricsFileOperations } from '../lyrics/saveLyrics.ts'
 import { resolveLyricsAcrossProviders } from '../../core/lyrics/providerLyrics.ts'
 import { fetchAmlTtml } from '../../core/lyrics/amllTtml.ts'
 import {
@@ -516,11 +518,14 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       getAppSettings: () => ({
         value: { onlineLyricsFallback: settings.read().onlineLyricsFallback }
       }),
-      loadLocalLyrics: createLocalLyricsLoader({
-        audioFile: (path, signal) => platform!.call('paths.authorizeAudioFile', { path }, signal),
-        directory: (path, signal) =>
-          platform!.call('paths.authorizeLibraryDirectory', { path }, signal)
-      }),
+      loadLocalLyrics: createLocalLyricsLoader(
+        {
+          audioFile: (path, signal) => platform!.call('paths.authorizeAudioFile', { path }, signal),
+          directory: (path, signal) =>
+            platform!.call('paths.authorizeLibraryDirectory', { path }, signal)
+        },
+        nodeLocalLyricsFilePort
+      ),
       resolveProviderLyrics: (track, signal) =>
         resolveLyricsAcrossProviders(
           (plugins?.listProviders() ?? []).map(
@@ -576,11 +581,19 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       )
     },
     importDraft: (signal) =>
-      importLyricDraft(() => platform!.call('lyrics.chooseImportFile', {}, signal), signal),
+      importLyricDraft(
+        () => platform!.call('lyrics.chooseImportFile', {}, signal),
+        {
+          readFile: (path) => readFile(path),
+          statSize: async (path) => (await stat(path)).size
+        },
+        signal
+      ),
     exportDraft: (contents, signal) =>
       exportLyricDraft(
         () => platform!.call('lyrics.chooseExportFile', {}, signal),
         contents,
+        nodeLyricsFileOperations,
         signal
       )
   })

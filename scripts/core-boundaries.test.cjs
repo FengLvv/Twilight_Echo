@@ -174,23 +174,21 @@ test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/cor
     'src/core/projections.ts',
     'src/core/portableSlice.ts',
     'src/core/playback/',
-    'src/core/settings/service.ts',
-    'src/core/settings/normalization.ts',
+    'src/core/settings/',
     'src/core/catalog/',
     'src/core/search/',
     'src/core/bookmarks/',
     'src/core/listening/',
     'src/core/workspace/',
+    'src/core/lyrics/',
+    'src/core/providers/ncmApi.ts',
+    'src/core/providers/ncmServerBinding.ts',
     'src/core/playlists/service.ts',
     'src/core/playlists/controller.ts',
     'src/core/playlists/views.ts',
     'src/core/playlists/sqlView.ts',
     'src/core/playlists/recordingVersions.ts',
-    'src/core/playlists/submission.ts',
-    'src/core/lyrics/service.ts',
-    'src/core/lyrics/loader.ts',
-    'src/core/lyrics/management.ts',
-    'src/core/lyrics/lyricSourceResolution.ts'
+    'src/core/playlists/submission.ts'
   ]
   const isGreenZone = (relativePath) =>
     greenZonePrefixes.some((prefix) =>
@@ -235,7 +233,7 @@ test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/cor
     'Green-zone Portable Core modules must not depend on the Legacy Node I/O shim (src/core/ports/index.ts)'
   )
   assert.ok(
-    legacyShimImporters.length <= 71,
-    `Legacy Node I/O shim consumer count grew from baseline 71 to ${legacyShimImporters.length}`
+    legacyShimImporters.length <= 65,
+    `Legacy Node I/O shim consumer count grew from baseline 65 to ${legacyShimImporters.length}`
   )
 })
