@@ -24,29 +24,6 @@ function loadPortableCoreInIsolatedSandbox() {
     },
     setTimeout,
     clearTimeout,
-    Promise,
-    Date,
-    Math,
-    JSON,
-    Map,
-    Set,
-    WeakMap,
-    WeakSet,
-    Array,
-    Object,
-    String,
-    Number,
-    Boolean,
-    Symbol,
-    RegExp,
-    Error,
-    TypeError,
-    RangeError,
-    Uint8Array,
-    Int32Array,
-    Float64Array,
-    ArrayBuffer,
-    DataView,
   }
   sandbox.globalThis = sandbox
 
@@ -246,7 +223,8 @@ function sendRequestAndWait(host, requestEnvelope) {
       reject(new Error(`Timed out waiting for response to ${requestEnvelope.requestId}`))
     }, 3000)
 
-    const unsubscribe = host.subscribeMessages((msg) => {
+    const unsubscribe = host.subscribeMessagesJson((rawJson) => {
+      const msg = JSON.parse(rawJson)
       if (msg.kind === 'response' && msg.requestId === requestEnvelope.requestId) {
         clearTimeout(timer)
         unsubscribe()
@@ -254,7 +232,7 @@ function sendRequestAndWait(host, requestEnvelope) {
       }
     })
 
-    host.dispatchRequest(requestEnvelope)
+    host.dispatchRequestJson(JSON.stringify(requestEnvelope))
   })
 }
 
@@ -405,4 +383,203 @@ test('Portable MusicCore runs inside a zero-Node sandbox and fulfills Phase 1 Po
   assert.equal(restoredSnap.track?.id, 'track-102')
   assert.equal(restoredSnap.playback?.playMode, 'listLoop')
   await restoredHost.shutdown()
+})
+
+test('Portable MusicCore Phase 2: Local Library Collections, Search, Playlists/Favorites, Bookmarks, and Lyrics in zero-Node sandbox', async () => {
+  const portableCore = loadPortableCoreInIsolatedSandbox()
+  const ports = createFakePorts()
+  const initialTracks = [
+    {
+      id: 'track-201',
+      filePath: 'content://media/external/audio/media/201',
+      title: 'Starlight Echo',
+      artist: 'Aurora',
+      album: 'Northern Skies',
+      genre: 'Ambient',
+      duration: 245,
+      lyrics: '[00:00.00]Starlight falling\n[00:05.50]Across the northern skies',
+    },
+    {
+      id: 'track-202',
+      filePath: 'content://media/external/audio/media/202',
+      title: 'Velvet Horizon',
+      artist: 'Aurora',
+      album: 'Northern Skies',
+      genre: 'Ambient',
+      duration: 198,
+    },
+    {
+      id: 'track-203',
+      filePath: 'content://media/external/audio/media/203',
+      title: 'Cyber Pulse',
+      artist: 'SynthWave',
+      album: 'Neon Grid',
+      genre: 'Electronic',
+      duration: 212,
+    },
+  ]
+
+  const host = portableCore.createPortableMusicCoreHost({
+    epoch: 'epoch-phase2-1',
+    platform: 'android',
+    clock: ports.clock,
+    sessionStore: ports.sessionStore,
+    audioEngine: ports.audioEngine,
+    initialTracks,
+  })
+
+  await host.initialize()
+  await host.playTracks(initialTracks, 0)
+
+  // 1. Query Local Library Collections (albums & artists)
+  const albumsResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-albums-1',
+    epoch: host.epoch,
+    name: 'library.collections',
+    payload: {
+      kind: 'albums',
+      query: { offset: 0, limit: 20 },
+    },
+  })
+  assert.equal(albumsResp.ok, true, `albumsResp failed: ${JSON.stringify(albumsResp)}`)
+  assert.equal(albumsResp.value.total, 2)
+
+  // 2. Unified Local Music Search ('search.songs')
+  const searchResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-search-1',
+    epoch: host.epoch,
+    name: 'search.songs',
+    payload: {
+      query: 'Starlight',
+      scope: 'local',
+      offset: 0,
+      limit: 20,
+    },
+  })
+  assert.equal(searchResp.ok, true, `searchResp failed: ${JSON.stringify(searchResp)}`)
+  assert.equal(searchResp.value.items.length, 1)
+  assert.equal(searchResp.value.items[0].track.id, 'track-201')
+
+  // 3. Create a playlist & toggle favorite
+  const plStateResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-pl-state-1',
+    epoch: host.epoch,
+    name: 'playlists.state',
+    payload: {},
+  })
+  assert.equal(plStateResp.ok, true)
+
+  const createPlResp = await sendRequestAndWait(host, {
+    kind: 'command',
+    requestId: 'req-pl-create-1',
+    epoch: host.epoch,
+    name: 'playlists.edit',
+    payload: {
+      revision: plStateResp.value.revision,
+      edit: {
+        kind: 'create',
+        name: 'Road Trip',
+      },
+    },
+  })
+  assert.equal(createPlResp.ok, true, `createPlResp failed: ${JSON.stringify(createPlResp)}`)
+
+  const listPlResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-pl-list-1',
+    epoch: host.epoch,
+    name: 'playlists.list',
+    payload: {
+      offset: 0,
+      limit: 20,
+    },
+  })
+  assert.equal(listPlResp.ok, true)
+  assert.ok(listPlResp.value.items.some((p) => p.name === 'Road Trip'))
+
+  // Toggle favorite on current playing track via playback.control ('toggle-favorite')
+  const favToggleResp = await sendRequestAndWait(host, {
+    kind: 'command',
+    requestId: 'req-fav-toggle-1',
+    epoch: host.epoch,
+    name: 'playback.control',
+    payload: { type: 'toggle-favorite' },
+  })
+  assert.equal(favToggleResp.ok, true, `favToggleResp failed: ${JSON.stringify(favToggleResp)}`)
+  assert.equal(favToggleResp.value.favorite.liked, true)
+
+  // 4. Bookmarks: add bookmark for current playing track & query bookmarks page
+  const bmStateResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-bm-state-1',
+    epoch: host.epoch,
+    name: 'bookmarks.state',
+    payload: {},
+  })
+  assert.equal(bmStateResp.ok, true, `bmStateResp failed: ${JSON.stringify(bmStateResp)}`)
+  assert.equal(bmStateResp.value.current?.trackId, 'track-201')
+
+  const bmAddResp = await sendRequestAndWait(host, {
+    kind: 'command',
+    requestId: 'req-bm-add-1',
+    epoch: host.epoch,
+    name: 'bookmarks.edit',
+    payload: {
+      revision: bmStateResp.value.revision,
+      edit: {
+        kind: 'addCurrent',
+        current: bmStateResp.value.current,
+        label: 'Chorus Drop',
+      },
+    },
+  })
+  assert.equal(bmAddResp.ok, true, `bmAddResp failed: ${JSON.stringify(bmAddResp)}`)
+
+  const bmPageResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-bm-page-1',
+    epoch: host.epoch,
+    name: 'bookmarks.page',
+    payload: {
+      revision: bmAddResp.value.revision,
+      scope: 'current',
+      offset: 0,
+      limit: 20,
+    },
+  })
+  assert.equal(bmPageResp.ok, true)
+  assert.equal(bmPageResp.value.items.length, 1)
+  assert.equal(bmPageResp.value.items[0].label, 'Chorus Drop')
+
+  // 5. Lyrics: read current track lyrics & adjust lyric offset
+  const lyricsResp = await sendRequestAndWait(host, {
+    kind: 'query',
+    requestId: 'req-lyrics-cur-1',
+    epoch: host.epoch,
+    name: 'player.lyrics',
+    payload: {},
+  })
+  assert.equal(lyricsResp.ok, true, `lyricsResp failed: ${JSON.stringify(lyricsResp)}`)
+  assert.match(lyricsResp.value.content.effective?.original ?? '', /Starlight falling/)
+
+  const lyricsEditResp = await sendRequestAndWait(host, {
+    kind: 'command',
+    requestId: 'req-lyrics-edit-1',
+    epoch: host.epoch,
+    name: 'lyrics.edit',
+    payload: {
+      revision: lyricsResp.value.state.revision,
+      edit: {
+        kind: 'globalOffset',
+        offsetMs: 250,
+      },
+    },
+  })
+  assert.equal(lyricsEditResp.ok, true, `lyricsEditResp failed: ${JSON.stringify(lyricsEditResp)}`)
+  assert.equal(lyricsEditResp.value.preferences.globalOffsetMs, 250)
+
+  await host.shutdown()
 })

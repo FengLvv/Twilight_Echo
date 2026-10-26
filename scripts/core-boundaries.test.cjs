@@ -180,7 +180,17 @@ test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/cor
     'src/core/search/',
     'src/core/bookmarks/',
     'src/core/listening/',
-    'src/core/workspace/'
+    'src/core/workspace/',
+    'src/core/playlists/service.ts',
+    'src/core/playlists/controller.ts',
+    'src/core/playlists/views.ts',
+    'src/core/playlists/sqlView.ts',
+    'src/core/playlists/recordingVersions.ts',
+    'src/core/playlists/submission.ts',
+    'src/core/lyrics/service.ts',
+    'src/core/lyrics/loader.ts',
+    'src/core/lyrics/management.ts',
+    'src/core/lyrics/lyricSourceResolution.ts'
   ]
   const isGreenZone = (relativePath) =>
     greenZonePrefixes.some((prefix) =>

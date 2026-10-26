@@ -1,10 +1,20 @@
 import { CoreApplication } from './application.ts'
+import { CoreBookmarksService } from './bookmarks/service.ts'
+import { CoreLyricsService } from './lyrics/service.ts'
+import { CorePlayerPresentationService } from './playback/presentationService.ts'
 import {
   CorePlaybackSession,
   type CorePlaybackEngine,
   type CoreSessionRepository
 } from './playback/session.ts'
 import { CoreQueueSubmission } from './playback/queueSubmission.ts'
+import { CoreRecordingVersions } from './playlists/recordingVersions.ts'
+import { CorePlaylistService } from './playlists/service.ts'
+import {
+  CorePlaylistSubmission,
+  createPlaylistInputResolver
+} from './playlists/submission.ts'
+import { CoreMusicSearchService } from './search/service.ts'
 import { CoreSettingsService } from './settings/service.ts'
 import {
   createDefaultSettings,
@@ -30,8 +40,13 @@ import type {
 import {
   LIBRARY_PAGE_SIZE,
   libraryQueueResumeMode,
+  type LibraryCollectionKind,
+  type LibraryCollectionPage,
+  type LibraryCollectionSummary,
   type LibraryMetadata,
   type LibraryPage,
+  type LibraryPlaylistViewSync,
+  type LibraryPlaylistViewSyncResult,
   type LibraryQuery,
   type LibraryQueueEdit,
   type LibraryQueueEditResult,
@@ -46,7 +61,20 @@ import type {
   LibraryQueueBuildReply,
   LibraryQueueSeedItem
 } from '../shared/libraryQueueBuild.ts'
+import {
+  DEFAULT_LYRICS_MANAGEMENT,
+  cloneLyricsManagementDocument,
+  type LyricsManagementDocument,
+  type OnlineLyricsQuery,
+  type OnlineLyricsSearchResult
+} from '../shared/lyricsManagement.ts'
+import {
+  DEFAULT_PLAYBACK_BOOKMARKS,
+  clonePlaybackBookmarksDocument,
+  type PlaybackBookmarksDocument
+} from '../shared/playbackBookmarks.ts'
 import type { PlaybackSessionData } from '../shared/playbackSession.ts'
+import type { Playlist } from '../shared/playlists.ts'
 import type { TrackData } from '../shared/track.ts'
 import type {
   NativeQueueCommit,
@@ -337,6 +365,16 @@ export interface PortableResourceAccessPort {
   ): Promise<{ source: PortableResourceId; expiresAt: number | null }>
 }
 
+export interface PortableLyricsPort {
+  loadLocalLyrics?(
+    track: TrackData,
+    kind: 'original' | 'translated' | 'romanized',
+    signal: AbortSignal
+  ): Promise<string | null>
+  loadOnlineLyrics?(query: OnlineLyricsQuery, signal: AbortSignal): Promise<string | null>
+  searchOnlineLyrics?(track: TrackData, signal?: AbortSignal): Promise<OnlineLyricsSearchResult>
+}
+
 export interface PortableHostOptions {
   epoch?: string
   platform?: CorePlatformId
@@ -345,6 +383,7 @@ export interface PortableHostOptions {
   sessionStore: PortableSessionStorePort
   audioEngine: PortableAudioEnginePort
   resourceAccess?: PortableResourceAccessPort
+  lyrics?: PortableLyricsPort
   initialTracks?: TrackData[]
   initialSettings?: Partial<AppSettings>
   onFatalError?: (error: Error) => void
@@ -392,6 +431,9 @@ interface PersistedEnvelope {
   }>
   tracks: LibraryTrackRecord[]
   settings?: Partial<AppSettings>
+  bookmarks?: PlaybackBookmarksDocument
+  lyricsManagement?: LyricsManagementDocument
+  playlists?: Playlist[]
 }
 
 function toTrackRecord(track: TrackData | LibraryTrackRecord): LibraryTrackRecord {
@@ -948,6 +990,171 @@ class PortableQueueAndLibraryStore {
       offset: 0
     }
   }
+
+  async queryCollections(
+    kind: LibraryCollectionKind,
+    query: LibraryQuery = {}
+  ): Promise<LibraryCollectionPage> {
+    const groups = new Map<string, LibraryCollectionSummary>()
+    for (const track of this.tracks.values()) {
+      if (kind === 'albums') {
+        const albumName = String(track.album || 'Unknown Album').trim() || 'Unknown Album'
+        const key = `album:${albumName.toLowerCase()}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.trackCount += 1
+          existing.duration += Number(track.duration) || 0
+        } else {
+          groups.set(key, {
+            id: key,
+            name: albumName,
+            artist: String(track.artist || 'Unknown Artist'),
+            trackCount: 1,
+            duration: Number(track.duration) || 0,
+            cover: typeof track.cover === 'string' ? track.cover : null
+          })
+        }
+      } else if (kind === 'artists') {
+        const artistName = String(track.artist || 'Unknown Artist').trim() || 'Unknown Artist'
+        const key = `artist:${artistName.toLowerCase()}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.trackCount += 1
+          existing.duration += Number(track.duration) || 0
+        } else {
+          groups.set(key, {
+            id: key,
+            name: artistName,
+            trackCount: 1,
+            duration: Number(track.duration) || 0,
+            cover: typeof track.cover === 'string' ? track.cover : null
+          })
+        }
+      } else if (kind === 'genres') {
+        const genreName = String(track.genre || 'Unknown Genre').trim() || 'Unknown Genre'
+        const key = `genre:${genreName.toLowerCase()}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.trackCount += 1
+          existing.duration += Number(track.duration) || 0
+        } else {
+          groups.set(key, {
+            id: key,
+            name: genreName,
+            trackCount: 1,
+            duration: Number(track.duration) || 0,
+            cover: null
+          })
+        }
+      }
+    }
+
+    let items = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))
+    if (query.search) {
+      const q = query.search.toLowerCase()
+      items = items.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          (item.artist && item.artist.toLowerCase().includes(q))
+      )
+    }
+    const offset = Math.max(0, query.offset ?? 0)
+    const limit = Math.max(1, query.limit ?? LIBRARY_PAGE_SIZE)
+    return {
+      revision: this.libraryRevisionCounter,
+      total: items.length,
+      offset,
+      items: items.slice(offset, offset + limit),
+      letterOffsets: {}
+    }
+  }
+
+  private readonly playlistViews = new Map<
+    string,
+    {
+      sequence: number
+      committed: boolean
+      entries: Array<{ id: string; snapshot?: LibraryTrackRecord; collectionId?: string }>
+    }
+  >()
+
+  async syncPlaylistView(
+    sync: LibraryPlaylistViewSync
+  ): Promise<LibraryPlaylistViewSyncResult> {
+    if (sync.kind === 'drop') {
+      this.playlistViews.delete(sync.id)
+      return { id: sync.id, sequence: 0, count: 0, committed: false }
+    }
+    if (sync.kind === 'begin') {
+      this.playlistViews.set(sync.id, { sequence: 0, committed: false, entries: [] })
+      return { id: sync.id, sequence: 0, count: 0, committed: false }
+    }
+    const current = this.playlistViews.get(sync.id) ?? {
+      sequence: 0,
+      committed: false,
+      entries: []
+    }
+    if (sync.kind === 'groups') {
+      current.sequence = sync.sequence
+      this.playlistViews.set(sync.id, current)
+      return {
+        id: sync.id,
+        sequence: sync.sequence,
+        count: sync.groups.length,
+        committed: false
+      }
+    }
+    if (sync.kind === 'append') {
+      current.sequence = sync.sequence
+      current.entries.push(...sync.entries)
+      this.playlistViews.set(sync.id, current)
+      return {
+        id: sync.id,
+        sequence: sync.sequence,
+        count: current.entries.length,
+        committed: false
+      }
+    }
+    current.sequence = sync.sequence
+    current.committed = true
+    this.playlistViews.set(sync.id, current)
+    return {
+      id: sync.id,
+      sequence: sync.sequence,
+      count: current.entries.length,
+      committed: true
+    }
+  }
+
+  async lookupTracksByPaths(paths: string[]) {
+    const byPath = new Map<string, string>()
+    for (const track of this.tracks.values()) {
+      if (track.filePath) {
+        byPath.set(track.filePath, track.id)
+      }
+    }
+    return {
+      revision: this.libraryRevisionCounter,
+      ids: paths.map((p) => byPath.get(p) ?? null)
+    }
+  }
+
+  async lookupPlaylistTracks(request: { entries: Array<{ id?: string; filePath?: string }> }) {
+    const byPath = new Map<string, string>()
+    for (const track of this.tracks.values()) {
+      if (track.filePath) {
+        byPath.set(track.filePath, track.id)
+      }
+    }
+    return {
+      revision: this.libraryRevisionCounter,
+      ids: request.entries.map((entry) => {
+        if (entry.id && this.tracks.has(entry.id)) return entry.id
+        if (entry.filePath && byPath.has(entry.filePath)) return byPath.get(entry.filePath)!
+        return null
+      })
+    }
+  }
 }
 
 // ============================================================================
@@ -1247,10 +1454,23 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
   const queueStore = new PortableQueueAndLibraryStore(options.initialTracks ?? [])
   const engineAdapter = new PortablePlaybackEngineAdapter(options.audioEngine)
 
-  let storeRevisionNum = 0
   let storeRevisionToken: string | null = null
   let currentSettings: AppSettings
   let settingsRevision = 0
+  let currentSessionData: PlaybackSessionData<TrackData> | null = null
+  let sessionDataRevision = 0
+  let bookmarksDoc: PlaybackBookmarksDocument = clonePlaybackBookmarksDocument(
+    DEFAULT_PLAYBACK_BOOKMARKS
+  )
+  let bookmarksRevision = 0
+  let lyricsDoc: LyricsManagementDocument = cloneLyricsManagementDocument(
+    DEFAULT_LYRICS_MANAGEMENT
+  )
+  let lyricsRevision = 0
+  let playlistsState: Playlist[] = []
+  let playlistsRevision = 0
+  let envelopeLoaded = false
+  let envelopeLoadPromise: Promise<void> | null = null
 
   const settingsEnv: SettingsEnvironment = {
     platform,
@@ -1265,85 +1485,407 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
     settingsEnv
   )
 
-  const sessionRepository: CoreSessionRepository = {
-    async load() {
+  const ensureEnvelopeLoaded = async (): Promise<void> => {
+    if (envelopeLoaded) return
+    if (envelopeLoadPromise) return envelopeLoadPromise
+    envelopeLoadPromise = (async () => {
       const stored = await options.sessionStore.load()
       if (!stored) {
-        storeRevisionNum = 0
         storeRevisionToken = null
-        return null
+        sessionDataRevision = 0
+        envelopeLoaded = true
+        return
       }
       storeRevisionToken = stored.revision
       const parsedNum = Number.parseInt(stored.revision, 10)
-      storeRevisionNum = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : 1
+      const initialRev = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : 1
       const parsed = JSON.parse(stored.payloadJson) as PersistedEnvelope
       queueStore.importState(parsed)
+      currentSessionData = parsed.session ?? null
+      sessionDataRevision = currentSessionData ? initialRev : 0
       if (parsed.settings) {
         currentSettings = normalizeAppSettings(
           { ...currentSettings, ...parsed.settings },
           settingsEnv
         )
       }
+      if (parsed.bookmarks) {
+        bookmarksDoc = clonePlaybackBookmarksDocument(parsed.bookmarks)
+        bookmarksRevision = initialRev
+      }
+      if (parsed.lyricsManagement) {
+        lyricsDoc = cloneLyricsManagementDocument(parsed.lyricsManagement)
+        lyricsRevision = initialRev
+      }
+      if (Array.isArray(parsed.playlists)) {
+        playlistsState = structuredClone(parsed.playlists)
+        playlistsRevision = initialRev
+      }
+      envelopeLoaded = true
+    })().finally(() => {
+      envelopeLoadPromise = null
+    })
+    return envelopeLoadPromise
+  }
+
+  let persistChain: Promise<void> = Promise.resolve()
+  const persistEnvelope = async (): Promise<void> => {
+    const work = persistChain
+      .catch(() => undefined)
+      .then(async () => {
+        const exported = queueStore.exportState()
+        const envelope: PersistedEnvelope = {
+          session: currentSessionData,
+          queues: exported.queues,
+          tracks: exported.tracks,
+          settings: currentSettings,
+          bookmarks: bookmarksDoc,
+          lyricsManagement: lyricsDoc,
+          playlists: playlistsState
+        }
+        const res = await options.sessionStore.save(
+          JSON.stringify(envelope),
+          storeRevisionToken
+        )
+        if (!res.ok) {
+          throw Object.assign(new Error('Session store CAS conflict'), {
+            code: 'STALE_REVISION'
+          })
+        }
+        storeRevisionToken = res.revision
+      })
+    persistChain = work
+    return work
+  }
+
+  const sessionRepository: CoreSessionRepository = {
+    async load() {
+      await ensureEnvelopeLoaded()
+      if (sessionDataRevision === 0 && !currentSessionData) {
+        return null
+      }
       return {
-        revision: storeRevisionNum,
-        data: parsed.session ?? null
+        revision: sessionDataRevision,
+        data: currentSessionData
       }
     },
     async save(sessionData, expectedRevision) {
-      if (expectedRevision !== storeRevisionNum) {
+      if (expectedRevision !== sessionDataRevision) {
         throw Object.assign(new Error('Session store revision conflict'), {
           code: 'STALE_REVISION'
         })
       }
-      const exported = queueStore.exportState()
-      const envelope: PersistedEnvelope = {
-        session: sessionData,
-        queues: exported.queues,
-        tracks: exported.tracks,
-        settings: currentSettings
-      }
-      const res = await options.sessionStore.save(
-        JSON.stringify(envelope),
-        storeRevisionToken
-      )
-      if (!res.ok) {
-        throw Object.assign(new Error('Session store CAS conflict'), {
-          code: 'STALE_REVISION'
-        })
-      }
-      storeRevisionToken = res.revision
-      storeRevisionNum++
-      return { revision: storeRevisionNum }
+      currentSessionData = sessionData
+      sessionDataRevision++
+      await persistEnvelope()
+      return { revision: sessionDataRevision }
     },
     async clear(expectedRevision) {
-      if (expectedRevision !== storeRevisionNum) {
+      if (expectedRevision !== sessionDataRevision) {
         throw Object.assign(new Error('Session store revision conflict'), {
           code: 'STALE_REVISION'
         })
       }
-      const exported = queueStore.exportState()
-      const envelope: PersistedEnvelope = {
-        session: null,
-        queues: exported.queues,
-        tracks: exported.tracks,
-        settings: currentSettings
-      }
-      const res = await options.sessionStore.save(
-        JSON.stringify(envelope),
-        storeRevisionToken
-      )
-      if (!res.ok) {
-        throw Object.assign(new Error('Session store CAS conflict'), {
-          code: 'STALE_REVISION'
-        })
-      }
-      storeRevisionToken = res.revision
-      storeRevisionNum++
-      return { revision: storeRevisionNum }
+      currentSessionData = null
+      sessionDataRevision++
+      await persistEnvelope()
+      return { revision: sessionDataRevision }
     }
   }
 
   let appInstance: CoreApplication | null = null
+
+  const stateApi: CoreStateApi = {
+    coreStateOpen: async () => {},
+    coreStateStatus: async () => ({
+      complete: true,
+      id: null,
+      manifest: null,
+      nextBatch: 0,
+      counts: emptyCoreStateCounts()
+    }),
+    coreStateRead: async (domain) => ({
+      domain,
+      revision: 0,
+      rows: [],
+      next: null
+    }),
+    coreStateWrite: async () => 1,
+    coreMigrationBegin: async (id, manifest) => ({
+      complete: false,
+      id,
+      manifest,
+      nextBatch: 0,
+      counts: emptyCoreStateCounts()
+    }),
+    coreMigrationStage: async (id, batch) => ({
+      complete: false,
+      id,
+      manifest: null,
+      nextBatch: batch + 1,
+      counts: emptyCoreStateCounts()
+    }),
+    coreMigrationCommit: async (id) => ({
+      complete: true,
+      id,
+      manifest: null,
+      nextBatch: 0,
+      counts: emptyCoreStateCounts()
+    }),
+    coreMigrationAbort: async () => {}
+  }
+
+  const recordingVersions = new CoreRecordingVersions(
+    {
+      coreStateRead: stateApi.coreStateRead,
+      coreVersionsReplace: async (_doc, expectedRevision) => expectedRevision + 1
+    },
+    () => appInstance?.changed(),
+    () => crypto.randomUUID()
+  )
+
+  const bookmarksService = new CoreBookmarksService({
+    repository: {
+      load: async () => {
+        await ensureEnvelopeLoaded()
+        return {
+          version: 2 as const,
+          revision: bookmarksRevision,
+          savedAt: new Date(clock.nowUnixMs()).toISOString(),
+          data: clonePlaybackBookmarksDocument(bookmarksDoc)
+        }
+      },
+      save: async (document, expectedRevision) => {
+        if (expectedRevision !== bookmarksRevision) {
+          throw Object.assign(new Error('Bookmarks revision conflict'), {
+            code: 'STALE_REVISION'
+          })
+        }
+        bookmarksDoc = clonePlaybackBookmarksDocument(document)
+        bookmarksRevision++
+        await persistEnvelope()
+        return {
+          version: 2 as const,
+          revision: bookmarksRevision,
+          savedAt: new Date(clock.nowUnixMs()).toISOString(),
+          data: clonePlaybackBookmarksDocument(bookmarksDoc)
+        }
+      }
+    },
+    now: () => clock.nowUnixMs(),
+    newId: () => crypto.randomUUID(),
+    changed: () => appInstance?.changed(),
+    failed: (error) => {
+      if (error instanceof Error) options.onFatalError?.(error)
+    }
+  })
+
+  const portableTimers = {
+    setTimeout(callback: () => void, delay: number) {
+      return scheduler.schedule(delay, callback)
+    },
+    clearTimeout(handle: unknown) {
+      if (handle && typeof (handle as { cancel?: () => void }).cancel === 'function') {
+        ;(handle as { cancel: () => void }).cancel()
+      }
+    }
+  }
+
+  const lyricsService = new CoreLyricsService({
+    repository: {
+      load: async () => {
+        await ensureEnvelopeLoaded()
+        return {
+          version: 2 as const,
+          revision: lyricsRevision,
+          savedAt: new Date(clock.nowUnixMs()).toISOString(),
+          data: cloneLyricsManagementDocument(lyricsDoc)
+        }
+      },
+      save: async (document, expectedRevision) => {
+        if (expectedRevision !== lyricsRevision) {
+          throw Object.assign(new Error('Lyrics revision conflict'), {
+            code: 'STALE_REVISION'
+          })
+        }
+        lyricsDoc = cloneLyricsManagementDocument(document)
+        lyricsRevision++
+        await persistEnvelope()
+        return {
+          version: 2 as const,
+          revision: lyricsRevision,
+          savedAt: new Date(clock.nowUnixMs()).toISOString(),
+          data: cloneLyricsManagementDocument(lyricsDoc)
+        }
+      }
+    },
+    now: () => clock.nowUnixMs(),
+    changed: () => appInstance?.changed(),
+    timers: portableTimers,
+    sources: {
+      loadLocalLyrics: async (track, kind, signal) => {
+        if (options.lyrics?.loadLocalLyrics) {
+          return options.lyrics.loadLocalLyrics(track, kind, signal)
+        }
+        if (kind === 'original') return track.lyrics ?? null
+        if (kind === 'translated') return track.translatedLyrics ?? null
+        if (kind === 'romanized') return track.romanizedLyrics ?? null
+        return null
+      },
+      resolveProviderLyrics: async (_track, _signal) => ({
+        lyrics: null,
+        translatedLyrics: null
+      }),
+      loadAmlTtml: async (_id, _signal) => null,
+      loadOnlineLyrics: async (query, signal) => {
+        if (options.lyrics?.loadOnlineLyrics) {
+          return options.lyrics.loadOnlineLyrics(query, signal)
+        }
+        return null
+      },
+      getAppSettings: () => ({ value: currentSettings })
+    },
+    search: async (track, signal) => {
+      if (options.lyrics?.searchOnlineLyrics) {
+        return options.lyrics.searchOnlineLyrics(track, signal)
+      }
+      return {
+        query: {
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          durationSeconds: track.duration
+        },
+        candidates: [],
+        best: null
+      }
+    },
+    importDraft: async () => null,
+    exportDraft: async () => null,
+    failed: (error) => {
+      if (error instanceof Error) options.onFatalError?.(error)
+    }
+  })
+
+  const playlistsService = new CorePlaylistService({
+    runtime: {
+      now: () => clock.nowUnixMs(),
+      newId: () => crypto.randomUUID(),
+      clone: <T>(val: T) => structuredClone(val),
+      notify: () => appInstance?.changed(),
+      identity: recordingVersions.identity,
+      versions: {
+        ensure: () => {},
+        revision: () => recordingVersions.getRevision()
+      },
+      repository: {
+        load: async () => {
+          await ensureEnvelopeLoaded()
+          return {
+            version: 2 as const,
+            revision: playlistsRevision,
+            savedAt: new Date(clock.nowUnixMs()).toISOString(),
+            data: structuredClone(playlistsState)
+          }
+        },
+        save: async (data, expectedRevision) => {
+          if (expectedRevision !== playlistsRevision) {
+            throw Object.assign(new Error('Playlists revision conflict'), {
+              code: 'STALE_REVISION'
+            })
+          }
+          playlistsState = structuredClone(data)
+          playlistsRevision++
+          await persistEnvelope()
+          return {
+            version: 2 as const,
+            revision: playlistsRevision,
+            savedAt: new Date(clock.nowUnixMs()).toISOString(),
+            data: structuredClone(playlistsState)
+          }
+        }
+      }
+    },
+    database: {
+      lookupTracksByPaths: (paths) => queueStore.lookupTracksByPaths(paths),
+      getTracksByIds: (ids) => queueStore.getTracksByIds(ids),
+      getMetadata: () => queueStore.getMetadata(),
+      queryTracks: (query) => queueStore.queryTracks(query),
+      queryCollections: (kind, query) => queueStore.queryCollections(kind, query),
+      syncPlaylistView: (sync) => queueStore.syncPlaylistView(sync)
+    },
+    versions: recordingVersions,
+    changed: () => appInstance?.changed()
+  })
+
+  const resolveSeedItems = async (
+    items: readonly import('../shared/coreQueueSubmission.ts').CoreQueueTrackInput[]
+  ): Promise<LibraryQueueSeedItem[]> => {
+    return items.map((item): LibraryQueueSeedItem => {
+      if ('track' in item && item.track) {
+        const record = toTrackRecord(item.track as TrackData)
+        return {
+          id: record.id,
+          snapshot: record,
+          localSnapshot: record
+        }
+      }
+      const id = String((item as { id?: string }).id ?? '')
+      return { id }
+    })
+  }
+
+  const resolvePlaylistInputs = createPlaylistInputResolver(
+    (inputs) => resolveSeedItems(inputs),
+    {
+      getTracksByIds: (ids) => queueStore.getTracksByIds(ids)
+    }
+  )
+
+  const playlistSubmission = new CorePlaylistSubmission({
+    playlists: playlistsService,
+    resolve: resolvePlaylistInputs,
+    newId: () => `pl-sub-${crypto.randomUUID().slice(0, 8)}`,
+    schedule: (callback, delayMs) => {
+      const handle = scheduler.schedule(delayMs, callback)
+      return () => handle.cancel()
+    }
+  })
+
+  const presentationService = new CorePlayerPresentationService({
+    artwork: async (track) => ({
+      cover: track.cover ?? null,
+      coverSource: track.coverSource ?? null
+    }),
+    playlists: {
+      isFavorite: (track) => playlistsService.isFavorite(track),
+      toggleFavorite: (track, assertCurrent) =>
+        playlistsService.toggleFavorite(track, assertCurrent)
+    },
+    supportedMethods: () => [],
+    callProvider: async () => null,
+    changed: () => appInstance?.changed(),
+    failed: (error) => {
+      if (error instanceof Error) options.onFatalError?.(error)
+    }
+  })
+
+  const searchService = new CoreMusicSearchService({
+    database: {
+      queryTracks: (query) => queueStore.queryTracks(query),
+      getMetadata: () => queueStore.getMetadata(),
+      queryCollections: (kind, query) => queueStore.queryCollections(kind, query)
+    },
+    versions: recordingVersions,
+    providers: () => [],
+    playlists: playlistsService,
+    searchCollectionProvider: async () => ({ items: [], total: 0 }),
+    searchProvider: async () => ({ items: [], total: 0 }),
+    network: {
+      revision: () => 0,
+      search: async () => []
+    }
+  })
 
   const settingsRepository = {
     issue: null,
@@ -1437,6 +1979,11 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
       const handle = scheduler.schedule(delayMs, callback)
       return () => handle.cancel()
     },
+    observePlayback: (track, info) => {
+      bookmarksService.observe(track, info)
+      lyricsService.observe(track)
+      presentationService.observe(track)
+    },
     changed: () => {
       appInstance?.changed()
     },
@@ -1447,20 +1994,7 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
 
   const queueSubmission = new CoreQueueSubmission({
     playback: playbackSession,
-    resolve: async (items) => {
-      return items.map((item): LibraryQueueSeedItem => {
-        if ('track' in item && item.track) {
-          const record = toTrackRecord(item.track as TrackData)
-          return {
-            id: record.id,
-            snapshot: record,
-            localSnapshot: record
-          }
-        }
-        const id = String((item as { id?: string }).id ?? '')
-        return { id }
-      })
-    },
+    resolve: (items) => resolveSeedItems(items),
     newId: () => `sub-${crypto.randomUUID().slice(0, 8)}`,
     schedule: (callback, delayMs) => {
       const handle = scheduler.schedule(delayMs, callback)
@@ -1468,73 +2002,29 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
     }
   })
 
-  const stateApi: CoreStateApi = {
-    coreStateOpen: async () => {},
-    coreStateStatus: async () => ({
-      complete: true,
-      id: null,
-      manifest: null,
-      nextBatch: 0,
-      counts: emptyCoreStateCounts()
-    }),
-    coreStateRead: async (domain) => ({
-      domain,
-      revision: 0,
-      rows: [],
-      next: null
-    }),
-    coreStateWrite: async () => 1,
-    coreMigrationBegin: async (id, manifest) => ({
-      complete: false,
-      id,
-      manifest,
-      nextBatch: 0,
-      counts: emptyCoreStateCounts()
-    }),
-    coreMigrationStage: async (id, batch) => ({
-      complete: false,
-      id,
-      manifest: null,
-      nextBatch: batch + 1,
-      counts: emptyCoreStateCounts()
-    }),
-    coreMigrationCommit: async (id) => ({
-      complete: true,
-      id,
-      manifest: null,
-      nextBatch: 0,
-      counts: emptyCoreStateCounts()
-    }),
-    coreMigrationAbort: async () => {}
-  }
-
   const application = new CoreApplication({
     epoch,
     playback: playbackSession,
     queueSubmission,
+    playlistSubmission,
+    resolvePlaylistInputs,
+    presentation: presentationService,
     settings: settingsService,
+    bookmarks: bookmarksService,
+    lyrics: lyricsService,
+    recordingVersions,
+    playlists: playlistsService,
+    search: searchService,
     libraryRevision: () => queueStore.getLibraryRevision(),
     library: {
       getMetadata: () => queueStore.getMetadata(),
       queryTracks: (query) => queueStore.queryTracks(query),
       readLibraryQueue: (id, offset, limit, opts) =>
         queueStore.readQueue(id, offset, limit, opts),
-      queryCollections: async () => ({
-        revision: queueStore.getLibraryRevision(),
-        total: 0,
-        offset: 0,
-        items: [],
-        letterOffsets: {}
-      }),
+      queryCollections: (kind, query) => queueStore.queryCollections(kind, query),
       getTracksByIds: (ids) => queueStore.getTracksByIds(ids),
-      lookupTracksByPaths: async (paths) => ({
-        revision: queueStore.getLibraryRevision(),
-        ids: paths.map(() => null)
-      }),
-      lookupPlaylistTracks: async ({ entries }) => ({
-        revision: queueStore.getLibraryRevision(),
-        ids: entries.map(() => null)
-      })
+      lookupTracksByPaths: (paths) => queueStore.lookupTracksByPaths(paths),
+      lookupPlaylistTracks: (req) => queueStore.lookupPlaylistTracks(req)
     },
     state: stateApi,
     scan: {
