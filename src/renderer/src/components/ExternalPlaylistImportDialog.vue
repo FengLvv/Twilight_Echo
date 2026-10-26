@@ -611,7 +611,10 @@ progress {
   font-weight: 400;
 }
 .overwrite input {
-  width: auto;
+  width: 1.05em;
+  height: 1.05em;
+  padding: 0;
+  flex: 0 0 auto;
 }
 footer {
   justify-content: flex-end;

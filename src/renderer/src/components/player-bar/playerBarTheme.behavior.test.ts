@@ -476,8 +476,7 @@ window.checkStandardPlayerGeometry=async()=>{
     const seeking=bar.querySelector('.progress-area').getBoundingClientRect()
     expect(utilities[0].left>=seeking.right+4,'utility hit targets cannot intrude into the seeking column at narrow widths')
     expect(utilities.at(-1).right<=frame.right-9,'trailing controls stay inside the panel')
-    for(let i=1;i<utilities.length;i++)expect(utilities[i].left-utilities[i-1].right>=3.9,'secondary hit targets do not overlap')
-    expect(utilities[2].left-utilities[1].right>=11.9&&utilities[4].left-utilities[3].right>=11.9,'whitespace separates playback preferences, output and queue, and player tools')
+    for(let i=1;i<utilities.length;i++)expect(Math.abs(utilities[i].left-utilities[i-1].right-4)<0.6,'secondary hit targets use even spacing')
     expect(play.width>=play.height*1.6,'play capsule remains horizontal at every width and font size')
     expect(Math.abs(glyph.x+glyph.width/2-play.x-play.width/2)<0.6&&Math.abs(glyph.y+glyph.height/2-play.y-play.height/2)<0.6,'transport glyph stays centered in the capsule: '+JSON.stringify({tone,glass,fontSize,width:innerWidth,play:play.toJSON(),glyph:glyph.toJSON(),display:getComputedStyle(button).display,align:getComputedStyle(button).alignItems}))
   }

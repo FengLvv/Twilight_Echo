@@ -692,11 +692,21 @@ watch(tone, (value) => emit('toneChange', value === 'dark' ? 'dark' : 'pureWhite
                   >
                     {{ characterPreview?.navigationExpanded ? '收起侧边栏' : '展开侧边栏' }}
                   </button>
-                  <button aria-label="缩小部件" @click="characterPreview?.zoomOut()">
-                    <i class="pi pi-minus" aria-hidden="true" /></button
-                  ><button aria-label="放大部件" @click="characterPreview?.zoomIn()">
-                    <i class="pi pi-plus" aria-hidden="true" /></button
-                  ><button @click="characterPreview?.fitPart()">适合部件</button>
+                  <button
+                    class="appearance-zoom-button"
+                    aria-label="缩小部件"
+                    @click="characterPreview?.zoomOut()"
+                  >
+                    <i class="pi pi-minus" aria-hidden="true" />
+                  </button>
+                  <button
+                    class="appearance-zoom-button"
+                    aria-label="放大部件"
+                    @click="characterPreview?.zoomIn()"
+                  >
+                    <i class="pi pi-plus" aria-hidden="true" />
+                  </button>
+                  <button @click="characterPreview?.fitPart()">适合部件</button>
                 </div>
               </div>
               <div class="appearance-character-viewport">

@@ -475,8 +475,8 @@
 .playlist-row-actions button {
   display: grid;
   place-items: center;
-  width: 27px;
-  height: 27px;
+  width: var(--te-control-height-sm);
+  height: var(--te-control-height-sm);
   padding: 0;
   border: 0;
   border-radius: 999px;

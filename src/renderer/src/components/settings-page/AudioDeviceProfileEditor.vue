@@ -254,6 +254,9 @@ button {
   padding: 8px;
   min-width: 0;
 }
+.profile-editor input[type='checkbox'] {
+  padding: 0;
+}
 input[type='checkbox'] {
   accent-color: var(--accent-color);
 }

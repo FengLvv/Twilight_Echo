@@ -314,11 +314,17 @@ html[data-te-motion='reduced'] .mini-customizer-panel-leave-active {
 }
 
 .customizer-switch-row input[type='checkbox'] {
-  width: 32px;
-  height: 18px;
+  width: max(1.05em, 16px);
+  height: max(1.05em, 16px);
+  justify-self: center;
   margin: 0;
   accent-color: var(--customizer-accent);
   cursor: pointer;
+}
+
+.customizer-switch-row input[type='checkbox']:checked {
+  border-color: var(--customizer-accent);
+  background-color: var(--customizer-accent);
 }
 
 .customizer-labeled-control {

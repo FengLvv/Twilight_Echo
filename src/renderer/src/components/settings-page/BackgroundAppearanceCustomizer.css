@@ -1478,6 +1478,13 @@ html[data-theme='pureWhite']
   padding: 6px 8px;
   font-size: var(--te-type-body);
 }
+.appearance-editor .appearance-zoom-tools .appearance-zoom-button {
+  width: var(--te-control-height-md);
+  height: var(--te-control-height-md);
+  min-width: var(--te-control-height-md);
+  min-height: var(--te-control-height-md);
+  padding: 0;
+}
 .appearance-editor .appearance-zoom-tools button[aria-pressed='true'] {
   background: var(--te-subtle-bg, rgb(127 127 127 / 12%));
 }

@@ -1308,6 +1308,10 @@ html[data-te-motion='off'] .network-create-form {
   padding: 0 12px;
   background: var(--te-settings-control-bg, rgba(255, 255, 255, 0.8));
 }
+.network-library-search:focus-within {
+  border-color: color-mix(in srgb, var(--te-control-focus-color) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-control-focus-color) 12%, transparent);
+}
 .network-library-search > i {
   color: var(--te-settings-text-muted);
 }

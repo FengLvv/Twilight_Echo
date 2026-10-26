@@ -1682,8 +1682,6 @@ html[data-theme='dark'] .streaming-search-box.focused {
   box-shadow:
     0 0 0 4px rgba(var(--te-primary-rgb), 0.16),
     0 18px 44px rgba(0, 0, 0, 0.28);
-  outline: 2px solid var(--te-primary-500);
-  outline-offset: 2px;
 }
 
 html[data-theme='dark'] .search-input,

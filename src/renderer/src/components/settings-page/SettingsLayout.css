@@ -234,7 +234,7 @@ html
   .check-field
   > input[type='checkbox'] {
   order: 1;
-  flex: 0 0 18px;
+  flex: 0 0 auto;
 }
 html .settings-preview-page[data-settings-layout='categories'] #desktopLyrics .check-field > span {
   min-width: 0;

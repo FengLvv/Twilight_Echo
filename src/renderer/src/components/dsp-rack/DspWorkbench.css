@@ -277,15 +277,16 @@ html[data-theme='dark'] .audio-workspace {
   background: var(--dsp-hover);
 }
 .audio-workspace :where(.icon-button):where(:not(.eq-page *)) {
-  width: 34px;
-  height: 34px;
+  width: var(--te-control-height-md);
+  height: var(--te-control-height-md);
+  min-height: var(--te-control-height-md);
   padding: 0;
   flex-shrink: 0;
 }
 .audio-workspace :where(.icon-button.small):where(:not(.eq-page *)) {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: var(--te-control-height-sm);
+  height: var(--te-control-height-sm);
+  min-height: var(--te-control-height-sm);
   border-radius: 7px;
   background: transparent;
   color: var(--dsp-muted);
@@ -4514,6 +4515,12 @@ html[data-theme='dark'] .audio-workspace .emblem-logo.is-mono-ink {
   }
   .audio-workspace .workspace-tabs {
     gap: 20px;
+  }
+  .audio-workspace .workspace-popout {
+    width: var(--te-control-height-md);
+    height: var(--te-control-height-md);
+    min-height: var(--te-control-height-md);
+    padding: 0;
   }
   .audio-workspace .workspace-popout .action-label {
     display: none;
