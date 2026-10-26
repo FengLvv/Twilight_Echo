@@ -34,10 +34,16 @@ export function createCoreListeningStats(options: {
       try {
         const summary = await options.overview(request.signal)
         const sorts = ['recent', 'plays', 'seconds'] as const
-        const pages = await Promise.all(sorts.map((sort) => options.page({ sort, limit: 200, revision: summary.revision }, request.signal)))
+        const pages = await Promise.all(sorts.map(async (sort) => {
+          const query = { sort, revision: summary.revision }
+          const first = await options.page({ ...query, limit: 128 }, request.signal)
+          if (first.total <= 128) return first.items
+          const next = await options.page({ ...query, offset: 128, limit: 72 }, request.signal)
+          return [...first.items, ...next.items]
+        }))
         if (request.signal.aborted || key() !== expected || disposed) return
         overview.value = freeze(summary)
-        windows.value = freeze({ recent: pages[0].items, plays: pages[1].items, seconds: pages[2].items })
+        windows.value = freeze({ recent: pages[0], plays: pages[1], seconds: pages[2] })
         error.value = ''
       } catch (failure) {
         if (!request.signal.aborted && key() === expected && !disposed) {
