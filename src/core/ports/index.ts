@@ -771,7 +771,9 @@ function createPortProxy<T extends object>(selectPort: (ports: CorePorts) => T):
       }
       let cached = fnCache.get(prop)
       if (!cached) {
-        cached = new Proxy(function () {}, {
+        cached = new Proxy(function () {
+          // A constructible target is required; the traps dispatch to the active host port.
+        }, {
           apply(_fn, _thisArg, args) {
             const port = selectPort(getCorePorts()) as Record<PropertyKey, any>
             const targetFn = port[prop]

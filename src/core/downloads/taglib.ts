@@ -1,5 +1,6 @@
 import { coreAudioMetadata } from '../ports/index.ts'
 
+// eslint-disable-next-line @typescript-eslint/no-namespace -- Preserve the Taglib.File/Tag type API without importing the Node module.
 export declare namespace Taglib {
   interface Tag {
     title?: string

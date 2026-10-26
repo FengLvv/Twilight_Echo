@@ -1719,7 +1719,11 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
           }
         }
       }
-      return { cancel() {} }
+      return {
+        cancel() {
+          // No timer was scheduled when the host has no timer API.
+        }
+      }
     }
   }
 
