@@ -688,7 +688,11 @@ export class CoreSupervisor extends EventEmitter {
       this.epoch = null
       for (const pending of [...this.pending.values()]) {
         pending.dispose()
-        pending.reject(Object.assign(new Error(error.message), { code: 'OUTCOME_UNKNOWN' }))
+        pending.reject(
+          Object.assign(new Error(error.message), {
+            code: pending.command ? 'OUTCOME_UNKNOWN' : 'CANCELLED'
+          })
+        )
       }
       if (child) terminateProcess(child)
       await Promise.all([

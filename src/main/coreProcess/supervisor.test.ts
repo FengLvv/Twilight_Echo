@@ -636,6 +636,33 @@ test('discard does not report completion before every owned service actually exi
   assert.equal(core.sent.filter(({ message }) => message.kind === 'core:shutdown').length, 0)
 })
 
+test('explicit discard settles in-flight writes as unknown and queries as cancelled without replay', async (t) => {
+  const { supervisor, children } = fixture(t)
+  supervisor.connect(identity)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  const write = assert.rejects(supervisor.request(identity.id, command(core.epoch, 'write-once')), {
+    code: 'OUTCOME_UNKNOWN'
+  })
+  const read = assert.rejects(
+    supervisor.request(identity.id, {
+      kind: 'query',
+      name: 'state.snapshot',
+      epoch: core.epoch,
+      requestId: 'cancel-read',
+      payload: {}
+    }),
+    { code: 'CANCELLED' }
+  )
+  await supervisor.forceShutdown()
+  await Promise.all([write, read])
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:request').length, 2)
+  assert.equal(core.sent.filter(({ message }) => message.kind === 'core:shutdown').length, 0)
+  assert.equal(children.length, 1)
+})
+
 test('Core exit without a shutdown ACK fails promptly instead of waiting out the checkpoint deadline', async (t) => {
   const { supervisor, children } = fixture(t)
   const started = supervisor.start()
