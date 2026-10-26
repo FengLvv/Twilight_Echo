@@ -29,6 +29,9 @@ export type RemoteServerMode = 'full' | 'mediaOnly'
 
 export type RemoteCommandHandler = (command: PlayerRemoteCommand) => Promise<void> | void
 export type RemoteBrowseHandler = (request: RemoteBrowseRequest) => Promise<RemoteBrowseResult>
+export type RemoteCoreRpcHandler = (
+  envelope: Record<string, unknown>
+) => Promise<Record<string, unknown>>
 
 export class RemoteCommandError extends Error {
   readonly status: number
@@ -46,6 +49,7 @@ export interface RemoteHttpServerOptions {
   useSource?<T>(action: () => Promise<T>): Promise<T>
   onCommand?: RemoteCommandHandler
   onBrowse?: RemoteBrowseHandler
+  onCoreRpc?: RemoteCoreRpcHandler
   auth?: RemoteAuthSession
   mediaGrants?: MediaStreamGrantStore
   preferredPort?: number
@@ -64,7 +68,9 @@ export class RemoteHttpServer {
   private readonly options: RemoteHttpServerOptions
   private onCommand: RemoteCommandHandler | null
   private onBrowse: RemoteBrowseHandler | null
+  private onCoreRpc: RemoteCoreRpcHandler | null
   private snapshot: RemotePlaybackSnapshot = createEmptyRemotePlaybackSnapshot()
+  private coreStateEvent: Record<string, unknown> | null = null
   private readonly sseClients = new Set<PortableServerResponse>()
   /** S3: SSE 长连接上限，防止局域网内开大量 /api/events 耗尽资源。 */
   private readonly sseMaxClients = 8
@@ -80,6 +86,7 @@ export class RemoteHttpServer {
     this.staticRoot = options.staticRoot
     this.onCommand = options.onCommand ?? null
     this.onBrowse = options.onBrowse ?? null
+    this.onCoreRpc = options.onCoreRpc ?? null
   }
 
   setCommandHandler(handler: RemoteCommandHandler | null): void {
@@ -88,6 +95,15 @@ export class RemoteHttpServer {
 
   setBrowseHandler(handler: RemoteBrowseHandler | null): void {
     this.onBrowse = handler
+  }
+
+  setCoreRpcHandler(handler: RemoteCoreRpcHandler | null): void {
+    this.onCoreRpc = handler
+  }
+
+  updateCoreStateEvent(event: Record<string, unknown>): void {
+    this.coreStateEvent = event
+    this.broadcastSse('core_state', event)
   }
 
   getAuth(): RemoteAuthSession {
@@ -354,7 +370,9 @@ export class RemoteHttpServer {
         this.sendJson(res, 200, {
           requiresPairing: true,
           paired: this.auth.isPaired(),
-          app: 'Twilight Echo'
+          app: 'Twilight Echo',
+          coreBridge: true,
+          protocolVersion: 1
         })
         return
       }
@@ -380,12 +398,35 @@ export class RemoteHttpServer {
         return
       }
 
-      if (req.method === 'GET' && url.pathname === '/api/events') {
+      if (req.method === 'GET' && (url.pathname === '/api/events' || url.pathname === '/api/core/events')) {
         if (!this.authorize(req, url)) {
           this.sendJson(res, 401, { error: 'unauthorized' })
           return
         }
         this.attachSse(res)
+        return
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/core/rpc') {
+        if (!this.authorize(req, url)) {
+          this.sendJson(res, 401, { error: 'unauthorized' })
+          return
+        }
+        if (!this.auth.tryConsumeCommand()) {
+          this.sendJson(res, 429, { error: 'rate_limited' })
+          return
+        }
+        const body = await readJsonBody(req)
+        if (!body || typeof body.requestId !== 'string' || typeof body.name !== 'string') {
+          this.sendJson(res, 400, { error: 'invalid_core_envelope' })
+          return
+        }
+        if (!this.onCoreRpc) {
+          this.sendJson(res, 503, { error: 'core_rpc_handler_missing' })
+          return
+        }
+        const responseEnvelope = await this.onCoreRpc(body)
+        this.sendJson(res, 200, responseEnvelope)
         return
       }
 
@@ -482,6 +523,9 @@ export class RemoteHttpServer {
       this.sseClients.delete(res)
     })
     this.writeSse(res, `event: state\ndata: ${JSON.stringify(this.snapshot)}\n\n`)
+    if (this.coreStateEvent) {
+      this.writeSse(res, `event: core_state\ndata: ${JSON.stringify(this.coreStateEvent)}\n\n`)
+    }
   }
 
   private writeSse(client: PortableServerResponse, payload: string): void {
