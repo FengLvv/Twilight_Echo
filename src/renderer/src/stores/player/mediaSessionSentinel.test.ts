@@ -24,7 +24,7 @@ function fakeAudio(playError?: Error): FakeAudio {
     playError,
     play() {
       audio.playedCount++
-      return playError ? Promise.reject(playError) : Promise.resolve()
+      return audio.playError ? Promise.reject(audio.playError) : Promise.resolve()
     },
     pause() {
       audio.pausedCount++
@@ -90,17 +90,27 @@ test('arming twice keeps one element and dispose releases it', () => {
   assert.equal(audio.pausedCount, 1)
 })
 
-test('a blocked autoplay is reported without breaking the caller', async () => {
+test('a blocked autoplay is reported without breaking the caller and retries on a later arm', async () => {
   const errors: unknown[] = []
+  let created = 0
   const audio = fakeAudio(new Error('NotAllowedError'))
   const sentinel = createMediaSessionSentinel({
-    createElement: () => audio as never,
+    createElement: () => {
+      created++
+      return audio as never
+    },
     onError: (error) => errors.push(error)
   })
   sentinel.arm()
   await new Promise((resolve) => setTimeout(resolve, 0))
   assert.equal(errors.length, 1)
   assert.match(String(errors[0]), /NotAllowedError/)
+  assert.equal(audio.playedCount, 1)
+  audio.playError = undefined
+  sentinel.arm()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(created, 1)
+  assert.equal(audio.playedCount, 2)
   sentinel.dispose()
 })
 

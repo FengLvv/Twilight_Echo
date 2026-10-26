@@ -84,15 +84,33 @@ export function createMediaSessionSentinel(
     })
   const buildSource = options.buildSource ?? (() => silentWavDataUri())
   let element: HTMLAudioElement | null = null
+  let playPendingOrSucceeded = false
   let disposed = false
 
   function report(error: unknown): void {
     options.onError?.(error)
   }
 
+  function startPlay(audio: HTMLAudioElement): void {
+    playPendingOrSucceeded = true
+    try {
+      void Promise.resolve(audio.play()).catch((error) => {
+        if (element === audio && !disposed) playPendingOrSucceeded = false
+        report(error)
+      })
+    } catch (error) {
+      playPendingOrSucceeded = false
+      report(error)
+    }
+  }
+
   return {
     arm(): void {
-      if (disposed || element) return
+      if (disposed) return
+      if (element) {
+        if (!playPendingOrSucceeded) startPlay(element)
+        return
+      }
       let audio: HTMLAudioElement
       try {
         audio = createElement()
@@ -115,11 +133,12 @@ export function createMediaSessionSentinel(
       // Autoplay can be blocked before the first gesture, so a rejection is
       // expected and must not surface as a playback error. The element stays
       // silent and unpublished until a later arm() succeeds.
-      void audio.play().catch(report)
+      startPlay(audio)
     },
     dispose(): void {
       if (disposed) return
       disposed = true
+      playPendingOrSucceeded = false
       const audio = element
       element = null
       if (!audio) return
