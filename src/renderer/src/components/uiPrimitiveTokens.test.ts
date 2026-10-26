@@ -75,10 +75,6 @@ const themeStudioCss = readFileSync(
 )
 const streamingSearch = readFileSync(new URL('./StreamingSearch.vue', import.meta.url), 'utf8')
 const ncmCloud = readFileSync(new URL('./NcmCloudPanel.vue', import.meta.url), 'utf8')
-const dspStudio = readFileSync(
-  new URL('./dsp-rack/DspStudio.css', import.meta.url),
-  'utf8'
-)
 const dspWorkbench = readFileSync(
   new URL('./dsp-rack/DspWorkbench.css', import.meta.url),
   'utf8'
@@ -191,12 +187,11 @@ test('button, pill and badge families consume control tokens', () => {
 })
 
 test('playlist card icon actions use the shared square small-control hit area', () => {
-  const match = playlistLibrary.match(/\.card-actions button\{([^}]*)\}/)
-  assert.ok(match, 'expected the playlist card action button rule')
-  assert.match(match[1], /width:\s*var\(--te-control-height-sm\)/)
-  assert.match(match[1], /height:\s*var\(--te-control-height-sm\)/)
-  assert.match(match[1], /min-height:\s*var\(--te-control-height-sm\)/)
-  assert.match(match[1], /padding:\s*0/)
+  const actions = rule(playlistLibrary, '.card-actions button')
+  assert.match(actions, /width:\s*var\(--te-control-height-sm\)/)
+  assert.match(actions, /height:\s*var\(--te-control-height-sm\)/)
+  assert.match(actions, /min-height:\s*var\(--te-control-height-sm\)/)
+  assert.match(actions, /padding:\s*0/)
 })
 
 test('queue playlist row icon actions use the shared square small-control size', () => {
@@ -215,7 +210,7 @@ test('dialog surfaces derive their radius from the single dialog token', () => {
   ] as const) {
     assert.match(
       rule(source, name),
-      /border-radius:\s*var\(--te-dialog-radius\)/,
+      /border-radius:\s*var\(--te-dialog-radius(?:,[^)]+)?\)/,
       `${name} must use var(--te-dialog-radius)`
     )
   }
@@ -329,20 +324,18 @@ test('track source picker close button uses the shared square icon size', () => 
 })
 
 test('DSP compact icon buttons use the small square control token', () => {
-  const buttons = [
-    rule(dspWorkbench, '.audio-workspace .icon-button.small'),
-    rule(dspStudio, '.audio-workspace .signal-scope button')
-  ]
-  for (const button of buttons) {
-    for (const property of ['width', 'height', 'min-height']) {
-      assert.match(button, new RegExp(`${property}:\\s*var\\(--te-control-height-sm\\)`))
-    }
+  const button = rule(
+    dspWorkbench,
+    '.audio-workspace :where(.icon-button.small):where(:not(.eq-page *))'
+  )
+  for (const property of ['width', 'height', 'min-height']) {
+    assert.match(button, new RegExp(`${property}:\\s*var\\(--te-control-height-sm\\)`))
   }
 })
 
 test('DSP narrow window action uses a square shared icon size', () => {
-  const mobileRule = dspStudio.match(
-    /@media \(max-width: 620px\) \{[\s\S]*?\.audio-workspace \.workspace-header > \.toolbar > button:last-child\s*\{([^}]*)\}/
+  const mobileRule = dspWorkbench.match(
+    /@container dsp-workbench \(max-width: 959px\) \{[\s\S]*?\.audio-workspace \.workspace-popout\s*\{([^}]*)\}/
   )
   assert.ok(mobileRule, 'expected the narrow DSP window action rule')
   for (const property of ['width', 'height', 'min-height']) {
@@ -351,14 +344,13 @@ test('DSP narrow window action uses a square shared icon size', () => {
 })
 
 test('external playlist overwrite checkbox keeps shared geometry outside generic field padding', () => {
-  const fieldRules = [...externalPlaylistImportDialog.matchAll(/input,select\{([^}]*)\}/g)]
-  assert.ok(fieldRules.some((match) => /padding:10px 12px/.test(match[1])))
-  const checkbox = externalPlaylistImportDialog.match(/\.overwrite input\{([^}]*)\}/)
-  assert.ok(checkbox, 'expected a scoped overwrite checkbox rule')
-  assert.match(checkbox[1], /width:1\.05em/)
-  assert.match(checkbox[1], /height:1\.05em/)
-  assert.match(checkbox[1], /padding:0/)
-  assert.match(checkbox[1], /flex:0 0 auto/)
+  const fieldRules = [...externalPlaylistImportDialog.matchAll(/input,\s*select\s*\{([^}]*)\}/g)]
+  assert.ok(fieldRules.some((match) => /padding:\s*10px 12px/.test(match[1])))
+  const checkbox = rule(externalPlaylistImportDialog, '.overwrite input')
+  assert.match(checkbox, /width:\s*1\.05em/)
+  assert.match(checkbox, /height:\s*1\.05em/)
+  assert.match(checkbox, /padding:\s*0/)
+  assert.match(checkbox, /flex:\s*0 0 auto/)
 })
 
 test('lyrics row checkboxes scale, use the local accent, and avoid double disabled dimming', () => {
