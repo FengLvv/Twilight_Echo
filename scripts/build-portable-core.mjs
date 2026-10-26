@@ -20,6 +20,189 @@ function resolveGitCommitSha() {
   }
 }
 
+const QUICKJS_BOOTSTRAP_INTRO = `
+(function(g) {
+  var uuidSeq = 0;
+  function genUuid() {
+    uuidSeq = (uuidSeq + 1) >>> 0;
+    function hex(len) {
+      var s = '';
+      for (var i = 0; i < len; i++) s += Math.floor(Math.random() * 16).toString(16);
+      return s;
+    }
+    var p = (Date.now() & 0xffffffff).toString(16).padStart(8, '0');
+    var q = (uuidSeq & 0xffff).toString(16).padStart(4, '0');
+    return p + '-' + q + '-4' + hex(3) + '-8' + hex(3) + '-' + hex(12);
+  }
+  if (!g.crypto || typeof g.crypto.randomUUID !== 'function') {
+    var c = (g.crypto && typeof g.crypto === 'object') ? g.crypto : {};
+    try { c.randomUUID = genUuid; g.crypto = c; } catch (_) {}
+  }
+  if (typeof g.structuredClone !== 'function') {
+    g.structuredClone = function clone(v) {
+      if (v === undefined || v === null || typeof v !== 'object') return v;
+      if (v instanceof Date) return new Date(v.getTime());
+      if (v instanceof Uint8Array) return new Uint8Array(v);
+      if (Array.isArray(v)) return v.map(clone);
+      if (v instanceof Map) {
+        var m = new Map();
+        v.forEach(function(val, k) { m.set(clone(k), clone(val)); });
+        return m;
+      }
+      if (v instanceof Set) {
+        var st = new Set();
+        v.forEach(function(val) { st.add(clone(val)); });
+        return st;
+      }
+      var out = {};
+      var keys = Object.keys(v);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        out[k] = clone(v[k]);
+      }
+      return out;
+    };
+  }
+  if (typeof g.Intl !== 'object' || g.Intl === null) {
+    g.Intl = {};
+  }
+  if (typeof g.Intl.Collator !== 'function') {
+    g.Intl.Collator = function PortableCollator(locales, options) {
+      this._locale = Array.isArray(locales) ? String(locales[0] || 'en') : String(locales || 'en');
+      this._options = options || {};
+      this.compare = function(a, b) {
+        var sa = String(a === undefined || a === null ? '' : a);
+        var sb = String(b === undefined || b === null ? '' : b);
+        if (sa === sb) return 0;
+        return sa < sb ? -1 : 1;
+      };
+      this.resolvedOptions = function() {
+        return { locale: this._locale };
+      };
+    };
+  }
+  if (typeof g.TextEncoder !== 'function') {
+    g.TextEncoder = function PortableTextEncoder() {
+      this.encoding = 'utf-8';
+      this.encode = function(input) {
+        var str = String(input === undefined ? '' : input);
+        var bytes = [];
+        for (var i = 0; i < str.length; i++) {
+          var cp = str.charCodeAt(i);
+          if (cp >= 0xd800 && cp <= 0xdbff && i + 1 < str.length) {
+            var next = str.charCodeAt(i + 1);
+            if (next >= 0xdc00 && next <= 0xdfff) {
+              cp = ((cp - 0xd800) << 10) + (next - 0xdc00) + 0x10000;
+              i++;
+            }
+          }
+          if (cp <= 0x7f) bytes.push(cp);
+          else if (cp <= 0x7ff) bytes.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+          else if (cp <= 0xffff) bytes.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+          else bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+        }
+        return new Uint8Array(bytes);
+      };
+    };
+  }
+  if (typeof g.TextDecoder !== 'function') {
+    g.TextDecoder = function PortableTextDecoder() {
+      this.encoding = 'utf-8';
+      this.decode = function(input) {
+        if (!input) return '';
+        var bytes = input instanceof Uint8Array ? input : (ArrayBuffer.isView(input) ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : new Uint8Array(input));
+        var out = '';
+        for (var i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+        try { return decodeURIComponent(escape(out)); } catch (_) { return out; }
+      };
+    };
+  }
+  if (typeof g.AbortController !== 'function') {
+    function PortableAbortSignal() {
+      this.aborted = false;
+      this.reason = undefined;
+      this._listeners = [];
+    }
+    PortableAbortSignal.prototype.addEventListener = function(_t, fn) {
+      if (this.aborted) { fn(); return; }
+      this._listeners.push(fn);
+    };
+    PortableAbortSignal.prototype.removeEventListener = function(_t, fn) {
+      var idx = this._listeners.indexOf(fn);
+      if (idx >= 0) this._listeners.splice(idx, 1);
+    };
+    PortableAbortSignal.prototype.throwIfAborted = function() {
+      if (this.aborted) throw (this.reason || new Error('Aborted'));
+    };
+    PortableAbortSignal.prototype._trigger = function(reason) {
+      if (this.aborted) return;
+      this.aborted = true;
+      this.reason = reason || new Error('Aborted');
+      var list = this._listeners.slice();
+      this._listeners.length = 0;
+      for (var i = 0; i < list.length; i++) { try { list[i](); } catch (_) {} }
+    };
+    PortableAbortSignal.abort = function(r) { var s = new PortableAbortSignal(); s._trigger(r); return s; };
+    PortableAbortSignal.any = function(sigs) {
+      var c = new PortableAbortSignal();
+      if (sigs && typeof sigs[Symbol.iterator] === 'function') {
+        for (var s of sigs) {
+          if (!s) continue;
+          if (s.aborted) { c._trigger(s.reason); return c; }
+          s.addEventListener('abort', function() { c._trigger(s.reason); });
+        }
+      }
+      return c;
+    };
+    g.AbortSignal = PortableAbortSignal;
+    g.AbortController = function PortableAbortController() {
+      this.signal = new PortableAbortSignal();
+      var self = this;
+      this.abort = function(reason) { self.signal._trigger(reason); };
+    };
+  }
+  if (typeof g.URL !== 'function') {
+    g.URL = function PortableURL(url) {
+      var raw = String(url === undefined ? '' : url).trim();
+      var m = /^([a-zA-Z][a-zA-Z0-9+.-]*:)\\/\\/(?:([^:@/]+)(?::([^@/]*))?@)?([^/:?#]+)(?::([0-9]+))?(\\/[^?#]*)?(\\?[^#]*)?(#.*)?$/.exec(raw);
+      if (!m) throw new TypeError('Invalid URL: ' + raw);
+      this.href = raw;
+      this.protocol = m[1].toLowerCase();
+      this.username = m[2] || '';
+      this.password = m[3] || '';
+      this.hostname = m[4];
+      this.port = m[5] || '';
+      this.host = this.port ? (this.hostname + ':' + this.port) : this.hostname;
+      this.pathname = m[6] || '/';
+      this.search = m[7] || '';
+      this.hash = m[8] || '';
+      this.toString = function() { return this.href; };
+    };
+  }
+  if (typeof g.console !== 'object' || g.console === null) {
+    var noop = function() {};
+    g.console = { log: noop, info: noop, warn: noop, error: noop, debug: noop };
+  }
+  if (typeof g.performance !== 'object' || g.performance === null) {
+    g.performance = { now: function() { return Date.now(); } };
+  }
+  if (typeof g.queueMicrotask !== 'function') {
+    g.queueMicrotask = function(cb) { Promise.resolve().then(cb); };
+  }
+  if (typeof g.setTimeout !== 'function') {
+    var nextTimerId = 1;
+    g.setTimeout = function(cb, delay) {
+      var id = nextTimerId++;
+      if (!delay || delay <= 0) {
+        Promise.resolve().then(function() { if (typeof cb === 'function') cb(); });
+      }
+      return id;
+    };
+    g.clearTimeout = function() {};
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+`;
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
@@ -32,7 +215,7 @@ async function main() {
       emptyOutDir: false,
       sourcemap: true,
       minify: false,
-      target: 'es2022',
+      target: 'es2020',
       lib: {
         entry: ENTRY,
         name: 'TwilightPortableCore',
@@ -41,6 +224,9 @@ async function main() {
       },
       rollupOptions: {
         external: [],
+        output: {
+          intro: QUICKJS_BOOTSTRAP_INTRO
+        },
         onwarn(warning, warn) {
           if (warning.code === 'CIRCULAR_DEPENDENCY') return
           warn(warning)

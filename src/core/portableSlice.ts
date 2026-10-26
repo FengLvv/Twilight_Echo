@@ -291,6 +291,74 @@ export function ensurePortableRuntimeGlobals(): void {
     }
     g.TextDecoder = PortableTextDecoder
   }
+
+  if (typeof g.Intl !== 'object' || g.Intl === null) {
+    g.Intl = {}
+  }
+  if (typeof g.Intl.Collator !== 'function') {
+    class PortableCollator {
+      private readonly locale: string
+      private readonly options: Record<string, unknown>
+      readonly compare: (a: string, b: string) => number
+      constructor(locales?: string | string[], options?: Record<string, unknown>) {
+        this.locale = Array.isArray(locales) ? String(locales[0] ?? 'en') : String(locales ?? 'en')
+        this.options = options ?? {}
+        this.compare = (a: string, b: string): number => {
+          const sa = String(a ?? '')
+          const sb = String(b ?? '')
+          if (sa === sb) return 0
+          return sa < sb ? -1 : 1
+        }
+      }
+      resolvedOptions() {
+        return { locale: this.locale, ...this.options }
+      }
+    }
+    g.Intl.Collator = PortableCollator
+  }
+
+  if (typeof g.URL !== 'function') {
+    class PortableURL {
+      href: string
+      protocol: string
+      username = ''
+      password = ''
+      host: string
+      hostname: string
+      port: string
+      pathname: string
+      search: string
+      hash: string
+      constructor(url: string) {
+        const raw = String(url ?? '').trim()
+        const match = /^([a-zA-Z][a-zA-Z0-9+.-]*:)\/\/(?:([^:@/]+)(?::([^@/]*))?@)?([^/:?#]+)(?::([0-9]+))?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/.exec(
+          raw
+        )
+        if (!match) {
+          throw new TypeError(`Invalid URL: ${raw}`)
+        }
+        this.href = raw
+        this.protocol = match[1]!.toLowerCase()
+        this.username = match[2] ?? ''
+        this.password = match[3] ?? ''
+        this.hostname = match[4]!
+        this.port = match[5] ?? ''
+        this.host = this.port ? `${this.hostname}:${this.port}` : this.hostname
+        this.pathname = match[6] || '/'
+        this.search = match[7] ?? ''
+        this.hash = match[8] ?? ''
+      }
+      toString(): string {
+        return this.href
+      }
+    }
+    g.URL = PortableURL
+  }
+
+  if (typeof g.console !== 'object' || g.console === null) {
+    const noop = () => {}
+    g.console = { log: noop, info: noop, warn: noop, error: noop, debug: noop }
+  }
 }
 
 ensurePortableRuntimeGlobals()

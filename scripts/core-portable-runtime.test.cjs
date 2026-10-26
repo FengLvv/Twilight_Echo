@@ -32,6 +32,12 @@ function loadPortableCoreInIsolatedSandbox() {
     codeGeneration: { strings: false, wasm: false },
   })
 
+  // Strip ECMA-402 / Web / Node globals that QuickJS does not provide natively
+  vm.runInContext(
+    'delete globalThis.Intl; delete globalThis.structuredClone; delete globalThis.crypto; delete globalThis.TextEncoder; delete globalThis.TextDecoder; delete globalThis.AbortController; delete globalThis.AbortSignal; delete globalThis.URL;',
+    context,
+  )
+
   vm.runInContext(bundleCode, context, {
     filename: 'music-core.js',
     timeout: 5000,
