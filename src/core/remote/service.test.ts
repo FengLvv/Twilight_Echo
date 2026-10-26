@@ -300,6 +300,7 @@ test('Roon-style Core RPC bridge translates mobile CoreRequestEnvelope queries a
     payload: { offset: 0, limit: 10 }
   })
   assert.equal(winRes.ok, true)
+  assert.equal((winRes.value as { limit: number }).limit, 10)
   assert.equal(
     (winRes.value as { items: Array<{ occurrenceId: string }> }).items[0].occurrenceId,
     'occurrence-a'

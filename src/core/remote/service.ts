@@ -618,7 +618,7 @@ export class CoreRemoteService {
               revision: page.revision,
               total: page.total,
               offset: page.offset,
-              limit: page.limit,
+              limit,
               currentIndex: queue.index,
               currentOccurrenceId: queue.occurrenceId,
               items: page.items.map((item) => ({
