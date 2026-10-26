@@ -1,4 +1,4 @@
-import { extname, posix, win32 } from 'node:path'
+import { extname, posix, win32 } from '../../shared/portablePath.ts'
 
 const MAX_FILE_NAME_LENGTH = 255
 const CLOUD_DOWNLOAD_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])

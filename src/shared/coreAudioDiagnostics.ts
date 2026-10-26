@@ -1,10 +1,11 @@
 import { isAppLocale, type AppLocale } from './i18n/locale.ts'
+import type { CorePlatformId } from './audioEngineTypes.ts'
 
 export interface AudioDiagnosticEnvironment {
   appName: string
   appVersion: string
   packaged: boolean
-  platform: NodeJS.Platform
+  platform: CorePlatformId
   architecture: string
   osRelease: string
   locale: string

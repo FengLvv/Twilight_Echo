@@ -1,10 +1,12 @@
-import { readFile, writeFile, mkdir, rename } from 'node:fs/promises'
-import { join } from 'node:path'
+import { coreFsPromises } from '../ports/index.ts'
+import { join } from '../../shared/portablePath.ts'
 import type { TwilightPluginManager } from './manager.ts'
 import { normalizeExperiences } from '../../shared/pluginExperience.ts'
 import type { createLegacyMusicAuthority } from './legacyMusicAuthority.ts'
 import { legacyMusicDocumentValue } from '../../shared/legacyMusicMetadata.ts'
 import type { LegacyMusicProvenanceOptions, LegacyMusicProvenanceReview } from '../../shared/legacyMusicMetadata.ts'
+
+const { readFile, writeFile, mkdir, rename } = coreFsPromises
 
 export interface ExperienceDocument {
   revision: number
@@ -37,14 +39,14 @@ export function createExperienceDocuments(
         legacyMusicDocumentValue(document)
         return document
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { revision: 0, value: {} }
+        if ((error as { code?: string }).code === 'ENOENT') return { revision: 0, value: {} }
         throw error
       }
     }
     const backup = async (document: ExperienceDocument, name: string) => {
       await mkdir(plugin.paths.dataDir, { recursive: true })
       await writeFile(join(plugin.paths.dataDir, name), JSON.stringify(document), { flag: 'wx' }).catch(
-        (error: NodeJS.ErrnoException) => {
+        (error: { code?: string }) => {
           if (error.code !== 'EEXIST') throw error
         }
       )

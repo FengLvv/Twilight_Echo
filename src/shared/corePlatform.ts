@@ -17,6 +17,7 @@ import type { CoreCastSafetyTarget } from './coreCast.ts'
 import type { CoreSettingsPaths } from './coreSettings.ts'
 import type { CoreAutoMixWorkerRequest } from './coreAutoMix.ts'
 import type { CorePlayerPresentation } from './coreSystemPlayer.ts'
+import type { CorePlatformId } from './audioEngineTypes.ts'
 /** Platform capabilities, not a generic main-process method invocation surface. */
 export interface CorePlatformOperations extends CoreModelPackPlatformOperations {
   'themes.importArchive': { input: Record<string, never>; output: ThemeProfileV2 | null }
@@ -47,7 +48,7 @@ export interface CorePlatformOperations extends CoreModelPackPlatformOperations 
   'dsp.environment': {
     input: Record<string, never>
     output: {
-      platform: NodeJS.Platform
+      platform: CorePlatformId
       temporaryDirectory: string
       searchPaths: string[]
       helpers: Vst3HelpersAvailability
@@ -73,7 +74,7 @@ export interface CorePlatformOperations extends CoreModelPackPlatformOperations 
   }
   'network.environment': {
     input: Record<string, never>
-    output: { platform: NodeJS.Platform; tempRoot: string; gvfsRoot: string | null }
+    output: { platform: CorePlatformId; tempRoot: string; gvfsRoot: string | null }
   }
   'network.protectCredential': { input: { plain: string }; output: string }
   'network.unprotectCredential': { input: { encrypted: string }; output: string }

@@ -1,10 +1,14 @@
-import { createReadStream } from 'node:fs'
-import { unlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { coreFs, coreFsPromises } from '../../ports/index.ts'
+import { join } from '../../../shared/portablePath.ts'
 import { buildNetworkEntryId, normalizeRemotePath } from '../networkPath.ts'
 import { NetworkSourceFailure } from '../errors.ts'
 import { entryKind } from '../entryKinds.ts'
-import type { NetworkAuth, NetworkSourceAdapter, NetworkSourceSession } from './types.ts'
+import type {
+  NetworkAuth,
+  NetworkReadableStream,
+  NetworkSourceAdapter,
+  NetworkSourceSession
+} from './types.ts'
 import type { NetworkEntry, NetworkSourceProfile } from '../../../shared/networkSources.ts'
 
 export interface SftpLsItem {
@@ -161,21 +165,21 @@ export function createSftpSystemAdapter(deps: {
           remotePath: string,
           signal?: AbortSignal,
           options?: { start?: number }
-        ): Promise<NodeJS.ReadableStream> {
+        ): Promise<NetworkReadableStream> {
           const path = normalizeRemotePath(remotePath)
           const local = join(tempRoot, `sftp-${deps.newId()}.tmp`)
           try {
             await run({ kind: 'download', path, local }, signal)
           } catch (error) {
-            await unlink(local).catch(() => {})
+            await coreFsPromises.unlink(local).catch(() => {})
             throw error
           }
           if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络文件读取已取消')
-          const stream = createReadStream(local, { start: options?.start ?? 0 })
+          const stream = coreFs.createReadStream(local, { start: options?.start ?? 0 })
           stream.on('close', () => {
-            void unlink(local).catch(() => undefined)
+            void coreFsPromises.unlink(local).catch(() => undefined)
           })
-          return stream
+          return stream as unknown as NetworkReadableStream
         },
         async resolvePlaybackUrl(): Promise<string | null> {
           return null

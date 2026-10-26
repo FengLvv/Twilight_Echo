@@ -455,7 +455,7 @@ test('v12 migration makes a consistent backup, preserves catalog IDs and rolls b
     db.sql.exec(LEGACY_METADATA_SCHEMA_SQL + 'PRAGMA user_version=12;')
     db.close()
     db = new LibraryDatabase(path)
-    assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 29)
+    assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
     assert.deepEqual(
       db.catalogQuery({ kind: 'artist' }).items.map((e) => e.id),
       ids

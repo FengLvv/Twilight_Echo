@@ -1,6 +1,5 @@
-import { readFile } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
-import type { IAudioMetadata } from 'music-metadata'
+import { basename, extname, join } from '../../shared/portablePath.ts'
+import { coreAudioMetadata, coreFsPromises } from '../ports/index.ts'
 import { decodeLyrics } from '../../shared/lyricsEncoding.ts'
 
 // music-metadata's TimestampFormat.milliseconds; imported lazily, so the value is inlined.
@@ -23,10 +22,21 @@ function lrcTimestamp(milliseconds: number): string {
   return `[${minutes}:${seconds}.${fraction}]`
 }
 
-export function extractEmbeddedLyrics(metadata: {
-  common: Pick<IAudioMetadata['common'], 'lyrics'>
-  native: IAudioMetadata['native']
-}): string | null {
+export interface EmbeddedLyricsMetadata {
+  common: {
+    lyrics?: Array<{
+      timeStampFormat?: number
+      text?: string
+      syncText?: Array<{
+        timestamp?: number
+        text: string
+      }>
+    }>
+  }
+  native: Record<string, ReadonlyArray<{ id: string; value: unknown }>>
+}
+
+export function extractEmbeddedLyrics(metadata: EmbeddedLyricsMetadata): string | null {
   for (const tags of Object.values(metadata.native)) {
     for (const tag of tags) {
       if (!LYRIC_TAG_IDS.has(tag.id.toUpperCase())) continue
@@ -69,12 +79,13 @@ export async function loadLocalLyrics(
   filePath: string | null
 ): Promise<string | null> {
   const lrcPath = join(directory, `${basename(fileName, extname(fileName))}.lrc`)
-  const lyrics = await readFile(lrcPath)
+  const lyrics = await coreFsPromises
+    .readFile(lrcPath)
     .then((bytes) => decodeLyrics(bytes).text)
     .catch(() => null)
   if (lyrics) return lyrics
   if (!filePath) return null
-  const { parseFile } = await import('music-metadata')
+  const { parseFile } = coreAudioMetadata.musicMetadata
   return await parseFile(filePath, { skipCovers: true, duration: false })
     .then(extractEmbeddedLyrics)
     .catch(() => null)
@@ -87,7 +98,8 @@ export async function loadLocalCompanionLyrics(
 ): Promise<string | null> {
   const suffix = kind === 'translated' ? '_trans' : '_roma'
   const lrcPath = join(directory, `${basename(fileName, extname(fileName))}${suffix}.lrc`)
-  const lyrics = await readFile(lrcPath)
+  const lyrics = await coreFsPromises
+    .readFile(lrcPath)
     .then((bytes) => decodeLyrics(bytes).text)
     .catch(() => null)
   return lyrics || null

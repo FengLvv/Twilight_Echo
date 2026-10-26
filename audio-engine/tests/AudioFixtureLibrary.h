@@ -34,6 +34,8 @@ class TempAudioFixture {
 };
 
 TempAudioFixture writePcmWavFixture(const PcmWavFixtureSpec& spec);
+TempAudioFixture writeFlacTailFixture(
+    const std::string& name, bool appendInvalidFrame, bool incomplete = false, bool knownLength = true);
 TempAudioFixture writeDsfFixture(const std::string& name, int sampleRate = 2822400, int blockSizePerChannel = 4096);
 TempAudioFixture writeWavPackDsdFixture(const std::string& name);
 std::vector<std::filesystem::path> findExternalAudioFixtures();

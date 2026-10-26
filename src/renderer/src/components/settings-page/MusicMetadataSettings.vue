@@ -48,6 +48,23 @@ onBeforeUnmount(model.dispose)
     :attention="state.error || state.policyError"
     description="本地与已加入音乐库的平台歌曲共用资料。先核对身份，再补介绍及可用资料；不按同名强行关联。"
   >
+    <div class="metadata-sources-heading">
+      <p>
+        {{
+          preferences.setup === 'pending'
+            ? '导入歌曲后可一次开启全部资料获取。'
+            : '自动补全艺人、专辑与歌曲资料。'
+        }}
+      </p>
+      <button
+        type="button"
+        class="soft-button"
+        :disabled="state.saving || state.loading"
+        @click="model.enableAll()"
+      >
+        开启全部资料获取
+      </button>
+    </div>
     <p id="music-metadata-privacy" class="metadata-privacy">
       开启后，会向所选资料源发送歌曲、艺人和专辑名称、已有外部
       ID、必要的曲序与时长；不上传音频、本地文件路径或播放历史。手动介绍不会被自动覆盖。
@@ -59,7 +76,7 @@ onBeforeUnmount(model.dispose)
         class="setting-item"
       >
         <div class="setting-copy">
-          <strong>自动补全新入库资料</strong><span>处理之后新加入的本地与平台歌曲。默认关闭。</span>
+          <strong>自动补全新入库资料</strong><span>在后台补充新加入的本地与平台歌曲资料。</span>
         </div>
         <button
           type="button"
@@ -112,6 +129,30 @@ onBeforeUnmount(model.dispose)
           <option value="zh-Hant">繁體中文</option>
           <option value="en">English</option>
         </select>
+      </div>
+      <div
+        id="setting-metadata-ncm-fallback"
+        data-setting-id="metadata-ncm-fallback"
+        class="setting-item"
+      >
+        <div class="setting-copy">
+          <strong>网易云资料兜底</strong>
+          <span>公共资料缺失时补充艺人简介与头像，并保存在本地。</span>
+        </div>
+        <button
+          type="button"
+          class="toggle-switch"
+          role="switch"
+          aria-label="网易云资料兜底"
+          aria-describedby="music-metadata-privacy"
+          :aria-checked="preferences.ncmLocalFallback !== false"
+          :class="{
+            active: preferences.ncmLocalFallback !== false,
+            inactive: preferences.ncmLocalFallback === false
+          }"
+          :disabled="state.saving"
+          @click="model.ncmFallback()"
+        />
       </div>
       <div
         id="setting-metadata-sources"

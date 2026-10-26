@@ -1,4 +1,4 @@
-import { resolve } from 'node:path'
+import { resolve } from '../../shared/portablePath.ts'
 import {
   backupPathFor,
   clearJsonFileArtifacts,

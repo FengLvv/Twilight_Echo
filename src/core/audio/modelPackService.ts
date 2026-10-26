@@ -1,14 +1,20 @@
-import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import type {
   CoreModelPackDecode,
   CoreModelPackStatus,
   CoreModelPackPlatformOperations
 } from '../../shared/coreModelPack.ts'
+import { join } from '../../shared/portablePath.ts'
+import {
+  coreFs,
+  coreFsPromises,
+  coreStream,
+  type PortableReadableStream
+} from '../ports/index.ts'
 import { AutoMixStemInstaller } from './autoMixStemInstaller.ts'
+
+const { createReadStream, createWriteStream } = coreFs
+const { mkdir, mkdtemp, rm, stat } = coreFsPromises
+const { Readable, pipeline } = coreStream
 
 interface Options {
   root: string
@@ -75,13 +81,13 @@ export class CoreModelPackService {
 /** Disk tickets keep multi-GB entry bytes out of IPC and keep 7za in main. */
 export function decodeWithPlatform(
   root: string,
-  input: Readable,
+  input: PortableReadableStream,
   bytes: number,
   decode: Options['decode'],
   signal: AbortSignal,
   progress?: (bytes: number) => void
-): Readable {
-  async function* run(): AsyncGenerator<Buffer> {
+): PortableReadableStream {
+  async function* run(): AsyncGenerator<Uint8Array> {
     await mkdir(root, { recursive: true })
     const directory = await mkdtemp(join(root, '.decode-'))
     try {
@@ -107,7 +113,10 @@ export function decodeWithPlatform(
       }
       signal.throwIfAborted()
       await rm(join(directory, 'input.lzma'))
-      for await (const chunk of createReadStream(output, { signal })) yield chunk as Buffer
+      for await (const chunk of createReadStream(output, {
+        signal
+      }) as unknown as AsyncIterable<Uint8Array>)
+        yield chunk
     } finally {
       input.destroy()
       await rm(directory, { recursive: true, force: true })

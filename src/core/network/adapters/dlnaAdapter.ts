@@ -1,16 +1,20 @@
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
-import { Readable } from 'node:stream'
+import { coreHttp, coreHttps, coreStream } from '../../ports/index.ts'
+import { PortableBuffer } from '../../../shared/portableBytes.ts'
 import { buildSoapEnvelope } from '../../../shared/soap.ts'
 import { buildNetworkEntryId } from '../networkPath.ts'
 import { NetworkSourceFailure } from '../errors.ts'
 import { entryKind } from '../entryKinds.ts'
-import type { NetworkAuth, NetworkSourceAdapter, NetworkSourceSession } from './types.ts'
+import type {
+  NetworkAuth,
+  NetworkReadableStream,
+  NetworkSourceAdapter,
+  NetworkSourceSession
+} from './types.ts'
 import type { NetworkEntry, NetworkSourceProfile } from '../../../shared/networkSources.ts'
 
 export interface DlnaHttpResponse {
   status: number
-  body: Buffer
+  body: Uint8Array
 }
 
 export interface DlnaTransport {
@@ -99,7 +103,7 @@ async function defaultPost(
     {
       SOAPACTION: `"${soapAction}"`,
       'Content-Type': 'text/xml; charset="utf-8"',
-      'Content-Length': Buffer.byteLength(body)
+      'Content-Length': PortableBuffer.byteLength(body)
     },
     body,
     signal
@@ -116,11 +120,13 @@ async function requestText(
   return new Promise((resolve, reject) => {
     signal?.throwIfAborted()
     const parsed = new URL(url)
-    const requestFn = parsed.protocol === 'https:' ? httpsRequest : httpRequest
+    const requestFn = parsed.protocol === 'https:' ? coreHttps.request : coreHttp.request
     const req = requestFn(parsed, { method, headers, signal, timeout: 30_000 }, (res) => {
-      const chunks: Buffer[] = []
-      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) }))
+      const chunks: PortableBuffer[] = []
+      res.on('data', (chunk) => chunks.push(PortableBuffer.from(chunk)))
+      res.on('end', () =>
+        resolve({ status: res.statusCode ?? 0, body: PortableBuffer.concat(chunks) })
+      )
     })
     req.on('timeout', () => req.destroy(new Error('DLNA request timed out')))
     req.on('error', reject)
@@ -170,7 +176,7 @@ export function createDlnaAdapter(deps?: {
           try {
             const response = await transport.get(`${baseUrl}${descPath}`, signal)
             if (response.status !== 200) continue
-            const relative = extractControlUrl(response.body.toString('utf8'))
+            const relative = extractControlUrl(PortableBuffer.wrap(response.body).toString('utf8'))
             if (!relative) continue
             controlUrl = new URL(relative, `${baseUrl}${descPath}`).toString()
             return
@@ -216,7 +222,7 @@ export function createDlnaAdapter(deps?: {
         )
         if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络操作已取消')
         throwForStatus(response.status)
-        const body = response.body.toString('utf8')
+        const body = PortableBuffer.wrap(response.body).toString('utf8')
         const result = /<Result[^>]*>([\s\S]*?)<\/Result>/i.exec(body)?.[1] ?? ''
         return parseDidl(result)
       }
@@ -248,14 +254,16 @@ export function createDlnaAdapter(deps?: {
           remotePath: string,
           signal?: AbortSignal,
           options?: { start?: number }
-        ): Promise<NodeJS.ReadableStream> {
+        ): Promise<NetworkReadableStream> {
           const url = await resolveUrl(remotePath, signal)
           if (!url) throw new NetworkSourceFailure('notFound', 'DLNA 条目没有可播放的媒体地址')
           const response = await transport.get(url, signal)
           if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络文件读取已取消')
           throwForStatus(response.status)
           const start = options?.start ?? 0
-          return Readable.from([response.body.subarray(start)])
+          return coreStream.Readable.from([
+            response.body.subarray(start)
+          ]) as unknown as NetworkReadableStream
         },
         async close(): Promise<void> {
           // 无状态 HTTP，无需清理。

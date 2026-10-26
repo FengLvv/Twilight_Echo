@@ -1,6 +1,7 @@
-import { createRequire } from 'node:module'
-import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { coreFs, coreModule } from '../ports/index.ts'
+import { join, resolve } from '../../shared/portablePath.ts'
+
+const { existsSync } = coreFs
 
 export const QISHUI_PLUGIN_ID = 'com.twilightecho.provider.qishui'
 
@@ -28,10 +29,13 @@ export interface QishuiAuthCheckResult {
   cookie?: string
 }
 
-const nodeRequire = createRequire(import.meta.url)
+let cachedLoader: ((id: string) => unknown) | null = null
 
 function loadQishuiAuthModule(entryPath: string): QishuiAuthModule {
-  return nodeRequire(entryPath) as QishuiAuthModule
+  if (!cachedLoader) {
+    cachedLoader = coreModule.createRequire(import.meta.url)
+  }
+  return cachedLoader(entryPath) as QishuiAuthModule
 }
 
 export class QishuiAuthBridge {

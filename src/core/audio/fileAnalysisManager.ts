@@ -1,4 +1,6 @@
-import { stat } from 'node:fs/promises'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { stat } = coreFsPromises
 
 export type FileAnalysisRequestResult<Analysis, Unavailable = never> =
   | { status: 'completed'; analysis: Analysis }

@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto'
-import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { coreFsPromises } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { dirname } from '../../shared/portablePath.ts'
 import { NetworkSourceFailure } from './errors.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import type { NetworkEntry } from '../../shared/networkSources.ts'
@@ -24,11 +25,12 @@ export function createNetworkLibraryPersistence(filePath: string): NetworkLibrar
 
   async function readDocument(): Promise<NetworkLibraryDocument> {
     try {
-      const file = await open(filePath, 'r')
+      const file = await coreFsPromises.open(filePath, 'r')
       try {
         if ((await file.stat()).size > MAX_INDEX_BYTES) throw new Error('index is too large')
-        const raw = await file.readFile('utf8')
-        if (Buffer.byteLength(raw, 'utf8') > MAX_INDEX_BYTES) throw new Error('index is too large')
+        const raw = await coreFsPromises.readFile(file, 'utf8')
+        if (PortableBuffer.byteLength(raw, 'utf8') > MAX_INDEX_BYTES)
+          throw new Error('index is too large')
         const parsed = tryParseJsonWithNestingLimit(raw)
         if (!parsed.ok || !isLibraryDocument(parsed.value)) throw new Error('invalid index')
         return parsed.value
@@ -36,7 +38,7 @@ export function createNetworkLibraryPersistence(filePath: string): NetworkLibrar
         await file.close()
       }
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+      if ((err as { code?: string })?.code === 'ENOENT') return {}
       throw new NetworkSourceFailure('network', '网络媒体库索引读取失败')
     }
   }
@@ -53,17 +55,17 @@ export function createNetworkLibraryPersistence(filePath: string): NetworkLibrar
     },
     async save(document) {
       const raw = JSON.stringify(document)
-      if (Buffer.byteLength(raw, 'utf8') > MAX_INDEX_BYTES) {
+      if (PortableBuffer.byteLength(raw, 'utf8') > MAX_INDEX_BYTES) {
         throw new NetworkSourceFailure('network', '网络媒体库索引过大，未写入')
       }
-      await mkdir(dirname(filePath), { recursive: true })
+      await coreFsPromises.mkdir(dirname(filePath), { recursive: true })
       const temporary = `${filePath}.${randomUUID()}.tmp`
       try {
-        await writeFile(temporary, raw, 'utf8')
+        await coreFsPromises.writeFile(temporary, raw, 'utf8')
         // Replace in the same directory. Never unlink the old index on failure.
-        await rename(temporary, filePath)
+        await coreFsPromises.rename(temporary, filePath)
       } catch (error) {
-        await rm(temporary, { force: true }).catch(() => undefined)
+        await coreFsPromises.rm(temporary, { force: true }).catch(() => undefined)
         throw error
       }
     }

@@ -1,5 +1,6 @@
-import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { PortableBuffer, bytesToUtf8 } from '../../shared/portableBytes.ts'
+import { coreCrypto, coreFs } from '../ports/index.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import { canonicalizePluginManifestPaths } from './manifest.ts'
 import { OFFICIAL_PLUGIN_INDEX_URL } from '../../shared/pluginDistribution.ts'
@@ -9,6 +10,9 @@ import type {
   TwilightPluginSignatureStatus,
   TwilightPluginVerification
 } from './types.ts'
+
+const { existsSync, readFileSync } = coreFs
+const { createPublicKey, verify } = coreCrypto
 
 export { OFFICIAL_PLUGIN_INDEX_URL } from '../../shared/pluginDistribution.ts'
 
@@ -36,7 +40,7 @@ export interface TrustedPluginPublisherRegistryFile {
 
 export interface NormalizedTrustedPublisherKey extends TrustedPluginPublisherKey {
   status: 'active' | 'revoked'
-  keyObject: KeyObject
+  keyObject: ReturnType<typeof coreCrypto.createPublicKey>
   fingerprintSha256: string
   notBeforeMs: number | null
   notAfterMs: number | null
@@ -67,7 +71,7 @@ export function loadTrustedPluginPublisherRegistry(
     if (contents.byteLength > MAX_TRUSTED_PUBLISHER_REGISTRY_BYTES) {
       throw new Error('Trusted publisher registry is too large')
     }
-    const parsed = tryParseJsonWithNestingLimit(contents.toString('utf-8'))
+    const parsed = tryParseJsonWithNestingLimit(bytesToUtf8(contents))
     if (!parsed.ok) {
       throw new Error(
         parsed.reason === 'too-deep'
@@ -112,9 +116,9 @@ export function createTrustedPluginPublisherRegistry(raw: unknown): TrustedPlugi
 export function createPluginIndexSignaturePayload(
   entry: Record<string, unknown>,
   indexOrigin: string
-): Buffer {
+): PortableBuffer {
   const canonicalEntry = canonicalPluginIndexEntry(entry, false)
-  return Buffer.from(
+  return PortableBuffer.from(
     canonicalJson({
       schemaVersion: SIGNATURE_SCHEMA_VERSION,
       indexOrigin,
@@ -242,7 +246,7 @@ function verifyPublisherSignature(
       null,
       createPluginIndexSignaturePayload(entry, indexOrigin),
       key.keyObject,
-      Buffer.from(parsed.signature.value, 'base64')
+      PortableBuffer.from(parsed.signature.value, 'base64')
     )
     return { status: valid ? 'valid' : 'invalid', ...activeCommon }
   } catch {
@@ -418,7 +422,7 @@ function requireNonEmptyString(value: unknown, label: string): string {
 
 function isCanonicalSignatureBase64(value: string): boolean {
   if (!BASE64_PATTERN.test(value)) return false
-  const decoded = Buffer.from(value, 'base64')
+  const decoded = PortableBuffer.from(value, 'base64')
   return decoded.byteLength === 64 && decoded.toString('base64') === value
 }
 

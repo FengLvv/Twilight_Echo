@@ -1,9 +1,13 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
-import { join, extname } from 'node:path'
-import { Readable } from 'node:stream'
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
-import { pipeline } from 'node:stream/promises'
+import {
+  coreFs,
+  coreHttp,
+  coreStream,
+  type PortableHttpServer,
+  type PortableIncomingMessage,
+  type PortableServerResponse
+} from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { join, extname } from '../../shared/portablePath.ts'
 import { parseByteRange } from './byteRange.ts'
 import { RemoteAuthSession } from './auth.ts'
 import { MediaStreamGrantStore, guessAudioContentType } from './mediaTokens.ts'
@@ -48,7 +52,7 @@ export interface RemoteHttpServerOptions {
 }
 
 export class RemoteHttpServer {
-  private server: Server | null = null
+  private server: PortableHttpServer | null = null
   private port: number | null = null
   /** Full remote-control surface (pair/UI/commands). False in mediaOnly cast mode. */
   private enabled = false
@@ -61,7 +65,7 @@ export class RemoteHttpServer {
   private onCommand: RemoteCommandHandler | null
   private onBrowse: RemoteBrowseHandler | null
   private snapshot: RemotePlaybackSnapshot = createEmptyRemotePlaybackSnapshot()
-  private readonly sseClients = new Set<ServerResponse>()
+  private readonly sseClients = new Set<PortableServerResponse>()
   /** S3: SSE 长连接上限，防止局域网内开大量 /api/events 耗尽资源。 */
   private readonly sseMaxClients = 8
   private readonly sseMaxBufferedBytes = 1024 * 1024
@@ -150,7 +154,7 @@ export class RemoteHttpServer {
     this.lastError = null
 
     await new Promise<void>((resolve, reject) => {
-      const server = createServer((req, res) => {
+      const server = coreHttp.createServer((req, res) => {
         void this.handleRequest(req, res)
       })
       server.on('error', (error) => {
@@ -230,7 +234,7 @@ export class RemoteHttpServer {
     if (!server) return
     await new Promise<void>((resolve) => {
       server.close(() => resolve())
-      server.closeAllConnections()
+      ;(server as PortableHttpServer & { closeAllConnections?: () => void }).closeAllConnections?.()
     })
   }
 
@@ -292,9 +296,13 @@ export class RemoteHttpServer {
     return Array.from(urls)
   }
 
-  private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private async handleRequest(
+    req: PortableIncomingMessage,
+    res: PortableServerResponse
+  ): Promise<void> {
     try {
-      const host = req.headers.host ?? `127.0.0.1:${this.port ?? 0}`
+      const hostHeader = req.headers.host
+      const host = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) ?? `127.0.0.1:${this.port ?? 0}`
       const url = new URL(req.url ?? '/', `http://${host}`)
       const remoteIp = (req.socket.remoteAddress ?? '').replace(/^::ffff:/i, '')
       if (remoteIp && !isPrivateOrLocalIp(remoteIp) && remoteIp !== '::1') {
@@ -302,15 +310,17 @@ export class RemoteHttpServer {
         return
       }
 
+      const originHeader = req.headers.origin
+      const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader
       // S2: CORS 不再无条件 `*`，仅当 Origin 与本服务同源（或本机回环）时回显。
       // 任意第三方网页跨源读取将被浏览器拦截。
-      ;(res as ServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin =
-        this.resolveAllowedOrigin(req.headers.origin, host)
+      ;(res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin =
+        this.resolveAllowedOrigin(origin, host)
 
       if (req.method === 'OPTIONS') {
         res.writeHead(
           204,
-          corsHeaders((res as ServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin)
+          corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin)
         )
         res.end()
         return
@@ -447,18 +457,20 @@ export class RemoteHttpServer {
     }
   }
 
-  private authorize(req: IncomingMessage, url: URL): boolean {
-    if (this.auth.authorizeBearer(req.headers.authorization)) return true
+  private authorize(req: PortableIncomingMessage, url: URL): boolean {
+    const authHeader = req.headers.authorization
+    const authorization = Array.isArray(authHeader) ? authHeader[0] : authHeader
+    if (this.auth.authorizeBearer(authorization)) return true
     return this.auth.authorizeTokenQuery(url.searchParams.get('token'))
   }
 
-  private attachSse(res: ServerResponse): void {
+  private attachSse(res: PortableServerResponse): void {
     // S3: 超过上限直接 429 拒绝，避免无限长连接。
     if (this.sseClients.size >= this.sseMaxClients) {
       this.sendJson(res, 429, { error: 'too_many_event_connections' })
       return
     }
-    const origin = (res as ServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin
+    const origin = (res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin
     res.writeHead(200, {
       ...corsHeaders(origin),
       'content-type': 'text/event-stream; charset=utf-8',
@@ -472,11 +484,13 @@ export class RemoteHttpServer {
     this.writeSse(res, `event: state\ndata: ${JSON.stringify(this.snapshot)}\n\n`)
   }
 
-  private writeSse(client: ServerResponse, payload: string): void {
+  private writeSse(client: PortableServerResponse, payload: string): void {
+    const writableLength =
+      (client as PortableServerResponse & { writableLength?: number }).writableLength ?? 0
     if (
       client.destroyed ||
       client.writableEnded ||
-      client.writableLength + Buffer.byteLength(payload) > this.sseMaxBufferedBytes
+      writableLength + PortableBuffer.byteLength(payload) > this.sseMaxBufferedBytes
     ) {
       this.sseClients.delete(client)
       client.destroy()
@@ -498,18 +512,18 @@ export class RemoteHttpServer {
   }
 
   private serveStatic(
-    res: ServerResponse,
+    res: PortableServerResponse,
     fileName: string,
     contentType = 'text/html; charset=utf-8'
   ): void {
     const path = join(this.staticRoot, fileName)
-    if (!existsSync(path)) {
+    if (!coreFs.existsSync(path)) {
       this.sendJson(res, 404, { error: 'static_missing', fileName })
       return
     }
-    const body = readFileSync(path)
+    const body = coreFs.readFileSync(path)
     res.writeHead(200, {
-      ...corsHeaders((res as ServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
+      ...corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
       'content-type': contentType,
       'content-length': body.length,
       'cache-control': 'no-cache'
@@ -518,8 +532,8 @@ export class RemoteHttpServer {
   }
 
   private async serveMedia(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: PortableIncomingMessage,
+    res: PortableServerResponse,
     token: string
   ): Promise<void> {
     const grant = this.mediaGrants.resolve(token)
@@ -551,14 +565,14 @@ export class RemoteHttpServer {
   }
 
   private async serveFile(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: PortableIncomingMessage,
+    res: PortableServerResponse,
     filePath: string,
     contentType: string
   ): Promise<void> {
     let stat
     try {
-      stat = statSync(filePath)
+      stat = coreFs.statSync(filePath)
     } catch {
       this.sendJson(res, 404, { error: 'media_missing' })
       return
@@ -569,7 +583,8 @@ export class RemoteHttpServer {
     }
 
     const total = stat.size
-    const range = req.headers.range
+    const rangeHeader = req.headers.range
+    const range = Array.isArray(rangeHeader) ? rangeHeader[0] : rangeHeader
     const type = contentType || guessAudioContentType(filePath)
 
     if (range) {
@@ -587,7 +602,9 @@ export class RemoteHttpServer {
         'accept-ranges': 'bytes',
         'cache-control': 'no-store'
       })
-      await pipeline(createReadStream(filePath, { start, end }), res).catch(() => res.destroy())
+      await coreStream
+        .pipeline(coreFs.createReadStream(filePath, { start, end }), res)
+        .catch(() => res.destroy())
       return
     }
 
@@ -597,7 +614,7 @@ export class RemoteHttpServer {
       'accept-ranges': 'bytes',
       'cache-control': 'no-store'
     })
-    await pipeline(createReadStream(filePath), res).catch(() => res.destroy())
+    await coreStream.pipeline(coreFs.createReadStream(filePath), res).catch(() => res.destroy())
   }
 
   /**
@@ -605,8 +622,8 @@ export class RemoteHttpServer {
    * original URL (may contain CDN tokens). Rejects redirects and non-audio types.
    */
   private async proxyRemoteMedia(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: PortableIncomingMessage,
+    res: PortableServerResponse,
     remoteUrl: string,
     fallbackContentType: string
   ): Promise<void> {
@@ -660,11 +677,9 @@ export class RemoteHttpServer {
       }
       // pipeline handles backpressure, premature close and both stream errors;
       // destroying the converted stream also cancels the upstream reader.
-      await pipeline(
-        Readable.fromWeb(upstream.body as unknown as NodeReadableStream<Uint8Array>),
-        res,
-        { signal: controller.signal }
-      )
+      await coreStream.pipeline(coreStream.Readable.fromWeb!(upstream.body), res, {
+        signal: controller.signal
+      })
     } catch {
       if (!res.destroyed && !res.writableEnded) {
         if (!res.headersSent) this.sendJson(res, 502, { error: 'upstream_fetch_failed' })
@@ -681,10 +696,10 @@ export class RemoteHttpServer {
     }
   }
 
-  private sendJson(res: ServerResponse, status: number, body: unknown): void {
-    const payload = Buffer.from(JSON.stringify(body), 'utf8')
+  private sendJson(res: PortableServerResponse, status: number, body: unknown): void {
+    const payload = PortableBuffer.from(JSON.stringify(body), 'utf8')
     res.writeHead(status, {
-      ...corsHeaders((res as ServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
+      ...corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       'content-length': payload.length
@@ -707,18 +722,19 @@ function corsHeaders(origin?: string | null): Record<string, string> {
   }
 }
 
-function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+function readJsonBody(req: PortableIncomingMessage): Promise<Record<string, unknown> | null> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
+    const chunks: PortableBuffer[] = []
     let size = 0
-    req.on('data', (chunk: Buffer) => {
-      size += chunk.length
+    req.on('data', (chunk: Uint8Array) => {
+      const buf = PortableBuffer.from(chunk)
+      size += buf.length
       if (size > 64 * 1024) {
         reject(new Error('body_too_large'))
         req.destroy()
         return
       }
-      chunks.push(chunk)
+      chunks.push(buf)
     })
     req.on('end', () => {
       if (chunks.length === 0) {
@@ -726,7 +742,7 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | n
         return
       }
       try {
-        const text = Buffer.concat(chunks).toString('utf8')
+        const text = PortableBuffer.concat(chunks).toString('utf8')
         const parsed = parseJsonWithNestingLimit(text) as unknown
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
           resolve(null)
@@ -741,7 +757,7 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | n
   })
 }
 
-function reqOnClose(res: ServerResponse, cb: () => void): void {
+function reqOnClose(res: PortableServerResponse, cb: () => void): void {
   res.on('close', cb)
   res.on('error', cb)
 }

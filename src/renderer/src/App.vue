@@ -77,6 +77,9 @@ const ExperienceView = defineAsyncComponent(
 const OnboardingWizard = defineAsyncComponent(
   () => import('./components/onboarding/OnboardingWizard.vue')
 )
+const MusicMetadataSetupHost = defineAsyncComponent(
+  () => import('./components/music-metadata/MusicMetadataSetupHost.vue')
+)
 import type { OnboardingFinishResult } from './components/onboarding/OnboardingWizard.vue'
 import { useMusicStore } from './stores/useMusicStore'
 import { startPlaylistPersistenceNotifications } from './app/playlistPersistenceNotifications.ts'
@@ -1239,6 +1242,7 @@ onBeforeUnmount(() => onWorkshopDecorationsUnmount?.())
       @finish="handleOnboardingFinish"
     />
   </Transition>
+  <MusicMetadataSetupHost :suspended="showOnboarding" />
   <NativeDialogTransition>
     <QueueWorkspaceDialog
       v-if="queueSessions.open.value"

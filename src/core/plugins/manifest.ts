@@ -1,4 +1,4 @@
-import { posix, win32 } from 'node:path'
+import { posix, win32 } from '../../shared/portablePath.ts'
 import { normalizeExperiences } from '../../shared/pluginExperience.ts'
 import {
   TWILIGHT_PLUGIN_API_VERSION,

@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { coreFsPromises } from '../ports/index.ts'
 import { decodeLyrics } from '../../shared/lyricsEncoding.ts'
 import { importLyricsFromDialog } from './importLyrics.ts'
 import { saveLyricsFromDialog } from './saveLyrics.ts'
@@ -11,8 +11,8 @@ export async function importLyricDraft(
   signal?.throwIfAborted()
   return importLyricsFromDialog(
     { canceled: file == null, filePaths: file ? [file] : [] },
-    async (path) => decodeLyrics(await readFile(path)).text,
-    async (path) => (await stat(path)).size
+    async (path) => decodeLyrics(await coreFsPromises.readFile(path)).text,
+    async (path) => (await coreFsPromises.stat(path)).size
   )
 }
 export async function exportLyricDraft(

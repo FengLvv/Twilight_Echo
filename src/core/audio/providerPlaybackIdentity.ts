@@ -1,5 +1,67 @@
-import { EventEmitter } from 'node:events'
-import { createHash } from 'node:crypto'
+import { createHash } from '../../shared/portableCrypto.ts'
+
+type EventListener = (...args: any[]) => void
+
+class PortableEventEmitter {
+  private readonly listenersMap = new Map<string | symbol, Set<EventListener>>()
+
+  on(event: string | symbol, listener: EventListener): this {
+    let set = this.listenersMap.get(event)
+    if (!set) {
+      set = new Set()
+      this.listenersMap.set(event, set)
+    }
+    set.add(listener)
+    return this
+  }
+
+  addListener(event: string | symbol, listener: EventListener): this {
+    return this.on(event, listener)
+  }
+
+  once(event: string | symbol, listener: EventListener): this {
+    const wrapped: EventListener = (...args: any[]) => {
+      this.off(event, wrapped)
+      listener(...args)
+    }
+    return this.on(event, wrapped)
+  }
+
+  off(event: string | symbol, listener: EventListener): this {
+    const set = this.listenersMap.get(event)
+    if (set) {
+      set.delete(listener)
+      if (set.size === 0) this.listenersMap.delete(event)
+    }
+    return this
+  }
+
+  removeListener(event: string | symbol, listener: EventListener): this {
+    return this.off(event, listener)
+  }
+
+  removeAllListeners(event?: string | symbol): this {
+    if (event === undefined) {
+      this.listenersMap.clear()
+    } else {
+      this.listenersMap.delete(event)
+    }
+    return this
+  }
+
+  listenerCount(event: string | symbol): number {
+    return this.listenersMap.get(event)?.size ?? 0
+  }
+
+  emit(event: string | symbol, ...args: any[]): boolean {
+    const set = this.listenersMap.get(event)
+    if (!set || set.size === 0) return false
+    for (const listener of [...set]) {
+      listener(...args)
+    }
+    return true
+  }
+}
 
 export interface ProviderPlaybackIdentity {
   providerId: string
@@ -23,7 +85,7 @@ const object = (v: unknown): Record<string, unknown> =>
 
 /** Internal provenance only. A resolution revision is never a content digest;
  * native analysis/transport must still hash and lease the actual local bytes. */
-export class ProviderPlaybackIdentityRegistry extends EventEmitter {
+export class ProviderPlaybackIdentityRegistry extends PortableEventEmitter {
   private sequence = 0
   private readonly tracks = new Map<
     string,

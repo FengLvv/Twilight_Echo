@@ -1,5 +1,5 @@
-import { existsSync, watch, type FSWatcher } from 'node:fs'
-import { dirname, extname, join } from 'node:path'
+import { dirname, extname, join } from '../../shared/portablePath.ts'
+import { coreFs, type PortableFsWatcher } from '../ports/index.ts'
 import type {
   LibraryWatcherFolderStatus,
   LibraryWatcherMode,
@@ -21,17 +21,17 @@ import { LibraryWatcherPoller } from './watcherPolling.ts'
 export { LIBRARY_WATCH_EXTENSIONS }
 
 type WatcherEntry = {
-  watcher: FSWatcher | null
-  debounce: NodeJS.Timeout | null
+  watcher: PortableFsWatcher | null
+  debounce: ReturnType<typeof setTimeout> | null
   changes: Map<string, LocalLibraryWatchChange>
   mode: LibraryWatcherMode
   state: LibraryWatcherState
   lastError: string | null
   lastEventAt: string | null
   lastReconcileAt: string | null
-  recreateTimer: NodeJS.Timeout | null
+  recreateTimer: ReturnType<typeof setTimeout> | null
   recreateAttempts: number
-  pollingTimer: NodeJS.Timeout | null
+  pollingTimer: ReturnType<typeof setInterval> | null
   poller: LibraryWatcherPoller | null
 }
 
@@ -47,7 +47,7 @@ export interface LibraryWatcherOptions {
   isExcluded(path: string): boolean
   isMutating(path: string): boolean
   changed(change?: { kind: 'add' | 'remove' | 'unknown'; path?: string }): void
-  watch?: typeof watch
+  watch?: typeof coreFs.watch
 }
 
 /** One set of native handles and polling timers per business owner. */
@@ -221,7 +221,7 @@ export function createLibraryWatchers(options: LibraryWatcherOptions) {
     }, delay)
   }
 
-  function attachWatcherHandlers(folder: string, watcher: FSWatcher): void {
+  function attachWatcherHandlers(folder: string, watcher: PortableFsWatcher): void {
     watcher.on('error', (error) => {
       const code = watcherErrorCode(error)
       console.warn('[library] library folder watcher error:', code)
@@ -260,7 +260,7 @@ export function createLibraryWatchers(options: LibraryWatcherOptions) {
     }
 
     try {
-      const watcher = (options.watch ?? watch)(
+      const watcher = (options.watch ?? coreFs.watch)(
         folder,
         { recursive: true },
         (_eventType, filename) => {
@@ -276,7 +276,7 @@ export function createLibraryWatchers(options: LibraryWatcherOptions) {
             // Directory move/rename: scoped root reconcile (complete identity snapshot).
             enqueueChange(folder, {
               kind: 'reconcile',
-              path: options.database() && existsSync(fullPath) ? fullPath : folder
+              path: options.database() && coreFs.existsSync(fullPath) ? fullPath : folder
             })
             return
           }
@@ -284,7 +284,7 @@ export function createLibraryWatchers(options: LibraryWatcherOptions) {
           const ext = extname(filename).toLowerCase()
           if (!isWatchableFileExtension(ext)) return
 
-          const kind: 'add' | 'remove' = existsSync(fullPath) ? 'add' : 'remove'
+          const kind: 'add' | 'remove' = coreFs.existsSync(fullPath) ? 'add' : 'remove'
           if (options.database()) {
             enqueueChange(folder, { kind, path: fullPath })
             return

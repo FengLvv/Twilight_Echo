@@ -1,8 +1,10 @@
-import { existsSync, statSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { join, resolve } from '../../shared/portablePath.ts'
 import type { AutoMixStemCapabilities, AutoMixStemDevice } from '../../shared/twilightAutoMix.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
 import { STEM_CHECKPOINT_SHA256, STEM_MODEL_VERSION } from './autoMixStemService.ts'
+
+const { existsSync, statSync } = coreFs
+const { readFile } = coreFsPromises
 
 export interface StemRuntimeProbe {
   cpu: boolean

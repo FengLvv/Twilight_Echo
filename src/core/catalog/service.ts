@@ -12,6 +12,7 @@ import type { CorePlaylistService } from '../playlists/service.ts'
 import type { TrackData } from '../../shared/track.ts'
 import { getTrackSource } from '../../shared/trackSourceIdentity.ts'
 import { projectCoreError, projectCoreTrack } from '../projections.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 
 interface Options {
   database: CatalogDatabaseApi
@@ -168,7 +169,7 @@ export class CoreCatalogService {
           cover: null,
           lyrics: null
         }
-        const size = Buffer.byteLength(JSON.stringify(source), 'utf8') + 1
+        const size = PortableBuffer.byteLength(JSON.stringify(source), 'utf8') + 1
         if (size + 2 > CATALOG_MAX_BATCH_BYTES) throw new Error('单条音乐资料超过目录批次上限')
         if (batch.length && (batch.length === 200 || bytes + size > CATALOG_MAX_BATCH_BYTES)) {
           job = await this.options.database.catalogSync({ kind: 'append', ...job, tracks: batch })

@@ -210,6 +210,28 @@ test('unconfirmed same-name sources never fetch details; confirmed local and str
   assert.equal(db.metadataDetail(entity(db, 'local', 'release'), 'zh-Hans').introduction, null)
 })
 
+test('pending first-import consent prevents automatic requests even with enabled scope switches; accepting resumes the durable scheduler', async t => {
+  const db = fixture(t), id = entity(db)
+  confirm(db, id)
+  let calls = 0
+  const settings: MusicIdentificationSettings = { newImports: true, history: true,
+    sources: ['platform.ncm'], setup: 'pending' }
+  const service = core(db, { id: 'platform.ncm', supports: kind => kind === 'artist',
+    blockedReason: () => null, context: () => 'fixture', enrich: async () => {
+      calls++; return { facts: [fact()], availability: 'available' }
+    } }, settings)
+  t.after(() => service.shutdown())
+  service.activate()
+  for (let i = 0; i < 20; i++) await new Promise<void>(resolve => setImmediate(resolve))
+  assert.equal(calls, 0)
+  assert.equal(db.metadataJobs({}).total, 0)
+  settings.setup = 'accepted'
+  service.refreshIdentification(true)
+  await until(() => db.metadataJobs({}).items.some(job => job.state === 'completed'))
+  assert.equal(calls, 1)
+  assert.equal(db.metadataDetail(id, 'zh-Hans').introduction?.value, '介绍')
+})
+
 test('same-name confirmed identities remain separate when their typed native IDs differ', (t) => {
   const db = fixture(t),
     local = entity(db),

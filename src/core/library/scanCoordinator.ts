@@ -1,4 +1,4 @@
-import { EventEmitter } from 'node:events'
+import { EventEmitter } from '../../shared/portableEvents.ts'
 import {
   LibraryScanInterruptedError,
   type CoreScanDatabase,

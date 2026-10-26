@@ -4,10 +4,15 @@
  *
  * Security: only used on LAN; media URLs are already app-issued token URLs.
  */
+import {
+  coreDgram,
+  coreTls,
+  type PortableDgramSocket,
+  type PortableRemoteInfo,
+  type PortableTlsSocket
+} from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
-
-import { createSocket, type Socket } from 'node:dgram'
-import { connect as tlsConnect, type TLSSocket } from 'node:tls'
 import type { CastDevice, CastLoadRequest, CastSample } from './castBackend.ts'
 
 const MDNS_ADDRESS = '224.0.0.251'
@@ -16,16 +21,19 @@ const CAST_DEFAULT_PORT = 8009
 /** Default Media Receiver app id. */
 const DEFAULT_MEDIA_RECEIVER = 'CC1AD845'
 
+export type ChromecastSocketFactory = (type: 'udp4' | 'udp6' | any, callback?: any) => any
+export type ChromecastTlsConnect = (options: any, secureConnectListener?: () => void) => any
+
 export interface ChromecastDiscoveryOptions {
   timeoutMs?: number
-  createSocket?: typeof createSocket
+  createSocket?: ChromecastSocketFactory
 }
 
 export async function discoverChromecastDevices(
   options: ChromecastDiscoveryOptions = {}
 ): Promise<CastDevice[]> {
   const timeoutMs = options.timeoutMs ?? 2500
-  const socketFactory = options.createSocket ?? createSocket
+  const socketFactory = options.createSocket ?? coreDgram.createSocket
   const records = await queryGoogleCastMdns(socketFactory, timeoutMs)
   const devices: CastDevice[] = []
   const seen = new Set<string>()
@@ -63,12 +71,12 @@ interface MdnsCastRecord {
 }
 
 function queryGoogleCastMdns(
-  socketFactory: typeof createSocket,
+  socketFactory: ChromecastSocketFactory,
   timeoutMs: number
 ): Promise<MdnsCastRecord[]> {
   return new Promise((resolve) => {
     const found = new Map<string, MdnsCastRecord>()
-    let socket: Socket
+    let socket: PortableDgramSocket
     try {
       socket = socketFactory('udp4')
     } catch {
@@ -87,9 +95,9 @@ function queryGoogleCastMdns(
 
     const timer = setTimeout(finish, timeoutMs)
 
-    socket.on('message', (msg, rinfo) => {
+    socket.on('message', (msg: Uint8Array, rinfo: PortableRemoteInfo) => {
       try {
-        const parsed = parseMdnsCastResponse(msg, rinfo.address)
+        const parsed = parseMdnsCastResponse(PortableBuffer.wrap(msg), rinfo.address)
         for (const rec of parsed) {
           const key = `${rec.address}:${rec.port}`
           const prev = found.get(key)
@@ -132,29 +140,29 @@ function queryGoogleCastMdns(
 }
 
 /** Build a minimal mDNS PTR query packet. */
-function buildMdnsPtrQuery(name: string): Buffer {
+function buildMdnsPtrQuery(name: string): PortableBuffer {
   const labels = name.split('.').filter(Boolean)
-  const nameBufs: Buffer[] = []
+  const nameBufs: PortableBuffer[] = []
   for (const label of labels) {
-    const b = Buffer.from(label, 'utf8')
-    nameBufs.push(Buffer.from([b.length]), b)
+    const b = PortableBuffer.from(label, 'utf8')
+    nameBufs.push(PortableBuffer.from([b.length]), b)
   }
-  nameBufs.push(Buffer.from([0]))
-  const qname = Buffer.concat(nameBufs)
-  const header = Buffer.alloc(12)
+  nameBufs.push(PortableBuffer.from([0]))
+  const qname = PortableBuffer.concat(nameBufs)
+  const header = PortableBuffer.alloc(12)
   header.writeUInt16BE(0x0000, 0) // id
   header.writeUInt16BE(0x0000, 2) // flags (standard query)
   header.writeUInt16BE(1, 4) // QDCOUNT
   header.writeUInt16BE(0, 6)
   header.writeUInt16BE(0, 8)
   header.writeUInt16BE(0, 10)
-  const question = Buffer.alloc(4)
+  const question = PortableBuffer.alloc(4)
   question.writeUInt16BE(12, 0) // PTR
   question.writeUInt16BE(1, 2) // IN
-  return Buffer.concat([header, qname, question])
+  return PortableBuffer.concat([header, qname, question])
 }
 
-function parseMdnsCastResponse(msg: Buffer, fallbackAddress: string): MdnsCastRecord[] {
+function parseMdnsCastResponse(msg: PortableBuffer, fallbackAddress: string): MdnsCastRecord[] {
   if (msg.length < 12) return []
   const ancount = msg.readUInt16BE(6)
   const nscount = msg.readUInt16BE(8)
@@ -226,7 +234,7 @@ function parseMdnsCastResponse(msg: Buffer, fallbackAddress: string): MdnsCastRe
   return results
 }
 
-function parseTxt(rdata: Buffer): Record<string, string> {
+function parseTxt(rdata: PortableBuffer): Record<string, string> {
   const out: Record<string, string> = {}
   let i = 0
   while (i < rdata.length) {
@@ -240,14 +248,14 @@ function parseTxt(rdata: Buffer): Record<string, string> {
   return out
 }
 
-function skipName(buf: Buffer, offset: number): number {
+function skipName(buf: PortableBuffer, offset: number): number {
   return readName(buf, offset).next
 }
 
 function readName(
-  buf: Buffer,
+  buf: PortableBuffer,
   offset: number,
-  fullMessage?: Buffer
+  fullMessage?: PortableBuffer
 ): { name: string; next: number } {
   const labels: string[] = []
   let jumped = false
@@ -283,7 +291,7 @@ function readName(
 // ─── Cast v2 session ─────────────────────────────────────────────────────────
 
 interface ActiveCastSession {
-  socket: TLSSocket
+  socket: PortableTlsSocket
   requestId: number
   transportId: string | null
   mediaSessionId: number | null
@@ -312,7 +320,7 @@ export async function chromecastLoad(
   options: {
     signal?: AbortSignal
     confirmed?: boolean
-    connect?: typeof tlsConnect
+    connect?: ChromecastTlsConnect
     receiverReady?(sessionId: string): Promise<void>
   } = {}
 ): Promise<void> {
@@ -500,12 +508,12 @@ function openCastSession(
   host: string,
   port: number,
   signal?: AbortSignal,
-  connect = tlsConnect
+  connect: ChromecastTlsConnect = coreTls.connect
 ): Promise<ActiveCastSession> {
   return new Promise((resolve, reject) => {
     signal?.throwIfAborted()
     let session: ActiveCastSession | undefined
-    const socket = connect(
+    const socket: PortableTlsSocket = connect(
       {
         host,
         port,
@@ -579,9 +587,9 @@ function openCastSession(
         })
 
         // Inbound message pump
-        let buffer = Buffer.alloc(0)
-        socket.on('data', (chunk: Buffer) => {
-          buffer = Buffer.concat([buffer, chunk])
+        let buffer = PortableBuffer.alloc(0)
+        socket.on('data', (chunk: Uint8Array) => {
+          buffer = PortableBuffer.concat([buffer, chunk])
           for (;;) {
             if (buffer.length < 4) break
             const size = buffer.readUInt32BE(0)
@@ -607,7 +615,7 @@ function openCastSession(
   })
 }
 
-function handleCastFrame(session: ActiveCastSession, frame: Buffer): void {
+function handleCastFrame(session: ActiveCastSession, frame: PortableBuffer): void {
   try {
     const msg = decodeCastMessage(frame)
     if (!msg.payloadUtf8) return
@@ -731,7 +739,7 @@ export async function chromecastStopReceiver(
   host: string,
   port: number,
   receiverSessionId: string,
-  connect = tlsConnect
+  connect: ChromecastTlsConnect = coreTls.connect
 ): Promise<void> {
   const session = await openCastSession(host, port, undefined, connect)
   const containsReceiver = (reply: Record<string, unknown>): boolean => {
@@ -826,10 +834,10 @@ async function sendJson(
     namespace,
     payloadUtf8: body
   })
-  const header = Buffer.alloc(4)
+  const header = PortableBuffer.alloc(4)
   header.writeUInt32BE(frame.length, 0)
   await new Promise<void>((resolve, reject) => {
-    session.socket.write(Buffer.concat([header, frame]), (err) => {
+    session.socket.write(PortableBuffer.concat([header, frame]), (err: Error | undefined) => {
       if (err) reject(err)
       else resolve()
     })
@@ -842,26 +850,26 @@ function encodeCastMessage(msg: {
   destinationId: string
   namespace: string
   payloadUtf8: string
-}): Buffer {
-  const parts: Buffer[] = []
+}): PortableBuffer {
+  const parts: PortableBuffer[] = []
   // protocol_version = 0 (field 1, varint)
-  parts.push(Buffer.from([0x08, 0x00]))
+  parts.push(PortableBuffer.from([0x08, 0x00]))
   parts.push(encodeStringField(2, msg.sourceId))
   parts.push(encodeStringField(3, msg.destinationId))
   parts.push(encodeStringField(4, msg.namespace))
   // payload_type = STRING (0) field 5
-  parts.push(Buffer.from([0x28, 0x00]))
+  parts.push(PortableBuffer.from([0x28, 0x00]))
   parts.push(encodeStringField(6, msg.payloadUtf8))
-  return Buffer.concat(parts)
+  return PortableBuffer.concat(parts)
 }
 
-function encodeStringField(fieldNumber: number, value: string): Buffer {
-  const data = Buffer.from(value, 'utf8')
+function encodeStringField(fieldNumber: number, value: string): PortableBuffer {
+  const data = PortableBuffer.from(value, 'utf8')
   const tag = (fieldNumber << 3) | 2
-  return Buffer.concat([Buffer.from([tag]), encodeVarint(data.length), data])
+  return PortableBuffer.concat([PortableBuffer.from([tag]), encodeVarint(data.length), data])
 }
 
-function encodeVarint(value: number): Buffer {
+function encodeVarint(value: number): PortableBuffer {
   const bytes: number[] = []
   let v = value >>> 0
   while (v > 0x7f) {
@@ -869,10 +877,10 @@ function encodeVarint(value: number): Buffer {
     v >>>= 7
   }
   bytes.push(v)
-  return Buffer.from(bytes)
+  return PortableBuffer.from(bytes)
 }
 
-function decodeCastMessage(buf: Buffer): {
+function decodeCastMessage(buf: PortableBuffer): {
   sourceId: string
   destinationId: string
   namespace: string
@@ -907,7 +915,7 @@ function decodeCastMessage(buf: Buffer): {
   return { sourceId, destinationId, namespace, payloadUtf8 }
 }
 
-function readVarint(buf: Buffer, offset: number): { value: number; next: number } {
+function readVarint(buf: PortableBuffer, offset: number): { value: number; next: number } {
   let result = 0
   let shift = 0
   let pos = offset

@@ -43,6 +43,7 @@ export interface EntityMetadataOptions {
   now(): number
   changed(): void
   failed(error: unknown): void
+  taskFailed?(error: unknown, task: { type: string; provider: string }): void
   legacy?(): {
     blockedReason(work: LegacyMusicTaskWork): Promise<string | null>
     lookup(work: LegacyMusicTaskWork, attempts: number, signal: AbortSignal): Promise<Extract<EntityMetadataResult, { state: 'legacy_result' }>>
@@ -326,7 +327,7 @@ export class CoreEntityMetadataService {
     const settings = this.options.automation?.()
     if (!settings) return undefined
     return {
-      enabled: this.options.policy().enabled,
+      enabled: this.options.policy().enabled && settings.setup !== 'pending',
       newImports: settings.newImports, history: settings.history,
       providers: (this.options.identificationProviders?.() ?? []).filter(p => settings.sources.includes(p.id)).map(p => ({
         id: p.id, matcherVersion: p.matcherVersion,
@@ -636,6 +637,9 @@ export class CoreEntityMetadataService {
                     )
                   }
                 : { state: 'failed', reason: http?.message ?? 'metadata_response_invalid' }
+        if (result.state === 'failed') this.options.taskFailed?.(error, {
+          type: work.job.type, provider: work.job.provider
+        })
       }
       if (!this.stopped && !controller.signal.aborted) {
         // Current deployment permission is a commit fence too. Disabled text does

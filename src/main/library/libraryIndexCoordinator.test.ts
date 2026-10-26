@@ -583,11 +583,11 @@ test('legacy SACD backfill uses native years and retains all subtrack identities
     )
     assert.equal(
       loadLocalLibraryFileIndex(fixture.libraryFile).document.entries[0].metadataVersion,
-      1
+      2
     )
     await coordinator.scanStartup()
     assert.equal(reads, 2)
-    assert.equal(runner.calls[2].request.knownIdentities[0].metadataVersion, 1)
+    assert.equal(runner.calls[2].request.knownIdentities[0].metadataVersion, 2)
     coordinator.destroy()
   } finally {
     fixture.cleanup()
@@ -669,11 +669,11 @@ test('streamed date backfill retains curated metadata and persists the per-file 
     assert.deepEqual(result.updatedTracks, result.library.tracks)
     assert.equal(
       loadLocalLibraryFileIndex(fixture.libraryFile).document.entries[0].metadataVersion,
-      1
+      2
     )
     assert.deepEqual(fixture.load().tracks, result.library.tracks)
     await coordinator.scanStartup()
-    assert.equal(runner.calls[1].request.knownIdentities[0].metadataVersion, 1)
+    assert.equal(runner.calls[1].request.knownIdentities[0].metadataVersion, 2)
     assert.deepEqual(fixture.load().tracks, result.library.tracks)
     coordinator.destroy()
   } finally {
@@ -727,7 +727,7 @@ test('failed and cancelled date reads leave legacy files eligible for retry; abs
     assert.deepEqual(completed.library.tracks, [createTrack('stable', filePath)])
     assert.equal(
       loadLocalLibraryFileIndex(fixture.libraryFile).document.entries[0].metadataVersion,
-      1
+      2
     )
     coordinator.destroy()
   } finally {

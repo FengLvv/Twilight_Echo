@@ -1,8 +1,11 @@
-import { randomUUID } from 'node:crypto'
-import { open, mkdir, readFile, rename, stat, unlink } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { coreFsPromises } from '../ports/index.ts'
 import type { TwilightPluginSource, TwilightPluginStateRecord } from './types.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+
+const { open, mkdir, readFile, rename, stat, unlink } = coreFsPromises
 
 export type PluginStateFile = Record<string, TwilightPluginStateRecord>
 
@@ -129,7 +132,7 @@ export async function writePluginStateFileAtomically(
 ): Promise<void> {
   const snapshot = clonePluginState(state)
   const json = JSON.stringify(snapshot, null, 2)
-  if (Buffer.byteLength(json, 'utf-8') > MAX_PLUGIN_STATE_BYTES) {
+  if (PortableBuffer.byteLength(json, 'utf-8') > MAX_PLUGIN_STATE_BYTES) {
     throw new Error('Plugin state is too large to persist.')
   }
 
@@ -160,7 +163,7 @@ async function readPluginStateCandidate(filePath: string): Promise<PluginStateCa
     if (fileStat.size > MAX_PLUGIN_STATE_BYTES)
       return { status: 'invalid', error: 'file is too large' }
     const raw = await readFile(filePath, 'utf-8')
-    if (Buffer.byteLength(raw, 'utf-8') > MAX_PLUGIN_STATE_BYTES) {
+    if (PortableBuffer.byteLength(raw, 'utf-8') > MAX_PLUGIN_STATE_BYTES) {
       return { status: 'invalid', error: 'file is too large' }
     }
     const parsed = tryParseJsonWithNestingLimit(raw)
@@ -186,7 +189,13 @@ async function writeRawFileAtomically(filePath: string, contents: string): Promi
   let handle: Awaited<ReturnType<typeof open>> | null = null
   try {
     handle = await open(temporaryPath, 'w', 0o600)
-    await handle.writeFile(contents, 'utf-8')
+    const bytes = PortableBuffer.from(contents, 'utf-8')
+    let offset = 0
+    while (offset < bytes.byteLength) {
+      const { bytesWritten } = await handle.write(bytes, offset, bytes.byteLength - offset, offset)
+      if (bytesWritten <= 0) throw new Error('Could not write plugin state file')
+      offset += bytesWritten
+    }
     await handle.sync()
     await handle.close()
     handle = null

@@ -1,7 +1,9 @@
 #include "../core/AudioTypes.h"
 #include "../output/alsa/AlsaBackend.h"
+#include "../output/android/OboeOutputBackend.h"
 #include "../output/coreaudio/CoreAudioBackend.h"
 #include "../output/coreaudio/CoreAudioExclusiveBackend.h"
+#include "../output/ios/IosAudioUnitBackend.h"
 #include "../output/wasapi/WasapiExclusiveBackend.h"
 #include "../output/wasapi/WasapiSharedBackend.h"
 
@@ -176,6 +178,56 @@ int main() {
     }
   }
 #endif
+
+  {
+    OboeOutputBackend backend;
+    assert(std::string(backend.id()) == "oboe");
+    assert(std::string(backend.getBackendName()) == "oboe");
+    assert(!backend.enumerateDevices().empty());
+    assert(!backend.isOpen());
+    std::string error;
+    assert(backend.open("auto", pcm(), &error));
+    assert(backend.isOpen());
+    assert(backend.getSampleRate() == 48000);
+    assert(backend.getChannels() == 2);
+    assert(backend.getLatencyFrames() > 0);
+    const OutputInfo info = backend.outputInfo();
+    assert(info.actualBackend == "oboe");
+    assertActualFormatFacts(info);
+    assertLatencyFacts(info);
+    assert(backend.start([](float*, size_t frames) { return frames; }, nullptr, &error));
+    assert(backend.isRunning());
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    backend.stop();
+    assert(!backend.isRunning());
+    backend.close();
+    assert(!backend.isOpen());
+  }
+
+  {
+    IosAudioUnitBackend backend;
+    assert(std::string(backend.id()) == "audiounit");
+    assert(std::string(backend.getBackendName()) == "audiounit");
+    assert(!backend.enumerateDevices().empty());
+    assert(!backend.isOpen());
+    std::string error;
+    assert(backend.open("auto", pcm(), &error));
+    assert(backend.isOpen());
+    assert(backend.getSampleRate() == 48000);
+    assert(backend.getChannels() == 2);
+    assert(backend.getLatencyFrames() > 0);
+    const OutputInfo info = backend.outputInfo();
+    assert(info.actualBackend == "audiounit");
+    assertActualFormatFacts(info);
+    assertLatencyFacts(info);
+    assert(backend.start([](float*, size_t frames) { return frames; }, nullptr, &error));
+    assert(backend.isRunning());
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    backend.stop();
+    assert(!backend.isRunning());
+    backend.close();
+    assert(!backend.isOpen());
+  }
 
   return 0;
 }

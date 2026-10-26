@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID } from '../../shared/portableCrypto.ts'
 import type { CoreApplication } from '../application.ts'
 import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
 import type { CorePlaybackSession } from '../playback/session.ts'

@@ -1,5 +1,6 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { dirname, join } from '../../shared/portablePath.ts'
+import { coreFs } from '../ports/index.ts'
 import { loadTaglib, type Taglib } from '../downloads/taglib.ts'
 import {
   loadJsonFileWithBackup,
@@ -64,7 +65,7 @@ const TAG_WRITE_JOURNAL_OPTIONS: JsonFileOptions<TagWriteJournal> = {
 }
 
 export function tagBackupPath(filePath: string, backupRoot: string): string {
-  return join(backupRoot, `${Buffer.from(filePath).toString('base64url')}.bak`)
+  return join(backupRoot, `${PortableBuffer.from(filePath).toString('base64url')}.bak`)
 }
 
 export function getTagWriteJournalPath(backupRoot: string): string {
@@ -72,14 +73,14 @@ export function getTagWriteJournalPath(backupRoot: string): string {
 }
 
 export function writeTagsWithBackup(input: TagWriteInput, backupRoot: string): TagWriteResult {
-  mkdirSync(backupRoot, { recursive: true })
+  coreFs.mkdirSync(backupRoot, { recursive: true })
   const result = { filePath: input.filePath, backupPath: tagBackupPath(input.filePath, backupRoot) }
-  copyFileSync(input.filePath, result.backupPath)
+  coreFs.copyFileSync(input.filePath, result.backupPath)
   try {
     writeTags(input)
     return result
   } catch (error) {
-    copyFileSync(result.backupPath, input.filePath)
+    coreFs.copyFileSync(result.backupPath, input.filePath)
     throw error
   }
 }
@@ -104,7 +105,7 @@ export function writeTagsBatchWithRollback(
       const input = inputs[index]
       const entry = journal.entries[index]
       try {
-        copyFileSync(input.filePath, entry.backupPath)
+        coreFs.copyFileSync(input.filePath, entry.backupPath)
       } catch (error) {
         entry.status = 'failed'
         entry.error = errorMessage(error)
@@ -169,13 +170,13 @@ export function getTagWriteJournalRecoveryEntries(backupRoot: string): TagWriteJ
 
 export function restoreTagsFromBackup(filePath: string, backupRoot: string): void {
   const backupPath = tagBackupPath(filePath, backupRoot)
-  if (!existsSync(backupPath)) throw new Error('Tag backup does not exist')
-  mkdirSync(dirname(filePath), { recursive: true })
-  copyFileSync(backupPath, filePath)
+  if (!coreFs.existsSync(backupPath)) throw new Error('Tag backup does not exist')
+  coreFs.mkdirSync(dirname(filePath), { recursive: true })
+  coreFs.copyFileSync(backupPath, filePath)
 }
 
 export function clearTagBackup(filePath: string, backupRoot: string): void {
-  rmSync(tagBackupPath(filePath, backupRoot), { force: true })
+  coreFs.rmSync(tagBackupPath(filePath, backupRoot), { force: true })
 }
 
 function writeTags(input: TagWriteInput): void {

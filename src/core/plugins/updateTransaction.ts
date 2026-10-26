@@ -1,6 +1,8 @@
-import { existsSync } from 'node:fs'
-import { mkdir, rename, rm } from 'node:fs/promises'
-import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from '../../shared/portablePath.ts'
+
+const { existsSync } = coreFs
+const { mkdir, rename, rm } = coreFsPromises
 
 export interface StagedPluginUpdateOptions {
   stagingRoot: string

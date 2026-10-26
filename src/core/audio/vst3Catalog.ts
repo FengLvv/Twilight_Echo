@@ -1,8 +1,4 @@
-import { hashFile } from '../persistence/fileHash.ts'
-import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { lstat, mkdir, readFile, rename, readdir, stat, writeFile } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
+import type { CorePlatformId } from '../../shared/audioEngineTypes.ts'
 import type {
   DspChannelLayout,
   Vst3CatalogEntry,
@@ -12,6 +8,13 @@ import type {
   Vst3ScanDescriptor
 } from '../../shared/dspGraph.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { basename, extname, join, resolve } from '../../shared/portablePath.ts'
+import { hashFile } from '../persistence/fileHash.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+
+const { existsSync } = coreFs
+const { lstat, mkdir, readFile, rename, readdir, stat, writeFile } = coreFsPromises
 
 const CATALOG_FILE = 'vst3-catalog.json'
 const MAX_SCAN_MODULES = 1024
@@ -34,7 +37,11 @@ export class Vst3CatalogService {
   private initialized = false
   private serial = Promise.resolve()
 
-  private readonly environment: { platform: NodeJS.Platform; helpers: Vst3HelpersAvailability; now(): number }
+  private readonly environment: {
+    platform: CorePlatformId
+    helpers: Vst3HelpersAvailability
+    now(): number
+  }
   constructor(
     root: string,
     scanner: Vst3ModuleScanner,
@@ -356,7 +363,7 @@ async function hashDirectory(
   }
 }
 
-function uniquePaths(paths: string[], platform: NodeJS.Platform): string[] {
+function uniquePaths(paths: string[], platform: CorePlatformId): string[] {
   const seen = new Set<string>()
   const result: string[] = []
   for (const value of paths) {

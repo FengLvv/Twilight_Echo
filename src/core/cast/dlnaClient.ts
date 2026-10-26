@@ -1,4 +1,5 @@
-import { createSocket, type Socket } from 'node:dgram'
+import { coreDgram, type PortableDgramSocket } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import {
   extractControlUrlsFromDeviceDescription,
   buildSsdpMSearch,
@@ -16,10 +17,12 @@ import {
 import type { CastSample } from './castBackend.ts'
 import type { DlnaDeviceInfo } from '../../shared/remoteControl.ts'
 
+export type DlnaSocketFactory = (type: 'udp4' | 'udp6' | any, callback?: any) => any
+
 export interface DlnaDiscoveryOptions {
   timeoutMs?: number
   fetchText?: (url: string) => Promise<string>
-  createSocket?: typeof createSocket
+  createSocket?: DlnaSocketFactory
 }
 
 export async function discoverDlnaDevices(
@@ -36,7 +39,7 @@ export async function discoverDlnaDevices(
       if (!response.ok) throw new Error(`device description HTTP ${response.status}`)
       return await response.text()
     })
-  const socketFactory = options.createSocket ?? createSocket
+  const socketFactory = options.createSocket ?? coreDgram.createSocket
 
   const responses = await collectSsdpResponses(socketFactory, timeoutMs)
   const byUsn = new Map<string, DlnaDeviceInfo>()
@@ -69,12 +72,12 @@ export async function discoverDlnaDevices(
 }
 
 function collectSsdpResponses(
-  socketFactory: typeof createSocket,
+  socketFactory: DlnaSocketFactory,
   timeoutMs: number
 ): Promise<NonNullable<ReturnType<typeof parseSsdpResponse>>[]> {
   return new Promise((resolve) => {
     const found: NonNullable<ReturnType<typeof parseSsdpResponse>>[] = []
-    let socket: Socket
+    let socket: PortableDgramSocket
     try {
       socket = socketFactory('udp4')
     } catch {
@@ -93,8 +96,8 @@ function collectSsdpResponses(
 
     const timer = setTimeout(finish, timeoutMs)
 
-    socket.on('message', (msg) => {
-      const parsed = parseSsdpResponse(msg.toString('utf8'))
+    socket.on('message', (msg: Uint8Array) => {
+      const parsed = parseSsdpResponse(PortableBuffer.wrap(msg).toString('utf8'))
       if (parsed) found.push(parsed)
     })
     socket.on('error', () => {
@@ -108,7 +111,7 @@ function collectSsdpResponses(
       } catch {
         // optional
       }
-      const payload = Buffer.from(buildSsdpMSearch(), 'utf8')
+      const payload = PortableBuffer.from(buildSsdpMSearch(), 'utf8')
       socket.send(payload, 0, payload.length, SSDP_PORT, SSDP_MULTICAST_ADDRESS)
       // Second burst improves discovery on flaky networks.
       setTimeout(() => {

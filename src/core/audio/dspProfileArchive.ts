@@ -1,20 +1,14 @@
-import { createRequire } from 'node:module'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname, extname, join, relative, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import type { DspAsset, DspProfile, DspScene } from '../../shared/dspGraph.ts'
-import { DspAssetLibrary } from './dspAssetLibrary.ts'
-import { parseCorrectionProfileFile } from './correctionProfile.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { dirname, extname, join, relative, resolve } from '../../shared/portablePath.ts'
+import { coreArchive, coreFsPromises } from '../ports/index.ts'
+import { parseCorrectionProfileFile } from './correctionProfile.ts'
+import { DspAssetLibrary } from './dspAssetLibrary.ts'
 
-const require = createRequire(import.meta.url)
-const yauzl = require('yauzl') as {
-  open: (
-    path: string,
-    options: { lazyEntries: true; validateEntrySizes: false },
-    callback: (error: Error | null, zipFile?: ZipFile) => void
-  ) => void
-}
+const { mkdir, mkdtemp, readFile, rm, stat, writeFile } = coreFsPromises
+const { yauzl, extractZip } = coreArchive
 
 const MAX_PROFILE_ARCHIVE_BYTES = 512 * 1024 * 1024
 const MAX_PROFILE_FILES = 1024
@@ -96,7 +90,7 @@ export async function exportDspProfileArchive(
     assets: archiveAssets.map(({ asset, archivePath }) => ({ asset, archivePath }))
   }
   const files: ZipSourceEntry[] = [
-    { path: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') }
+    { path: 'manifest.json', data: PortableBuffer.from(JSON.stringify(manifest, null, 2), 'utf8') }
   ]
   for (const entry of archiveAssets) {
     files.push({ path: entry.archivePath, data: await readFile(entry.path) })
@@ -122,8 +116,7 @@ export async function importDspProfileArchive(
   await inspectProfileArchive(source)
   const temporaryRoot = await mkdtemp(join(temporaryDirectory, 'twilight-dsp-profile-'))
   try {
-    const { default: extract } = await import('extract-zip')
-    await extract(source, { dir: temporaryRoot })
+    await extractZip(source, { dir: temporaryRoot })
     const manifestPath = resolve(temporaryRoot, 'manifest.json')
     const manifestInfo = await stat(manifestPath)
     if (!manifestInfo.isFile() || manifestInfo.size > MAX_PROFILE_MANIFEST_BYTES) {
@@ -232,44 +225,48 @@ function isArchiveAsset(value: unknown): value is ProfileArchiveManifest['assets
 
 async function inspectProfileArchive(source: string): Promise<void> {
   await new Promise<void>((resolveInspect, rejectInspect) => {
-    yauzl.open(source, { lazyEntries: true, validateEntrySizes: false }, (error, zipFile) => {
-      if (error || !zipFile) {
-        rejectInspect(error ?? new Error('无法读取 DSP 配置包'))
-        return
-      }
-      let count = 0
-      let total = 0
-      let settled = false
-      const fail = (reason: Error): void => {
-        if (settled) return
-        settled = true
-        zipFile.close()
-        rejectInspect(reason)
-      }
-      zipFile.on('entry', (entry) => {
-        try {
-          assertSafeArchiveEntry(entry)
-          if (!entry.fileName.endsWith('/')) {
-            count += 1
-            total += entry.uncompressedSize
-            if (count > MAX_PROFILE_FILES || total > MAX_PROFILE_ARCHIVE_BYTES) {
-              throw new Error('DSP 配置包解压后过大')
-            }
-          }
-        } catch (entryError) {
-          fail(entryError instanceof Error ? entryError : new Error(String(entryError)))
+    yauzl.open(
+      source,
+      { lazyEntries: true, validateEntrySizes: false },
+      (error: Error | null, zipFile?: ZipFile) => {
+        if (error || !zipFile) {
+          rejectInspect(error ?? new Error('无法读取 DSP 配置包'))
           return
         }
+        let count = 0
+        let total = 0
+        let settled = false
+        const fail = (reason: Error): void => {
+          if (settled) return
+          settled = true
+          zipFile.close()
+          rejectInspect(reason)
+        }
+        zipFile.on('entry', (entry: ZipEntry) => {
+          try {
+            assertSafeArchiveEntry(entry)
+            if (!entry.fileName.endsWith('/')) {
+              count += 1
+              total += entry.uncompressedSize
+              if (count > MAX_PROFILE_FILES || total > MAX_PROFILE_ARCHIVE_BYTES) {
+                throw new Error('DSP 配置包解压后过大')
+              }
+            }
+          } catch (entryError) {
+            fail(entryError instanceof Error ? entryError : new Error(String(entryError)))
+            return
+          }
+          zipFile.readEntry()
+        })
+        zipFile.once('end', () => {
+          if (settled) return
+          settled = true
+          resolveInspect()
+        })
+        zipFile.once('error', fail)
         zipFile.readEntry()
-      })
-      zipFile.once('end', () => {
-        if (settled) return
-        settled = true
-        resolveInspect()
-      })
-      zipFile.once('error', fail)
-      zipFile.readEntry()
-    })
+      }
+    )
   })
 }
 
@@ -287,7 +284,7 @@ function assertSafeArchiveEntry(entry: ZipEntry): void {
   if (unixMode === 0o120000) throw new Error('DSP 配置包不能包含符号链接')
 }
 
-type ZipSourceEntry = { path: string; data: Buffer }
+type ZipSourceEntry = { path: string; data: Uint8Array }
 
 async function writeStoredZip(outputPath: string, entries: ZipSourceEntry[]): Promise<void> {
   if (entries.length > MAX_PROFILE_FILES) throw new Error('DSP 配置包文件过多')
@@ -297,13 +294,13 @@ async function writeStoredZip(outputPath: string, entries: ZipSourceEntry[]): Pr
     total += entry.data.length
   }
   if (total > MAX_PROFILE_ARCHIVE_BYTES) throw new Error('DSP 配置包过大')
-  const localParts: Buffer[] = []
-  const centralParts: Buffer[] = []
+  const localParts: Uint8Array[] = []
+  const centralParts: Uint8Array[] = []
   let offset = 0
   for (const entry of entries) {
-    const name = Buffer.from(entry.path, 'utf8')
+    const name = PortableBuffer.from(entry.path, 'utf8')
     const crc = crc32(entry.data)
-    const local = Buffer.alloc(30)
+    const local = PortableBuffer.alloc(30)
     local.writeUInt32LE(0x04034b50, 0)
     local.writeUInt16LE(20, 4)
     local.writeUInt16LE(0, 6)
@@ -317,7 +314,7 @@ async function writeStoredZip(outputPath: string, entries: ZipSourceEntry[]): Pr
     local.writeUInt16LE(0, 28)
     localParts.push(local, name, entry.data)
 
-    const central = Buffer.alloc(46)
+    const central = PortableBuffer.alloc(46)
     central.writeUInt32LE(0x02014b50, 0)
     central.writeUInt16LE(20, 4)
     central.writeUInt16LE(20, 6)
@@ -340,7 +337,7 @@ async function writeStoredZip(outputPath: string, entries: ZipSourceEntry[]): Pr
   }
   const centralOffset = offset
   const centralSize = centralParts.reduce((size, part) => size + part.length, 0)
-  const end = Buffer.alloc(22)
+  const end = PortableBuffer.alloc(22)
   end.writeUInt32LE(0x06054b50, 0)
   end.writeUInt16LE(0, 4)
   end.writeUInt16LE(0, 6)
@@ -349,7 +346,7 @@ async function writeStoredZip(outputPath: string, entries: ZipSourceEntry[]): Pr
   end.writeUInt32LE(centralSize, 12)
   end.writeUInt32LE(centralOffset, 16)
   end.writeUInt16LE(0, 20)
-  await writeFile(outputPath, Buffer.concat([...localParts, ...centralParts, end]))
+  await writeFile(outputPath, PortableBuffer.concat([...localParts, ...centralParts, end]))
 }
 
 function assertZipPath(value: string): void {
@@ -363,7 +360,7 @@ function isInside(target: string, root: string): boolean {
   return relation === '' || (!relation.startsWith('..') && !relation.includes(':'))
 }
 
-function crc32(buffer: Buffer): number {
+function crc32(buffer: Uint8Array): number {
   let crc = 0xffffffff
   for (const byte of buffer) {
     crc ^= byte

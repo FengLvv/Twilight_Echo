@@ -1,6 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+import { extname, join } from '../../shared/portablePath.ts'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { appendFile, mkdir, readFile, rename, rm, stat, writeFile } = coreFsPromises
 import { equalizerSettingsAlterSignal } from '../../shared/audioProcessingOptions.ts'
 import {
   dspGraphNodeAltersSignal,
@@ -85,7 +88,7 @@ export class AudioDiagnosticRecorder {
       details: sanitizeDiagnosticValue(redactAudioDiagnosticValue(details))
     }
     const line = `${JSON.stringify(entry)}\n`
-    const byteLength = Buffer.byteLength(line)
+    const byteLength = PortableBuffer.byteLength(line)
     this.writeChain = this.writeChain
       .then(async () => {
         if (this.currentBytes > 0 && this.currentBytes + byteLength > this.maxLogBytes) {

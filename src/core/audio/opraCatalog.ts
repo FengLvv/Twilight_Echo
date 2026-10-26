@@ -1,9 +1,11 @@
-import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
 import type { EqualizerBand } from '../../shared/audioEngineTypes.ts'
 import type { OpraCatalogStatus, OpraProfile } from '../../shared/coreOpra.ts'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+
+const { existsSync } = coreFs
+const { mkdir, readFile, writeFile } = coreFsPromises
 
 export const OPRA_DATABASE_URL = 'https://opra.roonlabs.net/database_v1.jsonl'
 const OPRA_ATTRIBUTION_URL = 'https://github.com/opra-project/OPRA'

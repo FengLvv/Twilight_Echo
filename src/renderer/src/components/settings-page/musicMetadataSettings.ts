@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue'
 import type { EntityMetadataPolicyView } from '../../../../shared/entityMetadata.ts'
 import type { MusicIdentificationSettings } from '../../../../shared/musicIdentificationSchedule.ts'
+import { musicMetadataSetupChoice } from '../../../../shared/musicIdentificationSchedule.ts'
 import { metadataProviderLabel } from '../../../../shared/metadataProviders.ts'
 
 const reasons: Record<string, string> = {
@@ -98,7 +99,11 @@ export function createMusicMetadataSettings(api: {
   }
   async function change(patch: Partial<MusicIdentificationSettings>) {
     if (disposed || state.value.saving) return
-    const next = { ...api.current(), ...patch }
+    const next = {
+      ...api.current(),
+      ...patch,
+      ...(patch.newImports === true || patch.history === true ? { setup: 'accepted' as const } : {})
+    }
     if (patch.language === undefined && Object.hasOwn(patch, 'language')) delete next.language
     state.value = { ...state.value, saving: true, error: '', notice: '' }
     try {
@@ -117,8 +122,28 @@ export function createMusicMetadataSettings(api: {
   return {
     state,
     refresh,
+    enableAll: () =>
+      change(
+        musicMetadataSetupChoice(
+          api.current(),
+          true,
+          state.value.policy?.sources?.map((source) => source.provider) ?? []
+        )
+      ),
     scope: (scope: 'newImports' | 'history') => change({ [scope]: !api.current()[scope] }),
     language: (language: MusicIdentificationSettings['language']) => change({ language }),
+    ncmFallback() {
+      const current = api.current()
+      const enabled = current.ncmLocalFallback === false
+      if (enabled && !current.sources.includes('platform.ncm') && current.sources.length >= 16) {
+        state.value = { ...state.value, error: '最多选择 16 个资料源，请先取消一个。', notice: '' }
+        return Promise.resolve()
+      }
+      return change({
+        ncmLocalFallback: enabled,
+        ...(enabled ? { sources: [...new Set([...current.sources, 'platform.ncm'])] } : {})
+      })
+    },
     source(provider: string, selected: boolean) {
       if (disposed || state.value.saving) return Promise.resolve()
       const current = api.current().sources

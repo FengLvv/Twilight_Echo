@@ -1,11 +1,13 @@
 import { hashFile } from '../persistence/fileHash.ts'
-import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { basename, extname, join, resolve } from '../../shared/portablePath.ts'
 import type { DspAsset, DspAssetKind } from '../../shared/dspGraph.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import { isCanonicalPathInside } from '../persistence/pathGrants.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
+
+const { existsSync } = coreFs
+const { copyFile, mkdir, readFile, rename, rm, stat, writeFile } = coreFsPromises
 
 const ASSET_INDEX_FILE = 'assets.json'
 const MAX_ASSET_BYTES = 512 * 1024 * 1024
@@ -47,7 +49,7 @@ export interface DspAssetImportOptions {
 export interface DspAssetBufferImportOptions {
   kind: DspAssetKind
   fileName: string
-  data: Buffer
+  data: Uint8Array
   name?: string
 }
 

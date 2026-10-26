@@ -1,11 +1,13 @@
-import { createHash } from 'node:crypto'
-import { rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { join } from '../../shared/portablePath.ts'
 import { loadJsonFileWithBackup, writeJsonValueAtomic } from '../persistence/jsonFile.ts'
+import { coreFs } from '../ports/index.ts'
 import {
   isLoudnessGroupMeasurement,
   type LoudnessGroupMeasurement
 } from '../../shared/libraryLoudness.ts'
+
+const { rmSync } = coreFs
 
 interface LoudnessRecord {
   version: 1

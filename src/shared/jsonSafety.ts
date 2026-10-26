@@ -134,14 +134,39 @@ export function inspectJsonValueWithLimits(value: unknown, maxBytes: number): Js
   }
 
   if (json === undefined) return { ok: false, reason: 'invalid' }
-  if (Buffer.byteLength(json, 'utf8') > maxBytes) {
+  if (utf8ByteLength(json) > maxBytes) {
     return { ok: false, reason: 'too-large' }
   }
   return { ok: true }
 }
 
+function utf8ByteLength(value: string): number {
+  let bytes = 0
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    if (code <= 0x7f) {
+      bytes += 1
+    } else if (code <= 0x7ff) {
+      bytes += 2
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      if (index + 1 < value.length) {
+        const next = value.charCodeAt(index + 1)
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          bytes += 4
+          index += 1
+          continue
+        }
+      }
+      bytes += 3
+    } else {
+      bytes += 3
+    }
+  }
+  return bytes
+}
+
 function jsonEscapedUtf8ByteLength(value: string): number {
-  let bytes = Buffer.byteLength(value, 'utf8')
+  let bytes = utf8ByteLength(value)
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index)
     if (code === JSON_QUOTE || code === JSON_BACKSLASH) {

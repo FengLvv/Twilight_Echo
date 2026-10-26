@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash } from '../../shared/portableCrypto.ts'
 import type {
   AutoMixAnalysisResult,
   AutoMixFeatures,

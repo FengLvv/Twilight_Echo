@@ -1,4 +1,4 @@
-import type { Server } from 'node:http'
+import type { PortableHttpServer as Server } from '../ports/index.ts'
 
 export function getListeningPort(server: Server): number {
   const address = server.address()

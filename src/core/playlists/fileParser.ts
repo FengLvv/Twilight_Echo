@@ -1,22 +1,37 @@
-import { DOMParser, type Element, type Document } from '@xmldom/xmldom'
-import iconv from 'iconv-lite'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import path, { fileURLToPath } from '../../shared/portablePath.ts'
+import { coreText } from '../ports/index.ts'
 import { EXTERNAL_PLAYLIST_MAX_BYTES, EXTERNAL_PLAYLIST_MAX_ENTRIES, type ImportSong, type PlaylistImportDocument } from '../../shared/externalPlaylist.ts'
 import { parseImportTable, mapImportTable, type ImportTable } from '../../shared/playlistImportTable.ts'
 
+interface XmlElement {
+  nodeType: number
+  tagName: string
+  textContent?: string | null
+  childNodes: ArrayLike<XmlElement>
+  getElementsByTagName(tag: string): ArrayLike<XmlElement>
+  getAttribute(name: string): string | null
+}
+
+interface XmlDocument {
+  documentElement: XmlElement | null
+  getElementsByTagName(tag: string): ArrayLike<XmlElement>
+}
+
 const extensions = new Set(['m3u','m3u8','pls','xspf','wpl','asx','wax','kgl','xml','txt','csv','tsv'])
-const elements = (node: Element | Document, tag: string): Element[] => Array.from(node.getElementsByTagName(tag))
-const children = (node: Element) => Array.from(node.childNodes).filter((n): n is Element => n.nodeType === 1)
-const content = (node: Element | undefined) => node?.textContent?.trim() || undefined
-const value = (node: Element, tag: string) => content(elements(node, tag)[0])
+const elements = (node: XmlElement | XmlDocument, tag: string): XmlElement[] => Array.from(node.getElementsByTagName(tag))
+const children = (node: XmlElement) => Array.from(node.childNodes).filter((n): n is XmlElement => n.nodeType === 1)
+const content = (node: XmlElement | undefined) => node?.textContent?.trim() || undefined
+const value = (node: XmlElement, tag: string) => content(elements(node, tag)[0])
 function seconds(input: string | undefined, scale = 1): number | undefined {
   if (!input) return undefined
   const pieces = input.split(':').map(Number)
   const n = pieces.reduce((sum, n) => sum * 60 + n, 0) / scale
   return Number.isFinite(n) && n > 0 ? n : undefined
 }
-function decode(bytes: Buffer, extension: string): string {
+function decode(inputBytes: Uint8Array, extension: string): string {
+  const bytes = PortableBuffer.wrap(inputBytes)
+  const { iconv } = coreText
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return iconv.decode(bytes, 'utf16-le')
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return iconv.decode(bytes, 'utf16-be')
   if (bytes.subarray(0, 80).includes(0)) return iconv.decode(bytes, 'utf16-le')
@@ -26,7 +41,7 @@ function decode(bytes: Buffer, extension: string): string {
   catch { if (extension === 'm3u8') throw new Error('M3U8 必须使用 UTF-8 编码'); return iconv.decode(bytes, 'gb18030') }
 }
 
-export function parseExternalPlaylistFile(bytes: Buffer, filename: string): PlaylistImportDocument {
+export function parseExternalPlaylistFile(bytes: Uint8Array, filename: string): PlaylistImportDocument {
   if (bytes.length > EXTERNAL_PLAYLIST_MAX_BYTES) throw new Error('歌单文件超过 8 MiB 上限')
   const ext = path.extname(filename).slice(1).toLowerCase()
   if (!extensions.has(ext)) throw new Error(/fpl/i.test(ext) ? 'FPL / FPLite 请使用歌单文件桥接插件，或导出 M3U8' : '不支持的歌单格式')
@@ -71,8 +86,8 @@ export function parseExternalPlaylistFile(bytes: Buffer, filename: string): Play
     // xmldom does not fetch resources. Reject DTD/custom entity expansion too.
     const safe = text.replace(/<!DOCTYPE\s+plist\s+PUBLIC\s+"-\/\/Apple\/\/DTD PLIST 1.0\/\/EN"\s+"http:\/\/www.apple.com\/DTDs\/PropertyList-1.0.dtd"\s*>/i, '')
     if (/<!DOCTYPE|<!ENTITY/i.test(safe)) throw new Error('不支持含自定义 DTD 或实体的歌单')
-    let xml: Document
-    try { xml = new DOMParser({ onError: (level, message) => { if (level !== 'warning') throw new Error(message) } }).parseFromString(safe, 'text/xml') as unknown as Document }
+    let xml: XmlDocument
+    try { xml = new coreText.DOMParser({ onError: (level: string, message: string) => { if (level !== 'warning') throw new Error(message) } }).parseFromString(safe, 'text/xml') as unknown as XmlDocument }
     catch { throw new Error('XML 歌单损坏，请重新导出') }
     const root = xml.documentElement
     if (!root) throw new Error('XML 歌单缺少根元素')
@@ -95,7 +110,7 @@ export function parseExternalPlaylistFile(bytes: Buffer, filename: string): Play
       name = root.getAttribute('ListName') || name
       for (const file of elements(root,'File')) { const location = value(file,'FilePath') || value(file,'FileName'),parts=location?.split(/[\\/]/).at(-1)?.replace(/\.[\w]+$/,'').split(/\s+-\s+/)??[]; add({ title: value(file,'SongName')||(parts.length>=2?parts[1]:undefined), artist: value(file,'SingerName')||(parts.length>=2?parts[0]:undefined), album: value(file,'AlbumName')||(parts.length===3?parts[2]:undefined), locations: location ? [locate(location)] : [] }) }
     } else if (rootName === 'plist') {
-      function plist(node: Element): unknown {
+      function plist(node: XmlElement): unknown {
         if (node.tagName === 'dict') { const list = children(node), result: Record<string,unknown> = {}; if (list.length % 2) throw new Error('Apple XML 字典损坏'); for (let i=0;i<list.length;i+=2) { if (list[i].tagName !== 'key') throw new Error('Apple XML 字典损坏'); result[list[i].textContent || ''] = plist(list[i+1]) }; return result }
         if (node.tagName === 'array') return children(node).map(plist)
         return node.textContent || ''

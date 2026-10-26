@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, stat, writeFile, rename, rm } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { coreFsPromises } from '../ports/index.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { dirname } from '../../shared/portablePath.ts'
 import { normalizeRemotePath, redactProfile } from './networkPath.ts'
 import { NetworkSourceFailure } from './errors.ts'
 import { hasControlCharacters } from './textValidation.ts'
@@ -257,12 +258,12 @@ export function createNetworkProfileStore(deps: {
 
   async function load(): Promise<NetworkSourceProfile[]> {
     try {
-      const info = await stat(filePath)
+      const info = await coreFsPromises.stat(filePath)
       if (!info.isFile() || info.size > MAX_NETWORK_PROFILES_FILE_BYTES) {
         throw new Error('profile store file is invalid or too large')
       }
-      const raw = await readFile(filePath, 'utf8')
-      if (Buffer.byteLength(raw, 'utf8') > MAX_NETWORK_PROFILES_FILE_BYTES) {
+      const raw = await coreFsPromises.readFile(filePath, 'utf8')
+      if (PortableBuffer.byteLength(raw, 'utf8') > MAX_NETWORK_PROFILES_FILE_BYTES) {
         throw new Error('profile store file is too large')
       }
       const parsed = tryParseJsonWithNestingLimit(raw)
@@ -271,7 +272,7 @@ export function createNetworkProfileStore(deps: {
       }
       return parsed.value.profiles
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+      if ((err as { code?: string })?.code === 'ENOENT') return []
       throw new NetworkSourceFailure('network', '网络源配置读取失败')
     }
   }
@@ -280,16 +281,16 @@ export function createNetworkProfileStore(deps: {
     const raw = JSON.stringify({ profiles }, null, 2)
     if (
       profiles.length > MAX_NETWORK_PROFILES ||
-      Buffer.byteLength(raw) > MAX_NETWORK_PROFILES_FILE_BYTES
+      PortableBuffer.byteLength(raw) > MAX_NETWORK_PROFILES_FILE_BYTES
     )
       throw new NetworkSourceFailure('invalidProfile', '网络源配置超过保存上限')
-    await mkdir(dirname(filePath), { recursive: true })
+    await coreFsPromises.mkdir(dirname(filePath), { recursive: true })
     const temporary = `${filePath}.${randomUUID()}.tmp`
     try {
-      await writeFile(temporary, raw, 'utf8')
-      await rename(temporary, filePath)
+      await coreFsPromises.writeFile(temporary, raw, 'utf8')
+      await coreFsPromises.rename(temporary, filePath)
     } catch (error) {
-      await rm(temporary, { force: true }).catch(() => {})
+      await coreFsPromises.rm(temporary, { force: true }).catch(() => {})
       throw error
     }
   }

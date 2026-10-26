@@ -1,6 +1,5 @@
-import { constants } from 'node:fs'
-import { copyFile, rm } from 'node:fs/promises'
-import { basename, extname, join, parse } from 'node:path'
+import { basename, extname, join, parse } from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises } from '../ports/index.ts'
 import { isCanonicalPathInside, resolveCanonicalExistingPath } from '../persistence/pathGrants.ts'
 import { flushFileToDisk } from './downloadTargets.ts'
 import type { ProviderDownloadTaskSnapshot } from '../../shared/providerDownloads.ts'
@@ -35,11 +34,11 @@ export async function resolveCompletedDownloadResult(
         options.libraryRoots[0],
         `${parse(basename(source)).name}-${task.id}${extname(source)}`
       )
-      await copyFile(source, target, constants.COPYFILE_EXCL)
+      await coreFsPromises.copyFile(source, target, coreFs.constants.COPYFILE_EXCL)
       try {
         await flushFileToDisk(target)
       } catch (error) {
-        await rm(target, { force: true })
+        await coreFsPromises.rm(target, { force: true })
         throw error
       }
       options.updatePath(target)

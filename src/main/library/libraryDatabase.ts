@@ -37,6 +37,7 @@ import type {
 import type { LocalLibraryFileIdentity } from '../../shared/localLibraryScan.ts'
 import { LOCAL_LIBRARY_METADATA_VERSION } from '../../shared/localLibraryScan.ts'
 import { normalizeReleaseDate } from '../../shared/releaseDate.ts'
+import { observedTrackTags, type LocalLibraryTagObservations } from '../../shared/localLibraryObservations.ts'
 import {
   LIBRARY_MAX_PAGE_SIZE,
   LIBRARY_PAGE_SIZE,
@@ -132,10 +133,10 @@ import {
 } from './libraryDatabaseValidation.ts'
 
 type Row = Record<string, string | number | null>
-/** One small row per legacy physical file. No date becomes library content until finishScan. */
+/** One staged projection per legacy file. Publication shares finishScan's file/scope fences. */
 const SCAN_RELEASE_DATE_SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS scan_release_dates(
   job_id TEXT NOT NULL,file_key TEXT NOT NULL,epoch INTEGER NOT NULL,release_date TEXT,
-  dependencies TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(job_id,file_key),
+  dependencies TEXT NOT NULL DEFAULT '[]',observations TEXT,PRIMARY KEY(job_id,file_key),
   FOREIGN KEY(job_id,file_key) REFERENCES scan_items(job_id,file_key) ON DELETE CASCADE);`
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const normalizeSearch = (value: string): string =>
@@ -287,7 +288,7 @@ export class LibraryDatabase {
     })
     try {
       const version = Number((this.sql.prepare('PRAGMA user_version').get() as Row).user_version)
-      if (version > 29) throw new Error(`Unsupported music library database version: ${version}`)
+      if (version > 30) throw new Error(`Unsupported music library database version: ${version}`)
       let legacyV14InputFence = false
       if (existing) {
         const identity = Number(
@@ -305,7 +306,7 @@ export class LibraryDatabase {
           !tables.has('metadata_identification_inputs') &&
           !tables.has('metadata_identification_input_changed')
         if (
-          ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].includes(version) ||
+          ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30].includes(version) ||
           identity !== 0x54574c42 ||
           [
             'meta',
@@ -500,10 +501,10 @@ export class LibraryDatabase {
         ${ENTITY_METADATA_PERSONAL_SCHEMA_SQL}
         ${LEGACY_MUSIC_PROVENANCE_SCHEMA_SQL}
         ${PERSONAL_METADATA_REVISION_SCHEMA_SQL}
-        PRAGMA user_version=29;
+        PRAGMA user_version=30;
         COMMIT;
       `)
-      if (existing && version < 29) {
+      if (existing && version < 30) {
         // VACUUM INTO is a consistent SQLite snapshot, including committed WAL
         // pages. A backup failure must prevent the schema change.
         const destination = `${filePath}.v${version}-backup-${randomUUID()}.sqlite`
@@ -597,7 +598,8 @@ export class LibraryDatabase {
           }
           if (version < 28) this.sql.exec(`${ENTITY_METADATA_PERSONAL_SCHEMA_SQL}\n${LEGACY_MUSIC_PROVENANCE_SCHEMA_SQL}\n${PERSONAL_METADATA_REVISION_SCHEMA_SQL}`)
           if (version < 29) this.sql.exec(SCAN_RELEASE_DATE_SCHEMA_SQL)
-          this.sql.exec('PRAGMA user_version=29; COMMIT;')
+          else if (version < 30) this.sql.exec('ALTER TABLE scan_release_dates ADD COLUMN observations TEXT')
+          this.sql.exec('PRAGMA user_version=30; COMMIT;')
         } catch (error) {
           this.sql.exec('ROLLBACK')
           throw error
@@ -2316,7 +2318,7 @@ export class LibraryDatabase {
         const unchanged = sameBytes && Number(file.metadata_version) >= LOCAL_LIBRARY_METADATA_VERSION
         const dateOnly = job.mode !== 'full' && sameBytes && !unchanged
         const stagedDate = dateOnly ? this.statement(
-          'SELECT epoch,release_date,dependencies FROM scan_release_dates WHERE job_id=? AND file_key=?'
+          'SELECT epoch,release_date,dependencies,observations FROM scan_release_dates WHERE job_id=? AND file_key=?'
         ).get(id, key) as Row | undefined : undefined
         // A checkpoint describes committed records, not just bytes on disk. A
         // restore, metadata upgrade or later per-file change can invalidate it.
@@ -2350,9 +2352,10 @@ export class LibraryDatabase {
           Number(job.epoch)
         )
         if (permitted && dateOnly)
-          this.statement('INSERT INTO scan_release_dates VALUES(?,?,?,?,?)').run(
+          this.statement('INSERT INTO scan_release_dates VALUES(?,?,?,?,?,?)').run(
             id, key, Number(job.epoch), sameDateCheckpoint ? stagedDate!.release_date : null,
-            sameDateCheckpoint ? stagedDate!.dependencies : '[]'
+            sameDateCheckpoint ? stagedDate!.dependencies : '[]',
+            sameDateCheckpoint ? stagedDate!.observations : null
           )
         if (permitted || removing.has(key))
           this.statement('UPDATE files SET seen_job=? WHERE file_key=?').run(
@@ -2410,7 +2413,7 @@ export class LibraryDatabase {
     const excluded = new Set(metadata.exclusions.map((item) => normalizeLibraryFilePath(item.filePath)))
     const removing = this.removal.blockedPaths()
     const page = (after: string) => this.statement(
-      `SELECT d.file_key,d.release_date,d.dependencies,i.identity,i.expected_version,
+      `SELECT d.file_key,d.release_date,d.dependencies,d.observations,i.identity,i.expected_version,
         f.identity AS file_identity,f.content_version,f.status,f.audio_metadata
       FROM scan_release_dates d JOIN scan_items i ON i.job_id=d.job_id AND i.file_key=d.file_key AND i.epoch=d.epoch
       LEFT JOIN files f ON f.file_key=d.file_key
@@ -2452,25 +2455,29 @@ export class LibraryDatabase {
       if (!rows.length) break
       for (const row of rows) {
         const key = text(row.file_key), date = normalizeReleaseDate(row.release_date)
+        const observations = row.observations ? JSON.parse(text(row.observations)) as LocalLibraryTagObservations : undefined
         after = key
         const tracks = this.statement('SELECT payload FROM tracks WHERE file_key=? ORDER BY seq').all(key) as Row[]
         for (const record of tracks) {
           const track = JSON.parse(text(record.payload)) as LibraryTrackRecord
-          if (track.releaseDate === date && (date !== undefined || !Object.hasOwn(track, 'releaseDate'))) continue
           delete track.releaseDate
           if (date) track.releaseDate = date
+          const tags = observedTrackTags(track, observations)
+          if (tags) track.identityTags = tags
           changed = this.putTrack(track) || changed
         }
-        // CUE re-derivation can reuse the physical metadata cache later. Keep
-        // only its date aligned, without replacing any other cached field.
+        // Keep raw observations aligned for later CUE derivation; display
+        // fields and personal choices in the physical cache remain unchanged.
         const audioMetadata = row.audio_metadata ? JSON.parse(text(row.audio_metadata)) as LibraryTrackRecord : undefined
         if (audioMetadata) {
           delete audioMetadata.releaseDate
           if (date) audioMetadata.releaseDate = date
+          if (observations) audioMetadata.identityTags = observations.audioTags
         }
-        const identity = { ...JSON.parse(text(row.file_identity)), metadataVersion: LOCAL_LIBRARY_METADATA_VERSION }
+        const metadataVersion = LOCAL_LIBRARY_METADATA_VERSION
+        const identity = { ...JSON.parse(text(row.file_identity)), metadataVersion }
         this.statement("UPDATE files SET identity=?,metadata_version=?,status='complete',audio_metadata=? WHERE file_key=?").run(
-          JSON.stringify(identity), LOCAL_LIBRARY_METADATA_VERSION, audioMetadata ? JSON.stringify(audioMetadata) : null, key
+          JSON.stringify(identity), metadataVersion, audioMetadata ? JSON.stringify(audioMetadata) : null, key
         )
         this.statement('UPDATE scan_items SET identity=?,expected_version=(SELECT content_version FROM files WHERE file_key=?) WHERE job_id=? AND file_key=?').run(
           JSON.stringify(identity), key, id, key
@@ -2742,8 +2749,14 @@ export class LibraryDatabase {
           // Older parse-only callers remain valid, but their replacement Track
           // payloads never gain write authority over a date-only durable task.
           const date = normalizeReleaseDate(file.releaseDateOnly ? file.releaseDate : file.tracks[0]?.releaseDate)
-          this.statement('UPDATE scan_release_dates SET release_date=?,dependencies=? WHERE job_id=? AND file_key=?').run(
-            error ? null : date ?? null, JSON.stringify(file.dependencies ?? []), batch.jobId, key
+          const observations = file.observations
+          if (observations && (!normalizeTrackIdentityTags(observations.audioTags) ||
+            !Array.isArray(observations.tracks) || observations.tracks.length > 10000 ||
+            observations.tracks.some(row => !normalizeTrackIdentityTags(row.identityTags))))
+            throw new Error('Invalid raw tag observations')
+          this.statement('UPDATE scan_release_dates SET release_date=?,dependencies=?,observations=? WHERE job_id=? AND file_key=?').run(
+            error ? null : date ?? null, JSON.stringify(file.dependencies ?? []),
+            !error && observations ? stringifyJsonWithNestingLimit(observations, 'tag observations') : null, batch.jobId, key
           )
           this.statement('UPDATE scan_items SET state=?,error=? WHERE job_id=? AND file_key=?').run(
             error ? 'failed' : 'complete', error || null, batch.jobId, key

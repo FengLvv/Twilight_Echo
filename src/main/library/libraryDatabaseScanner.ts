@@ -217,7 +217,7 @@ export async function runDatabaseScan(
                     releaseDate: normalizeReleaseDate(file.releaseDateOnly ? file.releaseDate : file.tracks[0]?.releaseDate) }))
               return { identity, tracks: [], metadataRead: parsed.metadataRead, error: parsed.error,
                 dependencies: parsed.dependencies, releaseDateOnly: true as const,
-                releaseDate: parsed.releaseDate }
+                releaseDate: parsed.releaseDate, ...(parsed.observations ? { observations: parsed.observations } : {}) }
             }
             return await options.parse(
               identity,

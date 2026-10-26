@@ -199,6 +199,32 @@ TempAudioFixture writePcmWavFixture(const PcmWavFixtureSpec& spec) {
   return TempAudioFixture(path);
 }
 
+TempAudioFixture writeFlacTailFixture(
+    const std::string& name, bool appendInvalidFrame, bool incomplete, bool knownLength) {
+  // Stereo/44.1 kHz FLAC: 8820 silent samples in two frames (4608 + 4212).
+  const std::string hex =
+      "664c6143000000221200120000000e0000100ac442f00000227442b1eafdf0fc632f"
+      "46230ad0497a29bf8400000e0600000066666d70656700000000fff85918006b0000"
+      "00000000108afff8791801107364000000000000d405";
+  std::vector<uint8_t> bytes;
+  for (size_t i = 0; i < hex.size(); i += 2)
+    bytes.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16)));
+  if (!knownLength) {
+    bytes[21] &= 0xf0;
+    bytes[22] = bytes[23] = bytes[24] = bytes[25] = 0;
+  }
+  if (incomplete) bytes.resize(74);
+  if (appendInvalidFrame) {
+    // Valid frame header, invalid subframe: receive_frame returns INVALIDDATA.
+    const std::array<uint8_t, 14> invalid{0xff, 0xf8, 0x59, 0x18, 0x00, 0x6b, 0x04, 0, 0, 0, 0, 0, 0x10, 0x8a};
+    bytes.insert(bytes.end(), invalid.begin(), invalid.end());
+  }
+  const auto path = tempPathFor(name);
+  std::ofstream out(path, std::ios::binary);
+  out.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+  return TempAudioFixture(path);
+}
+
 TempAudioFixture writeDsfFixture(const std::string& name, int sampleRate, int blockSizePerChannel) {
   const auto path = tempPathFor(name);
   constexpr uint32_t kChannels = 2;

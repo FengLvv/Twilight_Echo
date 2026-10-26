@@ -84,7 +84,8 @@ export function applyDevelopmentMetadataSetup(
         ...settings.read().musicIdentification,
         newImports: true,
         history: false,
-        sources: ['musicbrainz']
+        sources: ['musicbrainz'],
+        setup: 'accepted'
       }
     })
   } catch (error) {

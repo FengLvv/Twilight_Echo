@@ -1,8 +1,9 @@
-import { createWriteStream } from 'node:fs'
-import { rename, rm, stat } from 'node:fs/promises'
-import { basename, extname } from 'node:path'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { basename, extname } from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises, coreStream } from '../ports/index.ts'
+
+const { createWriteStream } = coreFs
+const { rename, rm, stat } = coreFsPromises
+const { Readable, Transform, pipeline } = coreStream
 import {
   assertOwnedGrant,
   cancelOwnedTransfer,
@@ -308,7 +309,7 @@ export class CoreNcmCloudTransferService {
               fileName
             }
             const transform = new Transform({
-              transform(chunk: Buffer, _encoding, callback) {
+              transform(chunk: Uint8Array, _encoding: string, callback: (error?: Error | null, data?: unknown) => void) {
                 bytes += chunk.length
                 const percent = total ? Math.min(100, Math.round((bytes / total) * 100)) : null
                 emit({

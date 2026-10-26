@@ -3,6 +3,7 @@
  * Intentionally dependency-free; only extracts fields Twilight Echo needs.
  */
 
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import {
   MAX_PODCAST_DESCRIPTION_LENGTH,
   MAX_PODCAST_EPISODES_PER_FEED,
@@ -25,7 +26,7 @@ const MAX_FEED_BYTES = 8 * 1024 * 1024
 
 export function parsePodcastFeedXml(xml: string): ParsedPodcastFeed {
   if (typeof xml !== 'string') throw new Error('Podcast feed must be a string')
-  if (Buffer.byteLength(xml, 'utf8') > MAX_FEED_BYTES) {
+  if (PortableBuffer.byteLength(xml, 'utf8') > MAX_FEED_BYTES) {
     throw new Error('Podcast feed is too large')
   }
   const normalized = xml.replace(/^\uFEFF/, '')

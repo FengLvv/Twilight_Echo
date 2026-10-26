@@ -1,12 +1,15 @@
 #include "../core/AudioPipeline.h"
+#include "../core/TwilightAudioEngine.h"
 #include "../dsp/Vst3BridgeProcessor.h"
 #include "../output/IOutputBackend.h"
 #include "../automix-native/AutoMixAdapter.h"
 #include "../automix-native/am_hash.h"
 #include "../decoder/FFmpegDecoder.h"
 #include "../utils/JsonUtils.h"
+#include "AudioFixtureLibrary.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -806,6 +809,67 @@ bool pumpCallback(const std::shared_ptr<ControlledBackendState> &backend,
 
 // Capture the production float callback without a device or muted software
 // volume. This checks ordinary playback, before any transition is submitted.
+int verifyFlacTailContinuation() {
+  using namespace twilight::audio::test;
+  const auto first = writeFlacTailFixture("twilight-continuation-tail.flac", true);
+  const auto next = writePcmWavFixture({"twilight-continuation-next.wav", 44100, 2, 16, 88200, false});
+  g_pcmSharedFormat = true; // Match FLAC 44.1 kHz -> shared output 48 kHz.
+  for (const bool gapless : {false, true}) {
+    // Ordinary playback, resume near the end, and dragging the progress bar.
+    for (const int seekMode : {0, 1, 2}) {
+      resetBackend();
+      std::atomic<int> errors{0};
+      TwilightAudioEngine engine;
+      engine.setEventCallback([](const char* type, const char* payload, void* context) {
+        if (std::string(type) == "error" ||
+            (std::string(type) == "end-file" && json_utils::fieldString(payload, "reason") == "error"))
+          static_cast<std::atomic<int>*>(context)->fetch_add(1);
+      }, &errors);
+      assert(engine.setVolume(.2) == TAE_RESULT_OK);
+      assert(engine.setDspConfig(std::string("{\"gapless\":") + (gapless ? "true" : "false") +
+                                 ",\"crossfadeSeconds\":0,\"fftEnabled\":false}") == TAE_RESULT_OK);
+      const std::string queue = "[{\"id\":\"first\",\"source\":\"" + json_utils::escape(first.string()) +
+          "\"},{\"id\":\"next\",\"source\":\"" + json_utils::escape(next.string()) + "\"}]";
+      assert(engine.loadQueue(queue, 0) == TAE_RESULT_OK);
+      assert(engine.play(first.string(), seekMode == 1 ? .15 : 0) == TAE_RESULT_OK);
+      if (seekMode == 2) assert(engine.seek(.15) == TAE_RESULT_OK);
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+      bool advanced = false;
+      while (std::chrono::steady_clock::now() < deadline && errors.load() == 0) {
+        const auto backend = latestBackend();
+        RenderCallback render;
+        AudioFormat format;
+        if (backend) {
+          std::lock_guard lock(backend->mutex);
+          if (backend->started) { render = backend->render; format = backend->format; }
+        }
+        // The clock may close/reopen output for a non-gapless transition.
+        if (render) {
+          std::vector<float> block(kCallbackFrames * format.channelCount);
+          render(block.data(), kCallbackFrames);
+        }
+        const auto info = engine.getPlaybackInfoJson();
+        if (json_utils::fieldString(info, "source") == next.string() &&
+            json_utils::fieldNumber(info, "queueIndex") == 1) {
+          assert(json_utils::fieldString(info, "state") == "playing");
+          assert(json_utils::fieldNumber(info, "trackSerial") == 1);
+          advanced = true;
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+      if (!advanced) std::cerr << "FLAC continuation failed: gapless=" << gapless << " seekMode=" << seekMode
+                               << " info=" << engine.getPlaybackInfoJson() << '\n';
+      assert(errors.load() == 0);
+      assert(advanced);
+      assert(engine.stop() == TAE_RESULT_OK);
+    }
+  }
+  g_pcmSharedFormat = false;
+  std::cout << "PASS FLAC trailing-data auto-next: normal/resume/seek, gapless on/off, 44.1 -> 48 kHz\n";
+  return 0;
+}
+
 int verifyPcmTransparency(const std::filesystem::path& manifestPath) {
   std::ifstream manifest(manifestPath);
   const std::string json{std::istreambuf_iterator<char>(manifest), {}};
@@ -1191,6 +1255,8 @@ int main(int argc, char** argv) {
 #else
   ScopedPerformanceTestThreadPriority performanceTestThreadPriority;
   ScopedControlledBackendFactory controlledBackendFactory;
+  if (argc == 2 && std::string(argv[1]) == "--verify-flac-tail")
+    return verifyFlacTailContinuation();
   if (argc == 3 && std::string(argv[1]) == "--verify-pcm")
     return verifyPcmTransparency(std::filesystem::u8path(argv[2]));
   if (argc == 2 && std::string(argv[1]) == "--verify-neutral-pcm") {

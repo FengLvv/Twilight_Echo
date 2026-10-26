@@ -8,17 +8,14 @@ import {
   downloadTrackName,
   type DownloadPreferences
 } from '../../shared/downloadPreferences.ts'
-import { randomUUID } from 'node:crypto'
-import { createWriteStream, constants } from 'node:fs'
-import { access, copyFile, mkdir, rm, stat } from 'node:fs/promises'
-import { basename, extname, join, parse } from 'node:path'
-import { pipeline } from 'node:stream/promises'
-import { Readable, Transform } from 'node:stream'
+import { delay } from '../../shared/portableAsync.ts'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { basename, extname, join, parse } from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises, coreStream } from '../ports/index.ts'
 import type { TwilightPluginManager } from '../plugins/manager.ts'
 import { resolveCompletedDownloadResult } from './completedDownloadResult.ts'
 import { isCanonicalPathInside } from '../persistence/pathGrants.ts'
 import { flushFileToDisk, orderDownloadRoots, selectDownloadTargetRoot } from './downloadTargets.ts'
-import { setTimeout as delay } from 'node:timers/promises'
 import type {
   ProviderDownloadCreateInput,
   ProviderDownloadQuality,
@@ -303,7 +300,7 @@ export class ProviderDownloadManager {
     signal: AbortSignal
   ): Promise<void> {
     const task = this.requireTask(taskId)
-    await mkdir(targetRoot, { recursive: true })
+    await coreFsPromises.mkdir(targetRoot, { recursive: true })
     const file = normalizeRemoteFile(
       await this.options.pluginManager.callProvider(
         task.providerId,
@@ -349,8 +346,12 @@ export class ProviderDownloadManager {
       // 全列表克隆+IPC 广播；节流为 ≤1 次/250ms 或 ≥1% 步进，终态另有即时 patch。
       let lastProgressEmitAt = 0
       let lastProgressEmitValue = 0.45
-      const progress = new Transform({
-        transform: (chunk: Buffer, _encoding, callback) => {
+      const progress = new coreStream.Transform({
+        transform: (
+          chunk: Uint8Array,
+          _encoding: string,
+          callback: (error?: Error | null, data?: unknown) => void
+        ) => {
           received += chunk.length
           if (received > MAX_DOWNLOAD_BYTES) return callback(new Error('下载文件超过 4 GiB 限制'))
           const nextProgress = expectedSize
@@ -369,10 +370,13 @@ export class ProviderDownloadManager {
           callback(null, chunk)
         }
       })
-      await pipeline(
-        Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
+      const sourceStream = coreStream.Readable.fromWeb
+        ? coreStream.Readable.fromWeb(response.body)
+        : coreStream.Readable.from(response.body as unknown as AsyncIterable<Uint8Array>)
+      await coreStream.pipeline(
+        sourceStream,
         progress,
-        createWriteStream(partPath, { flags: 'wx' }),
+        coreFs.createWriteStream(partPath, { flags: 'wx' }),
         { signal }
       )
       if (expectedSize != null && received !== expectedSize) {
@@ -392,8 +396,8 @@ export class ProviderDownloadManager {
       })
       signal.throwIfAborted()
       await flushFileToDisk(partPath)
-      await copyFile(partPath, targetPath, constants.COPYFILE_EXCL)
-      await rm(partPath, { force: true })
+      await coreFsPromises.copyFile(partPath, targetPath, coreFs.constants.COPYFILE_EXCL)
+      await coreFsPromises.rm(partPath, { force: true })
       const lyricWarning = await saveDownloadedLyrics(targetPath, metadata.lyrics)
       this.patch(taskId, {
         actualQuality: metadata.actualQuality ?? task.actualQuality,
@@ -405,13 +409,13 @@ export class ProviderDownloadManager {
       this.patch(taskId, {
         status: 'completed',
         progress: 1,
-        fileSize: (await stat(targetPath)).size,
+        fileSize: (await coreFsPromises.stat(targetPath)).size,
         targetPath,
         error: null
       })
     } catch (error) {
-      await rm(partPath, { force: true }).catch(() => undefined)
-      await rm(`${partPath}.tags${extname(targetPath)}`, { force: true }).catch(() => undefined)
+      await coreFsPromises.rm(partPath, { force: true }).catch(() => undefined)
+      await coreFsPromises.rm(`${partPath}.tags${extname(targetPath)}`, { force: true }).catch(() => undefined)
       throw error
     }
   }
@@ -594,7 +598,7 @@ async function availableTargetPath(
     const suffix = index === 0 ? '' : ` (${index})`
     const candidate = join(root, `${parse(preferred).name}${suffix}${extension}`)
     try {
-      await access(candidate)
+      await coreFsPromises.access(candidate)
     } catch {
       return candidate
     }

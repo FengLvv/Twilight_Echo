@@ -68,7 +68,8 @@ test('development setup changes only identification preferences, consumes the re
       ...before.musicIdentification,
       newImports: true,
       history: false,
-      sources: ['musicbrainz']
+      sources: ['musicbrainz'],
+      setup: 'accepted' as const
     }
   }
   assert.deepEqual(f.settings.read(), expected)

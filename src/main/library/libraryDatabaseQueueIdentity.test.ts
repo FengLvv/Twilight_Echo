@@ -495,7 +495,7 @@ test('v10 migration preserves snapshots, identity, references, undo and WAL back
   )
   const upgraded = new LibraryDatabase(path)
   connections.push(upgraded)
-  assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()?.user_version, 29)
+  assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()?.user_version, 30)
   assert.deepEqual(upgraded.readLibraryQueue(queue.id), expectedPage)
   assert.deepEqual(upgraded.getMetadata(), expectedMeta)
   assert.equal(

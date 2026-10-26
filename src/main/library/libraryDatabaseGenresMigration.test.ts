@@ -55,7 +55,7 @@ test('v20 classification migration backs up and preserves library, queues and ex
   db.close()
   const upgraded = new LibraryDatabase(file)
   try {
-    assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()!.user_version, 29)
+    assert.equal(upgraded.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
     assert.deepEqual(upgraded.getMetadata(), metadata)
     assert.deepEqual(upgraded.getTracksByIds(['retained']), before)
     assert.deepEqual(upgraded.getLibraryQueue(queue.id), queue)

@@ -1,24 +1,8 @@
-import { createRequire } from 'node:module'
-import { existsSync, realpathSync } from 'node:fs'
-import { lstat, readdir, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { coreArchive, coreFs, coreFsPromises } from '../ports/index.ts'
+import { isAbsolute, join, relative, resolve, sep } from '../../shared/portablePath.ts'
 
-const require = createRequire(import.meta.url)
-const yauzl = require('yauzl') as {
-  open: (
-    path: string,
-    options: { lazyEntries: true; validateEntrySizes: false },
-    callback: (error: Error | null, zipFile?: ZipFile) => void
-  ) => void
-}
-
-interface ZipFile {
-  readEntry: () => void
-  close: () => void
-  on: (event: 'entry', handler: (entry: ZipEntry) => void) => void
-  once(event: 'end', handler: () => void): void
-  once(event: 'error', handler: (error: Error) => void): void
-}
+const { existsSync, realpathSync } = coreFs
+const { lstat, readdir, stat } = coreFsPromises
 
 interface ZipEntry {
   fileName: string
@@ -41,8 +25,7 @@ export async function assertPluginPackageFileSize(source: string): Promise<void>
 export async function extractPluginPackage(source: string, targetDir: string): Promise<void> {
   await assertPluginPackageFileSize(source)
   await inspectZipPackage(source)
-  const { default: extract } = await import('extract-zip')
-  await extract(source, { dir: targetDir })
+  await coreArchive.extractZip(source, { dir: targetDir })
   await assertPluginTreeSafe(targetDir)
 }
 
@@ -54,7 +37,10 @@ export async function assertPluginTreeSafe(root: string): Promise<void> {
 
 async function inspectZipPackage(source: string): Promise<void> {
   await new Promise<void>((resolveInspect, rejectInspect) => {
-    yauzl.open(source, { lazyEntries: true, validateEntrySizes: false }, (openError, zipFile) => {
+    coreArchive.yauzl.open(
+      source,
+      { lazyEntries: true, validateEntrySizes: false },
+      (openError, zipFile) => {
       if (openError) {
         rejectInspect(openError)
         return

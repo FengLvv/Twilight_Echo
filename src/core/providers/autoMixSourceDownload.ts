@@ -1,8 +1,11 @@
-import { createReadStream, createWriteStream } from 'node:fs'
-import { rename, rm } from 'node:fs/promises'
-import { createHash, randomUUID } from 'node:crypto'
-import { Readable, Transform } from 'node:stream'
-import { finished, pipeline } from 'node:stream/promises'
+import { coreAudioMetadata, coreFs, coreFsPromises, coreStream } from '../ports/index.ts'
+const { createReadStream, createWriteStream } = coreFs
+const { rename, rm } = coreFsPromises
+const { Readable, Transform, finished, pipeline } = coreStream
+
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+
+
 
 export const AUTOMIX_SOURCE_MAX_BYTES = 256 * 1024 * 1024
 export const AUTOMIX_SOURCE_TIMEOUT_MS = 10_000
@@ -16,10 +19,8 @@ export interface AutoMixSourceDownloadOptions {
 }
 
 async function validateAudioHeaders(path: string, signal: AbortSignal): Promise<void> {
-  const [{ parseFromTokenizer }, { fromStream }] = await Promise.all([
-    import('music-metadata'),
-    import('strtok3')
-  ])
+  const { parseFromTokenizer } = coreAudioMetadata.musicMetadata
+  const { fromStream } = coreAudioMetadata.strtok3
   signal.throwIfAborted()
   const stream = createReadStream(path, { signal })
   const closed = finished(stream, { cleanup: true }).catch(() => {})
@@ -97,7 +98,7 @@ export async function downloadAutoMixSource(
       throw new Error('online_source_size_budget')
     }
     const counter = new Transform({
-      transform(chunk: Buffer, _encoding, callback) {
+      transform(chunk: Uint8Array, _encoding: string, callback: (error?: Error | null, data?: unknown) => void) {
         bytes += chunk.length
         if (bytes > AUTOMIX_SOURCE_MAX_BYTES) {
           callback(new Error('online_source_size_budget'))

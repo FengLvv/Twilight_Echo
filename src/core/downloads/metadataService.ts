@@ -1,3 +1,4 @@
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import type { prepareDownloadedMetadata } from './downloadMetadata.ts'
 import type {
   DownloadMetadataRequest,
@@ -33,7 +34,7 @@ export function createDownloadMetadataPreparation(
       try {
         const raw = (await options.getLyrics()) as Record<string, unknown> | null
         for (const key of ['lyrics', 'translatedLyrics', 'wordLyrics'] as const) {
-          if (typeof raw?.[key] === 'string' && Buffer.byteLength(raw[key]) <= 1024 * 1024)
+          if (typeof raw?.[key] === 'string' && PortableBuffer.byteLength(raw[key]) <= 1024 * 1024)
             request.lyrics[key] = raw[key]
         }
       } catch {
@@ -45,7 +46,7 @@ export function createDownloadMetadataPreparation(
       try {
         const cover = await options.fetchCover?.(track.cover, signal)
         if (cover)
-          request.cover = { base64: Buffer.from(cover.bytes).toString('base64'), mime: cover.mime }
+          request.cover = { base64: PortableBuffer.from(cover.bytes).toString('base64'), mime: cover.mime }
       } catch {
         signal.throwIfAborted()
         request.coverFailure = true

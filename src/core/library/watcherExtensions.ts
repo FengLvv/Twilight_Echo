@@ -1,5 +1,5 @@
-import { existsSync, statSync } from 'node:fs'
-import { extname } from 'node:path'
+import { extname } from '../../shared/portablePath.ts'
+import { coreFs } from '../ports/index.ts'
 import { SUPPORTED_EXTENSIONS } from '../../shared/audioFormats.ts'
 
 // Shared scan extensions + CUE dependency sheets that can re-partition a disc.
@@ -18,7 +18,7 @@ export function looksLikeDirectoryEvent(filename: string, fullPath: string): boo
   if (!ext) return true
   if (isWatchableFileExtension(ext)) return false
   try {
-    return existsSync(fullPath) ? statSync(fullPath).isDirectory() : true
+    return coreFs.existsSync(fullPath) ? coreFs.statSync(fullPath).isDirectory() : true
   } catch {
     return true
   }

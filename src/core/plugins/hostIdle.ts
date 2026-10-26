@@ -14,8 +14,8 @@ export interface PluginHostIdleTrackerOptions {
   /** Return false to keep the host resident this round; it is re-armed. */
   canHibernate: (pluginId: string) => boolean
   onIdle: (pluginId: string) => void
-  setTimeout?: (callback: () => void, ms: number) => NodeJS.Timeout
-  clearTimeout?: (timer: NodeJS.Timeout) => void
+  setTimeout?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>
+  clearTimeout?: (timer: ReturnType<typeof setTimeout>) => void
 }
 
 export const DEFAULT_PLUGIN_HOST_IDLE_TIMEOUT_MS = 5 * 60 * 1000
@@ -34,10 +34,10 @@ export function isPluginHostedPlaybackUrl(value: unknown): boolean {
 }
 
 export class PluginHostIdleTracker {
-  private readonly timers = new Map<string, NodeJS.Timeout>()
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly idleTimeoutMs: number
-  private readonly schedule: (callback: () => void, ms: number) => NodeJS.Timeout
-  private readonly cancel: (timer: NodeJS.Timeout) => void
+  private readonly schedule: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>
+  private readonly cancel: (timer: ReturnType<typeof setTimeout>) => void
   private readonly canHibernate: (pluginId: string) => boolean
   private readonly onIdle: (pluginId: string) => void
   private stopped = false

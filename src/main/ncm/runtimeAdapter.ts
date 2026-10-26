@@ -1,4 +1,5 @@
 import { existsSync, writeFileSync } from 'node:fs'
+import type { Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Agent, request, type Dispatcher } from 'undici'
@@ -37,8 +38,8 @@ export function createNcmLoopbackTransport(
 }
 
 /** Node/package adapter shared by the legacy main entry and the utility Core. */
-export function createNcmApiRuntime(): NcmApiService {
-  return new NcmApiService({
+export function createNcmApiRuntime(): NcmApiService<Server> {
+  return new NcmApiService<Server>({
     ...createNcmLoopbackTransport(),
     startServer: async () => {
       const tokenPath = join(tmpdir(), 'anonymous_token')

@@ -2,6 +2,14 @@
 
 #include <cstdlib>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+#include "android/OboeOutputBackend.h"
+#endif
+
 #if defined(_WIN32) && defined(TAE_ENABLE_WASAPI)
 #include "wasapi/WasapiExclusiveBackend.h"
 #include "wasapi/WasapiSharedBackend.h"
@@ -15,12 +23,14 @@
 #include "asio/AsioBackend.h"
 #endif
 
-#if defined(__APPLE__) && defined(TAE_ENABLE_COREAUDIO)
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+#include "ios/IosAudioUnitBackend.h"
+#elif defined(__APPLE__) && (!defined(TARGET_OS_IPHONE) || !TARGET_OS_IPHONE) && defined(TAE_ENABLE_COREAUDIO)
 #include "coreaudio/CoreAudioBackend.h"
 #include "coreaudio/CoreAudioExclusiveBackend.h"
 #endif
 
-#if defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
 #include "alsa/AlsaBackend.h"
 #endif
 
@@ -98,13 +108,17 @@ PcmOutputProviderStatus validatePcmOutputProviderForBackend(
 }
 
 std::string defaultBackendId() {
-#if defined(_WIN32) && defined(TAE_ENABLE_WASAPI)
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+  return "oboe";
+#elif defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+  return "audiounit";
+#elif defined(_WIN32) && defined(TAE_ENABLE_WASAPI)
   return "wasapi";
 #elif defined(_WIN32) && defined(TAE_ENABLE_ASIO)
   return "asio";
-#elif defined(__APPLE__) && defined(TAE_ENABLE_COREAUDIO)
+#elif defined(__APPLE__) && (!defined(TARGET_OS_IPHONE) || !TARGET_OS_IPHONE) && defined(TAE_ENABLE_COREAUDIO)
   return "coreaudio";
-#elif defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#elif defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
   return "alsa";
 #else
   return {};
@@ -113,16 +127,22 @@ std::string defaultBackendId() {
 
 bool isOutputBackendAvailable(const std::string& backendId) {
   (void)backendId;  // Builds with every platform backend disabled still compile cleanly.
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+  if (backendId == "oboe") return true;
+#endif
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+  if (backendId == "audiounit") return true;
+#endif
 #if defined(_WIN32) && defined(TAE_ENABLE_WASAPI)
   if (backendId == "wasapi" || backendId == "wasapi-shared" || backendId == "wasapi-exclusive") return true;
 #endif
 #if defined(_WIN32) && defined(TAE_ENABLE_ASIO)
   if (backendId == "asio") return true;
 #endif
-#if defined(__APPLE__) && defined(TAE_ENABLE_COREAUDIO)
+#if defined(__APPLE__) && (!defined(TARGET_OS_IPHONE) || !TARGET_OS_IPHONE) && defined(TAE_ENABLE_COREAUDIO)
   if (backendId == "coreaudio" || backendId == "coreaudio-exclusive") return true;
 #endif
-#if defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
   if (backendId == "alsa") return true;
 #endif
   return false;
@@ -133,6 +153,16 @@ std::unique_ptr<IOutputBackend> createOutputBackend(const std::string& backendId
     if (error) *error = "Output backend is not available in this build: " + backendId;
     return nullptr;
   }
+#if defined(__ANDROID__) && defined(TAE_ENABLE_OBOE)
+  if (backendId == "oboe") {
+    return std::make_unique<OboeOutputBackend>();
+  }
+#endif
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE && defined(TAE_ENABLE_IOS_AUDIOUNIT)
+  if (backendId == "audiounit") {
+    return std::make_unique<IosAudioUnitBackend>();
+  }
+#endif
 #if defined(_WIN32) && defined(TAE_ENABLE_WASAPI)
   if (backendId == "wasapi" || backendId == "wasapi-shared") {
     const PcmOutputProviderSelection& selection = configuredPcmOutputProvider();
@@ -156,7 +186,7 @@ std::unique_ptr<IOutputBackend> createOutputBackend(const std::string& backendId
     return std::make_unique<AsioBackend>();
   }
 #endif
-#if defined(__APPLE__) && defined(TAE_ENABLE_COREAUDIO)
+#if defined(__APPLE__) && (!defined(TARGET_OS_IPHONE) || !TARGET_OS_IPHONE) && defined(TAE_ENABLE_COREAUDIO)
   if (backendId == "coreaudio") {
     return std::make_unique<CoreAudioBackend>();
   }
@@ -164,7 +194,7 @@ std::unique_ptr<IOutputBackend> createOutputBackend(const std::string& backendId
     return std::make_unique<CoreAudioExclusiveBackend>();
   }
 #endif
-#if defined(__linux__) && defined(TAE_ENABLE_ALSA)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(TAE_ENABLE_ALSA)
   if (backendId == "alsa") {
     return std::make_unique<AlsaBackend>();
   }

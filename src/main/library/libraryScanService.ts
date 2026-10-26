@@ -220,7 +220,7 @@ async function handleDatabaseScan(
       forceParse,
       parseReleaseDate: async (identity) => ({
         ...(await withTimeout(
-          readFileReleaseDate(identity.filePath),
+          readFileReleaseDate(identity, cueIndex),
           PARSE_TIMEOUT_MS,
           'file release-date parsing'
         )),
@@ -379,25 +379,10 @@ async function runScan(
               dateUpdate: { filePath, releaseDate: undefined }
             }
           }
-          try {
-            const metadata = await parseAudioMetadata(filePath, true)
-            const waveMetadata = await readWaveMetadata(filePath).catch(() => null)
-            return {
-              filePath,
-              dateOnly,
-              tracks: [],
-              metadataRead: true,
-              dateUpdate: {
-                filePath,
-                releaseDate: readLocalReleaseDate({
-                  ...metadata.common,
-                  year: waveMetadata?.year ?? metadata.common.year
-                })
-              }
-            }
-          } catch {
-            return { filePath, dateOnly, tracks: [], metadataRead: false, dateUpdate: undefined }
-          }
+          const read = identity ? await readFileReleaseDate(identity, cueIndex) : { metadataRead: false }
+          return { filePath, dateOnly, tracks: [], metadataRead: read.metadataRead,
+            dateUpdate: read.metadataRead ? { filePath, releaseDate: read.releaseDate,
+              observations: read.observations } : undefined }
         }
         const parsed = identity
           ? await parseTrack(identity, request.coverCacheDir, cueIndex)
@@ -741,20 +726,38 @@ async function parseAudioMetadata(filePath: string, skipCovers = false): Promise
   }
 }
 
-/** Reads native dates with cover extraction disabled, without rebuilding logical Track payloads. */
-async function readFileReleaseDate(filePath: string): Promise<{
+/** Refresh raw observations with cover extraction disabled, without replacing logical tracks. */
+async function readFileReleaseDate(identity: LocalLibraryFileIdentity, cueIndex: CueDirectoryIndex): Promise<{
   metadataRead: boolean; releaseDate?: string; error?: string
+  observations?: import('../../shared/localLibraryObservations.ts').LocalLibraryTagObservations
 }> {
+  const filePath = identity.filePath
   if (filePath.toLowerCase().endsWith('.iso'))
     return { metadataRead: false, error: 'Native ISO metadata reader is required' }
   const waveMetadata = await readWaveMetadata(filePath).catch(() => null)
+  const observe = async (common: Parameters<typeof collectTrackIdentityTags>[0], duration: number | undefined) => {
+    const audioTags = collectTrackIdentityTags(common, duration, getNameFromFile(filePath), waveMetadata)
+    const base = { id: '', filePath, identityTags: audioTags }
+    const tracks = identity.cueSignature
+      ? await cueIndex.derive(filePath, duration ?? 0, base) : null
+    return {
+      audioTags,
+      tracks: (tracks ?? [base]).map(track => ({
+        id: String(track.id),
+        ...(typeof track.cueSheetPath === 'string' ? { cueSheetPath: track.cueSheetPath } : {}),
+        ...(typeof track.trackNumber === 'number' ? { trackNumber: track.trackNumber } : {}),
+        identityTags: track.identityTags as import('../../shared/trackIdentification.ts').TrackIdentityTags
+      }))
+    }
+  }
   try {
     const metadata = await parseAudioMetadata(filePath, true)
     return { metadataRead: true, releaseDate: readLocalReleaseDate({
       ...metadata.common, year: waveMetadata?.year ?? metadata.common.year
-    }) }
+    }), observations: await observe(metadata.common, metadata.format.duration ?? waveMetadata?.duration) }
   } catch (error) {
-    if (waveMetadata) return { metadataRead: true, releaseDate: readLocalReleaseDate({ year: waveMetadata.year }) }
+    if (waveMetadata) return { metadataRead: true, releaseDate: readLocalReleaseDate({ year: waveMetadata.year }),
+      observations: await observe({}, waveMetadata.duration) }
     return { metadataRead: false, error: error instanceof Error ? error.message : String(error) }
   }
 }

@@ -1,4 +1,5 @@
-import type { IncomingHttpHeaders } from 'node:http'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import type { PortableIncomingHttpHeaders } from '../ports/index.ts'
 
 export const AMLL_TTML_TIMEOUT_MS = 8_000
 export const AMLL_TTML_MAX_BYTES = 2 * 1024 * 1024
@@ -45,7 +46,7 @@ function writeCache(id: number, value: string, now = Date.now()): void {
   }
 }
 
-function contentLength(headers: Headers | IncomingHttpHeaders): number | null {
+function contentLength(headers: Headers | PortableIncomingHttpHeaders): number | null {
   const value =
     headers instanceof Headers ? headers.get('content-length') : headers['content-length']
   const raw = Array.isArray(value) ? value[0] : value
@@ -55,7 +56,7 @@ function contentLength(headers: Headers | IncomingHttpHeaders): number | null {
 }
 
 function validateTtmlPayload(text: string): string {
-  if (Buffer.byteLength(text, 'utf8') > AMLL_TTML_MAX_BYTES) {
+  if (PortableBuffer.byteLength(text, 'utf8') > AMLL_TTML_MAX_BYTES) {
     throw new Error('AMLL TTML response exceeds size limit')
   }
   if (!text.trim() || /<!DOCTYPE|<!ENTITY/i.test(text) || !/<tt(?:\s|>)/i.test(text)) {

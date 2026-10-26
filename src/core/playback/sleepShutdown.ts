@@ -12,8 +12,8 @@ interface SleepTimerShutdownOptions {
   onStopped(): void
   onError(error: unknown): void
   now?: () => number
-  setTimeout?: (callback: () => void, ms: number) => NodeJS.Timeout
-  clearTimeout?: (timer: NodeJS.Timeout) => void
+  setTimeout?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>
+  clearTimeout?: (timer: ReturnType<typeof setTimeout>) => void
 }
 
 /** One fade step in flight, no per-tick promise backlog. Logical/user volume
@@ -22,7 +22,7 @@ export class SleepTimerShutdown {
   private epoch = 0
   private active = false
   private finishing = false
-  private timer: NodeJS.Timeout | null = null
+  private timer: ReturnType<typeof setTimeout> | null = null
   private ready: Promise<void> = Promise.resolve()
   private gainDrain: Promise<void> = Promise.resolve()
   private completion: Promise<void> | null = null

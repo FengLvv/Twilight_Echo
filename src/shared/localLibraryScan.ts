@@ -6,7 +6,9 @@ import type {
 } from './libraryDatabase.ts'
 
 export const LOCAL_LIBRARY_FILE_INDEX_SCHEMA_VERSION = 1 as const
-export const LOCAL_LIBRARY_METADATA_VERSION = 1 as const
+// v2 adds raw identity tags (including fractional duration and NCM file IDs)
+// to the existing non-destructive upgrade read.
+export const LOCAL_LIBRARY_METADATA_VERSION = 2 as const
 
 export type LocalLibraryScanMode = 'startup' | 'full' | 'watch'
 export type LocalLibraryScanState =
@@ -76,6 +78,7 @@ export interface LocalLibraryReleaseDateUpdate {
   filePath: string
   /** Missing means tags were read successfully but contained no valid date. */
   releaseDate?: string
+  observations?: import('./localLibraryObservations.ts').LocalLibraryTagObservations
 }
 
 export interface LocalLibraryScanIdentityBatch {

@@ -52,7 +52,7 @@ test('identity observations keep artist roles, ID order and original precision w
   assert.equal(tags.discTotal?.value, 3)
   assert.deepEqual(tags.isrcs, ['ISRC-A', 'ISRC-B'])
   assert.equal(tags.barcode, '0012345')
-  assert.equal(LOCAL_LIBRARY_METADATA_VERSION, 1, 'new optional evidence must not force a full reread')
+  assert.equal(LOCAL_LIBRARY_METADATA_VERSION, 2, 'upgrades must collect observations once without replacing display fields')
 })
 
 test('fallback, compilation-only tags and old caches never become observed performer tags', () => {
@@ -365,7 +365,7 @@ test('scan worker tracks sibling CUE dependencies across startup and watcher sca
 
     const unchanged = await sendScan(child, {
       ...baseRequest(root),
-      knownIdentities: [{ ...addedIdentity, metadataVersion: 1 }],
+      knownIdentities: [{ ...addedIdentity, metadataVersion: 2 }],
       knownTrackPaths: [filePath],
       mode: 'startup'
     })
@@ -508,14 +508,14 @@ test('real WAV dates backfill without replacing existing metadata and missing ta
   })
   try {
     const first = await coordinator.scanStartup()
-    assert.deepEqual(first.library.tracks, [
+    assert.deepEqual(first.library.tracks.map(value => { const { identityTags: _tags, ...track } = value as Record<string, unknown>; return track }), [
       { ...tracks[0], releaseDate: '2020-05-12' },
       tracks[1],
       tracks[2]
     ])
     const index = loadLocalLibraryFileIndex(libraryFile).document.entries
-    assert.equal(index.find((i) => i.filePath === dated)?.metadataVersion, 1)
-    assert.equal(index.find((i) => i.filePath === undated)?.metadataVersion, 1)
+    assert.equal(index.find((i) => i.filePath === dated)?.metadataVersion, 2)
+    assert.equal(index.find((i) => i.filePath === undated)?.metadataVersion, 2)
     assert.equal(index.find((i) => i.filePath === unreadable)?.metadataVersion, undefined)
     const second = await coordinator.scanStartup()
     assert.equal(second.skippedUnchanged, 2)

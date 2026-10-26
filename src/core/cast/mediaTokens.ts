@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes } from '../../shared/portableCrypto.ts'
 import { REMOTE_MEDIA_TOKEN_TTL_MS } from '../../shared/remoteControl.ts'
 
 export type MediaStreamGrantKind = 'file' | 'remote'

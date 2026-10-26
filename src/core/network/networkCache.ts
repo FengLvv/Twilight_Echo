@@ -1,9 +1,15 @@
-import { createWriteStream } from 'node:fs'
-import { lstat, mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { pipeline } from 'node:stream/promises'
+import { coreFs, coreFsPromises, coreProcess, coreStream } from '../ports/index.ts'
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep
+} from '../../shared/portablePath.ts'
 import { NetworkResumeUnsupported, NetworkSourceFailure } from './errors.ts'
-import type { NetworkSourceSession } from './adapters/types.ts'
+import type { NetworkReadableStream, NetworkSourceSession } from './adapters/types.ts'
 import type { NetworkEntry } from '../../shared/networkSources.ts'
 
 /**
@@ -28,7 +34,7 @@ const cacheDirectories = new Map<string, CacheDirectoryAccess>()
 
 function cachePathKey(path: string): string {
   const absolute = resolve(path)
-  return process.platform === 'win32' ? absolute.toLowerCase() : absolute
+  return coreProcess.platform === 'win32' ? absolute.toLowerCase() : absolute
 }
 
 function directoryAccess(directory: string): CacheDirectoryAccess {
@@ -143,10 +149,10 @@ function waitForDownload(previous: Promise<void>, signal?: AbortSignal): Promise
 
 async function download(deps: Download & { target: string }): Promise<string> {
   const { session, entry, cacheRoot, target, signal } = deps
-  await mkdir(cacheRoot, { recursive: true })
+  await coreFsPromises.mkdir(cacheRoot, { recursive: true })
 
   try {
-    const info = await stat(target)
+    const info = await coreFsPromises.stat(target)
     if (entry.sizeBytes == null || info.size === entry.sizeBytes) return target
   } catch {
     // 未缓存，继续下载
@@ -156,35 +162,39 @@ async function download(deps: Download & { target: string }): Promise<string> {
   try {
     let partialSize = 0
     try {
-      partialSize = (await stat(temp)).size
+      partialSize = (await coreFsPromises.stat(temp)).size
     } catch {
       // 无部分文件，从头下载
     }
     // Without a known total the stream interface cannot prove Range was
     // honored. Restart instead of appending a potentially complete response.
     if (entry.sizeBytes == null || partialSize > entry.sizeBytes) {
-      await rm(temp, { force: true })
+      await coreFsPromises.rm(temp, { force: true })
       partialSize = 0
     }
     if (partialSize > 0 && partialSize === entry.sizeBytes) {
-      await rename(temp, target)
+      await coreFsPromises.rename(temp, target)
       return target
     }
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络文件下载已取消')
       const start = attempt === 0 ? partialSize : 0
-      if (start === 0 && attempt > 0) await rm(temp, { force: true })
-      let stream: NodeJS.ReadableStream
+      if (start === 0 && attempt > 0) await coreFsPromises.rm(temp, { force: true })
+      let stream: NetworkReadableStream
       try {
         stream = await session.readStream(entry.path, signal, { start })
       } catch (error) {
         if (start > 0 && error instanceof NetworkResumeUnsupported) continue
         throw error
       }
-      await pipeline(stream, createWriteStream(temp, { flags: start > 0 ? 'a' : 'w' }), { signal })
-      const completedSize = (await stat(temp)).size
+      await coreStream.pipeline(
+        stream,
+        coreFs.createWriteStream(temp, { flags: start > 0 ? 'a' : 'w' }),
+        { signal }
+      )
+      const completedSize = (await coreFsPromises.stat(temp)).size
       if (entry.sizeBytes == null || completedSize === entry.sizeBytes) {
-        await rename(temp, target)
+        await coreFsPromises.rename(temp, target)
         return target
       }
       // A server that ignored Range returns the whole object. Reset once and
@@ -209,18 +219,18 @@ export function networkCacheDir(musicCacheRoot: string): string {
 export async function getDirectorySize(directory: string): Promise<number> {
   let total = 0
   try {
-    const entries = await readdir(directory, { withFileTypes: true })
+    const entries = await coreFsPromises.readdir(directory, { withFileTypes: true })
     for (const entry of entries) {
       const target = join(directory, entry.name)
       if (entry.isDirectory()) {
         total += await getDirectorySize(target)
       } else {
-        const info = await stat(target)
+        const info = await coreFsPromises.stat(target)
         total += info.size
       }
     }
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    if ((err as { code?: string })?.code !== 'ENOENT') throw err
   }
   return total
 }
@@ -241,11 +251,11 @@ export async function clearDirectory(directory: string): Promise<void> {
   access.clears++
   try {
     await previousClear
-    await mkdir(directory, { recursive: true })
-    for (const entry of await readdir(directory)) {
+    await coreFsPromises.mkdir(directory, { recursive: true })
+    for (const entry of await coreFsPromises.readdir(directory)) {
       const path = join(directory, entry)
       if (!protectedPaths.has(cachePathKey(path))) {
-        await rm(path, { recursive: true, force: true })
+        await coreFsPromises.rm(path, { recursive: true, force: true })
       }
     }
   } finally {
@@ -265,12 +275,14 @@ export async function clearUnpinnedCache(
   const pins = sources.filter(isAbsolute).map((source) => resolve(source))
   // Managed directory links are removed themselves, never traversed for deletion.
   try {
-    if ((await lstat(root)).isSymbolicLink()) await rm(root, { force: true })
+    if ((await coreFsPromises.lstat(root)).isSymbolicLink()) {
+      await coreFsPromises.rm(root, { force: true })
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    if ((error as { code?: string })?.code !== 'ENOENT') throw error
   }
-  await mkdir(root, { recursive: true })
-  for (const entry of await readdir(root, { withFileTypes: true })) {
+  await coreFsPromises.mkdir(root, { recursive: true })
+  for (const entry of await coreFsPromises.readdir(root, { withFileTypes: true })) {
     signal?.throwIfAborted()
     const target = resolve(root, entry.name)
     const key = relative(root, target)
@@ -283,6 +295,6 @@ export async function clearUnpinnedCache(
       })
     )
       continue
-    await rm(target, { recursive: entry.isDirectory(), force: true })
+    await coreFsPromises.rm(target, { recursive: entry.isDirectory(), force: true })
   }
 }

@@ -4,6 +4,7 @@ import type {
   AudioDeviceOption,
   BpmAnalysisResult,
   ConvolverInfo,
+  CorePlatformId,
   LoudnessAnalysisResult,
   NativeAudioMetadata,
   PlaybackInfo,
@@ -16,8 +17,8 @@ export type { DspSceneState } from '../../shared/dspGraph.ts'
 
 export interface AudioEngineScheduler {
   now: () => number
-  setInterval: (callback: () => void, delayMs: number) => NodeJS.Timeout
-  clearInterval: (handle: NodeJS.Timeout) => void
+  setInterval: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>
+  clearInterval: (handle: ReturnType<typeof setInterval>) => void
   setImmediate: (callback: () => void) => void
 }
 
@@ -126,7 +127,7 @@ export interface AudioOutputCommit {
 }
 
 export interface AudioEngineManagerDependencies {
-  platform?: NodeJS.Platform
+  platform?: CorePlatformId
   persistAudioOutput?: (commit: AudioOutputCommit) => void
   persistDeviceProfiles?: (commit: import('./deviceProfiles.ts').DeviceProfileCommit) => void
   nativeBinding?: NativeAudioBinding | null

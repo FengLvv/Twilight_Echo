@@ -1,17 +1,11 @@
-import {
-  createWriteStream,
-  mkdirSync,
-  readdirSync,
-  existsSync,
-  statSync,
-  unlinkSync,
-  utimesSync
-} from 'node:fs'
-import { rename, rm } from 'node:fs/promises'
-import { join, extname, isAbsolute, resolve } from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { coreFs, coreFsPromises, coreProcess, coreStream } from '../ports/index.ts'
+const { createWriteStream, mkdirSync, readdirSync, existsSync, statSync, unlinkSync, utimesSync } = coreFs
+const { rename, rm } = coreFsPromises
+const { Readable, pipeline } = coreStream
+import { join, extname, isAbsolute, resolve } from '../../shared/portablePath.ts'
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+
+
 import { redactSensitiveText } from '../../shared/errors/redactSensitiveText.ts'
 import { getMusicCacheStorageDirectories } from './musicCacheLayout.ts'
 import { NCM_CACHE_MAX_BYTES, planNcmCachePrune } from './ncmCachePrune.ts'
@@ -116,7 +110,7 @@ export function createNcmCache(options: NcmCacheOptions) {
   const pruneDirectories = new Set<string>()
   const writerTargets = new Map<string, number>()
   const pathKey = (path: string) =>
-    process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path)
+    coreProcess.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path)
   function writing(target: string): () => void {
     const key = pathKey(target)
     writerTargets.set(key, (writerTargets.get(key) ?? 0) + 1)

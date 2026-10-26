@@ -1,5 +1,7 @@
-import { randomUUID } from 'node:crypto'
-import { stat } from 'node:fs/promises'
+import { randomUUID } from '../../shared/portableCrypto.ts'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { stat } = coreFsPromises
 import {
   idleLoudnessBatchStatus,
   isLoudnessGroupMeasurement,

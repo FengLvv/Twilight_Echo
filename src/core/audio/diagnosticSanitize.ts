@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash } from '../../shared/portableCrypto.ts'
 
 const SECRET_KEY =
   /password|passwd|secret|cookie|authorization|credential|api[_-]?key|(?:access|refresh|auth|bearer)[_-]?token|^token$|signature|private[_-]?key/i

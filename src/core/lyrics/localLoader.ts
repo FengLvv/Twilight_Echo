@@ -1,4 +1,4 @@
-import { basename, dirname } from 'node:path'
+import { basename, dirname } from '../../shared/portablePath.ts'
 import type { LyricsLoaderOptions } from './loader.ts'
 import { loadLocalLyrics, loadLocalCompanionLyrics } from './loadLyrics.ts'
 

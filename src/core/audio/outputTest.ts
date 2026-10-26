@@ -1,14 +1,17 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
 import type { OutputConfig } from '../../shared/audioEngineTypes.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import portablePath, { join, resolve } from '../../shared/portablePath.ts'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { mkdtemp, rm, writeFile } = coreFsPromises
 
 export const OUTPUT_TEST_DURATION_MS = 1_800
 
 /** Quiet, faded PCM notes: left channel first, then right. */
-export function createOutputTestWav(): Buffer {
+export function createOutputTestWav(): PortableBuffer {
   const rate = 48_000
   const frames = Math.round((rate * OUTPUT_TEST_DURATION_MS) / 1000)
-  const wav = Buffer.alloc(44 + frames * 4)
+  const wav = PortableBuffer.alloc(44 + frames * 4)
   wav.write('RIFF', 0)
   wav.writeUInt32LE(wav.length - 8, 4)
   wav.write('WAVEfmt ', 8)
@@ -144,7 +147,7 @@ export class OutputTest {
         await this.close(session)
         if (
           directory &&
-          resolve(directory).startsWith(resolve(this.dependencies.temporaryDirectory) + sep)
+          resolve(directory).startsWith(resolve(this.dependencies.temporaryDirectory) + portablePath.sep)
         )
           await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
       } finally {

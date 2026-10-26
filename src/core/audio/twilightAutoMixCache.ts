@@ -1,8 +1,11 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, open, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
-import { isAutoMixAnalysisResult, type AutoMixFeatures } from '../../shared/twilightAutoMix.ts'
 import { tryParseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { PortableBuffer } from '../../shared/portableBytes.ts'
+import { createHash, randomUUID } from '../../shared/portableCrypto.ts'
+import { dirname } from '../../shared/portablePath.ts'
+import { isAutoMixAnalysisResult, type AutoMixFeatures } from '../../shared/twilightAutoMix.ts'
+import { coreFsPromises } from '../ports/index.ts'
+
+const { mkdir, open, rename, rm, stat, writeFile } = coreFsPromises
 
 const SHA256 = /^[a-f0-9]{64}$/
 const MODEL_VERSION = /^twilight-automix-native-1:[a-f0-9]{64}:[a-f0-9]{64}$/
@@ -153,11 +156,11 @@ export class TwilightAutoMixWindowCache {
       )
       while (ordered.length > this.limit) delete cache.entries[ordered.shift()!]
       let text = JSON.stringify(cache)
-      while (Buffer.byteLength(text) > MAX_CACHE_BYTES && ordered.length > 1) {
+      while (PortableBuffer.byteLength(text) > MAX_CACHE_BYTES && ordered.length > 1) {
         delete cache.entries[ordered.shift()!]
         text = JSON.stringify(cache)
       }
-      if (Buffer.byteLength(text) > MAX_CACHE_BYTES)
+      if (PortableBuffer.byteLength(text) > MAX_CACHE_BYTES)
         throw new Error('AutoMix cache budget exceeded')
       await mkdir(dirname(this.file), { recursive: true })
       const temporary = `${this.file}.${randomUUID()}.tmp`
@@ -222,7 +225,7 @@ export class TwilightAutoMixWindowCache {
       try {
         const size = (await handle.stat()).size
         if (size > MAX_CACHE_BYTES) return { version: 1, entries: {} }
-        const bytes = Buffer.allocUnsafe(size + 1)
+        const bytes = PortableBuffer.allocUnsafe(size + 1)
         let count = 0
         while (count < bytes.length) {
           const { bytesRead } = await handle.read(bytes, count, bytes.length - count, null)
@@ -274,6 +277,15 @@ export class TwilightAutoMixWindowCache {
   }
 }
 
+interface BigIntFileStats {
+  isFile(): boolean
+  dev: bigint
+  ino: bigint
+  size: bigint
+  mtimeNs: bigint
+  ctimeNs: bigint
+}
+
 /** Worker/control path only. Caller must first resolve the existing authorization.
  * Hash the actual open file and reject replacement/mutation during the read. */
 export async function identifyTwilightAutoMixFile(
@@ -283,11 +295,11 @@ export async function identifyTwilightAutoMixFile(
   signal?.throwIfAborted()
   const file = await open(authorizedPath, 'r')
   try {
-    const before = await file.stat({ bigint: true })
+    const before = (await file.stat({ bigint: true })) as unknown as BigIntFileStats
     if (!before.isFile() || before.size <= 0n)
       throw new Error('AutoMix needs a regular, nonempty audio source')
     const hash = createHash('sha256'),
-      buffer = Buffer.allocUnsafe(128 * 1024)
+      buffer = PortableBuffer.allocUnsafe(128 * 1024)
     let total = 0n
     while (true) {
       signal?.throwIfAborted()
@@ -297,8 +309,8 @@ export async function identifyTwilightAutoMixFile(
       if (total > before.size) throw new Error('AutoMix source changed while hashing')
       hash.update(buffer.subarray(0, bytesRead))
     }
-    const after = await file.stat({ bigint: true }),
-      current = await stat(authorizedPath, { bigint: true })
+    const after = (await file.stat({ bigint: true })) as unknown as BigIntFileStats,
+      current = (await stat(authorizedPath, { bigint: true })) as unknown as BigIntFileStats
     for (const observed of [after, current]) {
       if (
         observed.dev !== before.dev ||

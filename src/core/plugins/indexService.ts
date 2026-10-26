@@ -1,9 +1,16 @@
-import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, open, readFile, rm, stat, writeFile, type FileHandle } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { PortableBuffer, bytesToUtf8 } from '../../shared/portableBytes.ts'
+import {
+   dirname,
+  fileURLToPath,
+  isAbsolute,
+  join,
+  pathToFileURL,
+  relative,
+  resolve,
+  sep
+} from '../../shared/portablePath.ts'
+import { coreFs, coreFsPromises, coreOs, type PortableFileHandle } from '../ports/index.ts'
 import {
   OFFICIAL_PLUGIN_INDEX_URL,
   createPluginIndexEntryFingerprint,
@@ -26,6 +33,10 @@ import type {
 } from './types'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
 import { LEGACY_GITHUB_PLUGIN_INDEX_URL } from '../../shared/pluginDistribution.ts'
+
+const { existsSync } = coreFs
+const { mkdir, mkdtemp, open, readFile, rm, stat, writeFile } = coreFsPromises
+const { tmpdir } = coreOs
 
 interface PluginIndexRaw {
   schemaVersion: number
@@ -759,7 +770,7 @@ export class PluginIndexService {
     const filePath = source.startsWith('file://') ? fileUrlToPath(source) : resolve(source)
     const data = await readFile(filePath)
     if (data.byteLength > this.indexSizeLimitBytes) throw new Error('插件索引文件过大')
-    return data.toString('utf-8')
+    return bytesToUtf8(data)
   }
 
   private async readRemoteIndex(
@@ -789,7 +800,7 @@ export class PluginIndexService {
     limitBytes: number,
     headers?: Record<string, string>
   ): Promise<{
-    buffer: Buffer
+    buffer: PortableBuffer
     responseUrl: string
     redirected: boolean
     status: number
@@ -963,17 +974,17 @@ export class PluginIndexService {
     response: Response,
     limitBytes: number,
     controller: AbortController
-  ): Promise<Buffer> {
-    const chunks: Buffer[] = []
+  ): Promise<PortableBuffer> {
+    const chunks: PortableBuffer[] = []
     const totalBytes = await consumeResponseBody(
       response,
       limitBytes,
       controller,
       async (chunk) => {
-        chunks.push(Buffer.from(chunk))
+        chunks.push(PortableBuffer.from(chunk))
       }
     )
-    return Buffer.concat(chunks, totalBytes)
+    return PortableBuffer.concat(chunks, totalBytes)
   }
 
   private async writeResponsePackage(
@@ -1016,7 +1027,7 @@ export class PluginIndexService {
       let receivedBytes = 0
       try {
         while (true) {
-          const chunk = Buffer.allocUnsafe(PACKAGE_STREAM_CHUNK_BYTES)
+          const chunk = PortableBuffer.allocUnsafe(PACKAGE_STREAM_CHUNK_BYTES)
           const { bytesRead } = await source.read(chunk, 0, chunk.byteLength, null)
           if (bytesRead === 0) return
           const data = chunk.subarray(0, bytesRead)
@@ -1036,10 +1047,10 @@ export class PluginIndexService {
   private async writePackage(
     packagePath: string,
     copy: (writeChunk: (chunk: Uint8Array) => Promise<void>) => Promise<void>,
-    existingBytes?: Buffer,
+    existingBytes?: Uint8Array,
     resumeFrom = 0
   ): Promise<string> {
-    let handle: FileHandle | null = null
+    let handle: PortableFileHandle | null = null
     let position = 0
     const hash = createHash('sha256')
     try {
@@ -1182,7 +1193,11 @@ function addBoundedBytes(receivedBytes: number, chunkBytes: number, limitBytes: 
   return receivedBytes + chunkBytes
 }
 
-async function writeAll(handle: FileHandle, chunk: Uint8Array, position: number): Promise<number> {
+async function writeAll(
+  handle: PortableFileHandle,
+  chunk: Uint8Array,
+  position: number
+): Promise<number> {
   let sourceOffset = 0
   let targetPosition = position
   while (sourceOffset < chunk.byteLength) {

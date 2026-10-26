@@ -1,4 +1,4 @@
-import { open, type FileHandle } from 'node:fs/promises'
+import { coreFsPromises, type PortableFileHandle } from '../ports/index.ts'
 import { lexicalPathKey } from '../persistence/pathGrants.ts'
 
 /** Platforms and filesystems that cannot honour an explicit flush of an already-written file. */
@@ -22,9 +22,9 @@ const UNAVAILABLE_FLUSH_CODES = new Set([
  * barrier must not discard it.
  */
 export async function flushFileToDisk(filePath: string): Promise<void> {
-  let handle: FileHandle
+  let handle: PortableFileHandle
   try {
-    handle = await open(filePath, 'r+')
+    handle = await coreFsPromises.open(filePath, 'r+')
   } catch (error) {
     if (isUnavailableFlushError(error)) return
     throw error
@@ -72,6 +72,6 @@ export function selectDownloadTargetRoot(requested: unknown, roots: readonly str
 }
 
 function isUnavailableFlushError(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException | null)?.code
+  const code = (error as { code?: unknown } | null)?.code
   return typeof code === 'string' && UNAVAILABLE_FLUSH_CODES.has(code)
 }

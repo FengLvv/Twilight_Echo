@@ -1,10 +1,21 @@
-import type { FileInfo } from 'basic-ftp'
-import { PassThrough } from 'node:stream'
+import { coreFtp, coreStream } from '../../ports/index.ts'
 import { buildNetworkEntryId, normalizeRemotePath } from '../networkPath.ts'
 import { NetworkSourceFailure } from '../errors.ts'
 import { entryKind } from '../entryKinds.ts'
 import type { NetworkEntry, NetworkSourceProfile } from '../../../shared/networkSources.ts'
-import type { NetworkAuth, NetworkSourceAdapter, NetworkSourceSession } from './types.ts'
+import type {
+  NetworkAuth,
+  NetworkReadableStream,
+  NetworkSourceAdapter,
+  NetworkSourceSession
+} from './types.ts'
+
+interface FtpFileInfo {
+  name: string
+  type: number
+  size: number
+  modifiedAt?: Date
+}
 
 function toFailure(err: unknown): NetworkSourceFailure {
   if (err instanceof NetworkSourceFailure) return err
@@ -29,7 +40,7 @@ export function createFtpAdapter(options: { verbose?: boolean } = {}): NetworkSo
       profile: NetworkSourceProfile,
       auth: NetworkAuth
     ): Promise<NetworkSourceSession> {
-      const { Client, FileType } = await import('basic-ftp')
+      const { Client, FileType } = coreFtp
       const client = new Client(profile.options.transferTimeoutMs)
       if (options.verbose) client.ftp.verbose = true
       let connected = false
@@ -77,7 +88,7 @@ export function createFtpAdapter(options: { verbose?: boolean } = {}): NetworkSo
         }
       }
 
-      function toEntry(info: FileInfo, parentPath: string): NetworkEntry {
+      function toEntry(info: FtpFileInfo, parentPath: string): NetworkEntry {
         const name = info.name
         const path = parentPath === '/' ? `/${name}` : `${normalizeRemotePath(parentPath)}/${name}`
         const normalized = normalizeRemotePath(path)
@@ -99,7 +110,7 @@ export function createFtpAdapter(options: { verbose?: boolean } = {}): NetworkSo
           return operation(signal, async () => {
             const parent = normalizeRemotePath(remotePath)
             try {
-              const infos = await client.list(parent)
+              const infos: FtpFileInfo[] = await client.list(parent)
               return infos.map((info) => toEntry(info, parent))
             } catch (err) {
               throw toFailure(err)
@@ -136,9 +147,9 @@ export function createFtpAdapter(options: { verbose?: boolean } = {}): NetworkSo
           remotePath: string,
           signal?: AbortSignal,
           options?: { start?: number }
-        ): Promise<NodeJS.ReadableStream> {
+        ): Promise<NetworkReadableStream> {
           if (signal?.aborted) throw new NetworkSourceFailure('timeout', '网络文件读取已取消')
-          const stream = new PassThrough()
+          const stream = new coreStream.PassThrough()
           const onAbort = (): void => {
             stream.destroy(new Error('download aborted'))
             client.close()
@@ -151,7 +162,7 @@ export function createFtpAdapter(options: { verbose?: boolean } = {}): NetworkSo
           void operation(signal, async () => {
             await client.downloadTo(stream, normalizeRemotePath(remotePath), options?.start ?? 0)
           }).catch((error) => stream.destroy(toFailure(error)))
-          return stream
+          return stream as unknown as NetworkReadableStream
         },
         async resolvePlaybackUrl(): Promise<string | null> {
           // FTP/FTPS 无 URL 播放能力，一律走缓存下载。

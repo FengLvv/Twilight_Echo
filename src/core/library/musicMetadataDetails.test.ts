@@ -561,7 +561,7 @@ test('v17 upgrades preserve targets, overrides, source membership and running jo
   db.close()
   db = new LibraryDatabase(path)
   try {
-    assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 29)
+    assert.equal(db.sql.prepare('PRAGMA user_version').get()!.user_version, 30)
     assert.equal(db.identificationDetail(entityId).link!.targetId, targetId)
     assert.equal(db.metadataDetail(entityId, 'en').introduction?.value, 'My album notes')
     db.metadataRecover(3000)

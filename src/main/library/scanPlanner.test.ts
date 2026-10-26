@@ -174,7 +174,7 @@ test('startup planning remains linear for 25000 indexed files', () => {
 })
 
 function identity(filePath: string, size: number, mtimeMs: number): LocalLibraryFileIdentity {
-  return { filePath, size, mtimeMs, metadataVersion: 1 }
+  return { filePath, size, mtimeMs, metadataVersion: 2 }
 }
 
 test('unchanged legacy files backfill dates once while changed files get a normal parse', () => {

@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createHash } from '../../shared/portableCrypto.ts'
+import { coreFsPromises } from '../ports/index.ts'
+import { join } from '../../shared/portablePath.ts'
 import { assertPluginPackageFileSize } from './packageSecurity.ts'
 import type {
   TwilightPluginInstallEvidence,
@@ -8,6 +8,8 @@ import type {
   TwilightPluginSignatureStatus,
   TwilightPluginVerificationLevel
 } from './types.ts'
+
+const { readFile, writeFile } = coreFsPromises
 
 const signatureStatusLabels: Record<TwilightPluginSignatureStatus, string> = {
   missing: '缺失',

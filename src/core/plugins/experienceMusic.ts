@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID } from '../../shared/portableCrypto.ts'
 import type { TwilightPluginManager } from './manager.ts'
 import type { createExperienceDocuments } from './experienceDocuments.ts'
 import type { MusicAlbum } from '../../shared/rhineMusic.ts'

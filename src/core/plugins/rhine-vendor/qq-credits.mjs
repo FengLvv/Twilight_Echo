@@ -1,7 +1,6 @@
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
-import OpenCC from 'opencc-js'
+import { coreFsPromises as fs, coreText } from '../../ports/index.ts'
+import path from '../../../shared/portablePath.ts'
+import { createHash, randomUUID } from '../../../shared/portableCrypto.ts'
 
 // Native, read-only requests to QQ's public metadata service. Request shapes were
 // checked against the public service on 2026-10-01; no cookies or signing code.
@@ -12,7 +11,11 @@ const DAY = 86_400_000
 const sharedQueue = { chain: Promise.resolve(), lastStart: -Infinity, retryAt: 0 }
 // eslint-disable-next-line no-control-regex -- Strip control characters from source metadata.
 const clean = (value) => typeof value === 'string' ? value.normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 240) : ''
-const simplified = OpenCC.Converter({ from: 'hk', to: 'cn' })
+let simplifiedConverter = null
+const simplified = (text) => {
+  if (!simplifiedConverter) simplifiedConverter = coreText.opencc.Converter({ from: 'hk', to: 'cn' })
+  return simplifiedConverter(text)
+}
 const normalize = (value) => simplified(clean(value)).toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '')
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 const stamp = (value) => new Date(value).toISOString()

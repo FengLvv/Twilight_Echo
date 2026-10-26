@@ -1,7 +1,15 @@
-import OpenCC from 'opencc-js'
+import { coreText } from '../../ports/index.ts'
 
-const simplified = OpenCC.Converter({ from: 'hk', to: 'cn' })
-const traditional = OpenCC.Converter({ from: 'cn', to: 'tw' })
+let simplifiedConverter = null
+let traditionalConverter = null
+const simplified = (text) => {
+  if (!simplifiedConverter) simplifiedConverter = coreText.opencc.Converter({ from: 'hk', to: 'cn' })
+  return simplifiedConverter(text)
+}
+const traditional = (text) => {
+  if (!traditionalConverter) traditionalConverter = coreText.opencc.Converter({ from: 'cn', to: 'tw' })
+  return traditionalConverter(text)
+}
 const unique = (values) => [...new Set(values.filter(Boolean))]
 const clean = (value) => typeof value === 'string' ? value.trim().normalize('NFKC').replace(/[‘’′]/g, "'").replace(/[“”]/g, '"') : ''
 const now = () => new Date().toISOString()

@@ -1,3 +1,4 @@
+import '../../adapters-node/index.ts'
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import {

@@ -21,7 +21,7 @@ export class AutoMixStemInstaller extends CoreInstaller {
       probe: (directory, signal) =>
         (options.probe ?? probeStemRuntime)(directory, options.workerDirectory(), signal),
       decodeLzma: (input, bytes, signal) =>
-        decodeStemZipLzma(input, bytes, join(options.workerDirectory(), '7za.exe'), signal)
+        decodeStemZipLzma(input as any, bytes, join(options.workerDirectory(), '7za.exe'), signal) as any
     })
   }
 }

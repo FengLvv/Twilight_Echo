@@ -77,6 +77,26 @@ const SPONSORS: readonly Sponsor[] = [
   {
     id: 'afdian-user-3adb7',
     name: '爱发电用户_3adb7'
+  },
+  {
+    id: 'kobe-kotori',
+    name: '神戶小鳥'
+  },
+  {
+    id: 'yuediao-xiaogui',
+    name: '月调的小桂'
+  },
+  {
+    id: 'lengying-zz',
+    name: '冷莺zz'
+  },
+  {
+    id: 'supernova-burning-little-asteroid-belt',
+    name: '超新星燃烧小小行星带'
+  },
+  {
+    id: 'lotywe',
+    name: 'lotywe'
   }
 ]
 

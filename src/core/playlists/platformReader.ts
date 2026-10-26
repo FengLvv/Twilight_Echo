@@ -1,3 +1,4 @@
+import { PortableBuffer } from '../../shared/portableBytes.ts'
 import { recognizePlaylistLink, type PlaylistImportPage, type ImportSong, type PlaylistLink } from '../../shared/externalPlaylist.ts'
 
 import type { PlaylistReadCredentials } from '../../shared/coreImports.ts'
@@ -71,7 +72,7 @@ export async function readOfficialPlaylistPage(request: PlaylistReadRequest, fet
     if (response.status===429) throw new Error('RATE_LIMIT: 平台请求限流，请稍后重试')
     if (!response.ok) throw new Error(`NETWORK: 平台读取失败（HTTP ${response.status}），请重试或使用文件导入`)
     const raw=await response.text()
-    if (Buffer.byteLength(raw)>8*1024*1024) throw new Error('平台单页响应超过 8 MiB')
+    if (PortableBuffer.byteLength(raw)>8*1024*1024) throw new Error('平台单页响应超过 8 MiB')
     return JSON.parse(raw)
   }
   if (link.platform==='qq') {
