@@ -316,16 +316,15 @@
   gap: calc(var(--te-player-control-gap, 12px) * 5 / 6);
 }
 
-/* Related controls sit closer together; whitespace marks the next function
-   without adding another glass container around each group. */
+/* Keep the standard utility icons on one evenly spaced row. */
 .player-bar:not(.player-bar-mini):not(.player-bar-compact) .player-right {
   gap: 4px;
 }
 
 .player-bar:not(.player-bar-mini):not(.player-bar-compact)
   .player-right
-  > :is(.volume-anchor, .mini-player-btn):not(:first-child) {
-  margin-inline-start: 8px;
+  :is(.icon-btn, .mode-btn-right) {
+  font-size: 18px;
 }
 
 .player-bar > .player-left {
@@ -1230,18 +1229,14 @@ html[data-te-motion='off'] .player-bar :deep(.ab-loop-range) {
 }
 
 .desktop-lyrics-icon {
-  box-sizing: border-box;
   display: grid;
   place-items: center;
   width: 18px;
   height: 18px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
   font-family: var(--te-font-sans);
-  font-size: calc(var(--te-font-size-body, 14px) * 11 / 14);
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0;
 }
 
 .desktop-lyrics-btn,

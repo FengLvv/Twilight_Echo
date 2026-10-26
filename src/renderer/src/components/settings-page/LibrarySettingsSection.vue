@@ -9,6 +9,10 @@ import type {
   LocalLibraryScanStatus
 } from '../../../../shared/localLibraryScan.ts'
 import { canResumeLocalLibraryScan } from '../../utils/libraryScanPresentation.ts'
+import {
+  libraryWatcherAttention,
+  libraryWatcherErrorText
+} from '../../utils/libraryWatcherPresentation.ts'
 import type { BooleanSettingKey } from './types.ts'
 const { settings } = useSettingsStore()
 const genreSeparatorsDraft = ref(settings.value.genreSeparators)
@@ -124,7 +128,7 @@ defineProps<{
         libraryResetMessage ||
         (libraryScanStatus.state === 'failed' ? libraryScanProgressText : '') ||
         libraryMetadataEnrichmentError ||
-        libraryWatcherStatus?.folders.find((folder) => folder.lastError)?.lastError ||
+        libraryWatcherAttention(libraryWatcherStatus?.folders) ||
         ''
       "
       ><div class="setting-list">
@@ -178,7 +182,9 @@ defineProps<{
                 事件 {{ formatWatcherTime(item.lastEventAt) }} · 检查
                 {{ formatWatcherTime(item.lastReconcileAt) }}
               </span>
-              <span v-if="item.lastError" class="watcher-status-error">{{ item.lastError }}</span>
+              <span v-if="item.lastError" class="watcher-status-error">{{
+                libraryWatcherErrorText(item.lastError)
+              }}</span>
             </div>
           </div>
         </div>

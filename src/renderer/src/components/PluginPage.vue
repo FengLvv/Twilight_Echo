@@ -1111,10 +1111,10 @@ onUnmounted(() => {
 }
 
 .switch {
-  width: 36px;
-  height: 20px;
+  width: var(--te-switch-width);
+  height: var(--te-switch-height);
   background: var(--te-border-color, #e5e7eb);
-  border-radius: 20px;
+  border-radius: var(--te-control-radius-pill);
   position: relative;
   cursor: pointer;
   transition: background 0.2s;
@@ -1123,10 +1123,10 @@ onUnmounted(() => {
 .switch::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
+  top: var(--te-switch-inset);
+  left: var(--te-switch-inset);
+  width: var(--te-switch-thumb);
+  height: var(--te-switch-thumb);
   background: #fff; /* keep-white: toggle knob */
   border-radius: 50%;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1138,7 +1138,7 @@ onUnmounted(() => {
 }
 
 .switch.on::after {
-  transform: translateX(16px);
+  transform: translateX(var(--te-switch-travel));
 }
 
 /* Main Content */
@@ -1176,7 +1176,7 @@ onUnmounted(() => {
 
 .search-box:focus-within {
   background: var(--te-card-bg);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--te-control-focus-color) 20%, transparent);
 }
 
 .search-box i {

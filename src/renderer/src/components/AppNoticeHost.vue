@@ -413,9 +413,6 @@ defineExpose({ historyOpen, toggleHistory })
 .notice-icon-button {
   display: grid;
   place-items: center;
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
   border-radius: 8px;
   color: var(--notice-muted);
   background: transparent;

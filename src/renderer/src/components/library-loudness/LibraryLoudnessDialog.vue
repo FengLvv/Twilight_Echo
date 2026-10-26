@@ -428,6 +428,12 @@ label {
 input {
   accent-color: var(--accent-color, #6958cb);
 }
+.loudness-options input[type='radio'] {
+  flex: 0 0 auto;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0;
+}
 .loudness-options {
   justify-content: space-between;
   flex-wrap: wrap;

@@ -112,7 +112,7 @@ const emit = defineEmits<{
   font: inherit;
 }
 .track-search:focus-within {
-  color: var(--stage-accent);
+  color: var(--te-control-focus-color);
 }
 .track-count {
   font-size: 0.8em;
@@ -157,9 +157,13 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
-select:focus-visible,
-.track-search:focus-within {
+select:focus-visible {
   outline: 2px solid var(--stage-accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.track-search:focus-within {
+  outline: 2px solid var(--te-control-focus-color);
   outline-offset: 3px;
   border-radius: 8px;
 }

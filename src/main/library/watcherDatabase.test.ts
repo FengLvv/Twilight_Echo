@@ -9,18 +9,34 @@ import type { LocalLibraryWatchChange } from '../../shared/localLibraryScan.ts'
 import { LibraryWatcherPoller } from './libraryWatcherPolling.ts'
 import * as extensions from './watcherExtensions.ts'
 
-function fixture() {
+function fixture(
+  options: {
+    platform?: string
+    watch?: (
+      folder: string,
+      watchOptions: { recursive?: boolean },
+      callback: (type: string, name: string | null) => void
+    ) => EventEmitter & { close(): void }
+  } = {}
+) {
   let callback!: (type: string, name: string | null) => void
   const pending = new Map<number, () => void>()
   let sequence = 0
   const deliveries: LocalLibraryWatchChange[][] = []
+  const watchCalls: { folder: string; recursive: boolean }[] = []
   const watch = Object.assign(new EventEmitter(), { close() {} })
   const exports: {
     createLibraryWatchers?: typeof import('../../core/library/watcher.ts').createLibraryWatchers
   } = {}
   const dependencies: Record<string, unknown> = {
     'node:fs': {
-      watch: (_folder: string, _options: object, cb: typeof callback) => {
+      watch: (
+        folder: string,
+        watchOptions: { recursive?: boolean },
+        cb: typeof callback
+      ) => {
+        watchCalls.push({ folder, recursive: watchOptions?.recursive === true })
+        if (options.watch) return options.watch(folder, watchOptions, cb)
         callback = cb
         return watch
       },
@@ -40,7 +56,7 @@ function fixture() {
     {
       exports,
       console,
-      process: { platform: 'win32' },
+      process: { platform: options.platform ?? 'win32' },
       require: (id: string) => {
         assert.ok(id in dependencies, id)
         return dependencies[id]
@@ -56,7 +72,7 @@ function fixture() {
   )
   const root = path.resolve('media')
   const watchers = exports.createLibraryWatchers!({
-    platform: 'win32',
+    platform: options.platform ?? 'win32',
     now: () => new Date(),
     debounceMs: () => 350,
     database: () => ({
@@ -73,6 +89,11 @@ function fixture() {
     root,
     deliveries,
     pending,
+    watchCalls,
+    watch,
+    status() {
+      return watchers.snapshot([root], true).folders[0]
+    },
     emit(name: string) {
       callback('change', name)
     },
@@ -109,5 +130,48 @@ test('native SQLite event staging stays bounded when more than 256 directories c
     JSON.stringify(f.deliveries[0]),
     JSON.stringify([{ kind: 'reconcile', path: f.root }])
   )
+  f.stop()
+})
+
+test('Linux arms a recursive watcher instead of pre-emptively demoting to polling', () => {
+  const f = fixture({ platform: 'linux' })
+  // The regression: no arm attempt was ever made on Linux, so the folder was
+  // reported degraded with the internal 'linux-recursive-watch-unsupported' code.
+  assert.deepEqual(f.watchCalls, [{ folder: f.root, recursive: true }])
+  const status = f.status()
+  assert.equal(status.state, 'active')
+  assert.equal(status.mode, 'recursive')
+  assert.equal(status.lastError, null)
+  f.stop()
+})
+
+test('a non-recoverable arming error still falls back to polling on Linux', () => {
+  const f = fixture({
+    platform: 'linux',
+    watch: () => {
+      throw Object.assign(new Error('inotify watch limit reached'), { code: 'ENOSPC' })
+    }
+  })
+  const status = f.status()
+  assert.equal(status.state, 'degraded')
+  assert.equal(status.mode, 'polling')
+  assert.equal(status.lastError, 'ENOSPC')
+  f.stop()
+})
+
+test('a transient arming error is retried instead of demoting the folder to polling', () => {
+  const f = fixture({
+    platform: 'linux',
+    watch: () => {
+      throw Object.assign(new Error('device temporarily unavailable'), { code: 'EIO' })
+    }
+  })
+  // Re-arming is scheduled, so the folder is not permanently demoted to polling.
+  const status = f.status()
+  assert.equal(status.mode, 'none')
+  assert.notEqual(status.mode, 'polling')
+  assert.equal(status.lastError, 'EIO')
+  // One timer re-arms the watcher; the other flushes the compensating reconcile.
+  assert.equal(f.pending.size, 2)
   f.stop()
 })

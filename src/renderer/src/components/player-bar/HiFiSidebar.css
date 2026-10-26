@@ -763,6 +763,10 @@ html[data-theme='dark'] .deck .deck-card {
   color: var(--d-ink) !important;
 }
 
+html[data-theme='dark'] .deck .deck-lyric-source-controls select option {
+  background: var(--te-neutral-100) !important;
+}
+
 .deck-lyric-source-controls select:focus-visible,
 .deck-translation-toggle:focus-visible {
   outline: 2px solid var(--d-accent);
@@ -1125,7 +1129,7 @@ html[data-theme='dark'] .deck .deck-card {
 
 html[data-theme='dark'] .deck .deck-select option {
   color: var(--d-ink) !important;
-  background: var(--d-card) !important;
+  background: var(--te-neutral-100) !important;
 }
 
 html[data-theme='dark'] .deck .deck-select {

@@ -389,8 +389,9 @@ h1 {
   gap: 4px;
 }
 .card-actions button {
-  width: 27px;
-  min-height: 27px;
+  width: var(--te-control-height-sm);
+  height: var(--te-control-height-sm);
+  min-height: var(--te-control-height-sm);
   padding: 0;
   border: 0;
   background: transparent;
@@ -469,5 +470,9 @@ h1 {
   .playlist-grid {
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   }
+}
+.library-toolbar label:focus-within {
+  border-color: color-mix(in srgb, var(--te-control-focus-color) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--te-control-focus-color) 12%, transparent);
 }
 </style>
