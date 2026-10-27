@@ -798,3 +798,59 @@ test('platform UI lifetime is cancelled before a crashed Core can be replaced', 
   assert.equal(supervisor.getStatus().phase, 'ready')
   assert.equal(old.sent.filter((row) => row.message.kind === 'core:platform-response').length, 0)
 })
+
+test('core:service-close silences audio and audio-test peers before terminating their process', async (t) => {
+  const { supervisor, children } = fixture(t)
+  const started = supervisor.start()
+  const core = children[0].child
+  core.boot()
+  await started
+  for (const service of ['audio', 'audio-test'] as const) {
+    core.emit('message', {
+      kind: 'core:service-open',
+      epoch: core.epoch,
+      leaseId: service,
+      service
+    })
+  }
+  const music = children[1].child
+  const outputTest = children[2].child
+  music.stopReply = false
+  outputTest.stopReply = false
+
+  core.emit('message', {
+    kind: 'core:service-close',
+    epoch: core.epoch,
+    leaseId: 'audio'
+  })
+  core.emit('message', {
+    kind: 'core:service-close',
+    epoch: core.epoch,
+    leaseId: 'audio-test'
+  })
+
+  // Process must NOT be killed before supervisor:audio-stopped is acknowledged (or times out).
+  assert.equal(music.kills, 0)
+  assert.equal(outputTest.kills, 0)
+  const musicStop = music.sent.find((row) => row.message.kind === 'supervisor:stop-audio')
+  const testStop = outputTest.sent.find((row) => row.message.kind === 'supervisor:stop-audio')
+  assert.ok(musicStop)
+  assert.ok(testStop)
+
+  music.emit('message', {
+    kind: 'supervisor:audio-stopped',
+    requestId: musicStop.message.requestId,
+    stopped: true
+  })
+  await tick()
+  assert.equal(music.kills, 1)
+  assert.equal(outputTest.kills, 0)
+
+  outputTest.emit('message', {
+    kind: 'supervisor:audio-stopped',
+    requestId: testStop.message.requestId,
+    stopped: true
+  })
+  await tick()
+  assert.equal(outputTest.kills, 1)
+})

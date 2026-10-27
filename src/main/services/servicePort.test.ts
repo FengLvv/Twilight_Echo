@@ -82,3 +82,18 @@ test('lease connection buffers only unsent messages; detach never replays a sent
   assert.throws(() => lease.postMessage(request), /closed/)
   launcher.destroy()
 })
+test('service port notifies onClose when peer or parent port closes', () => {
+  const parent = new Port()
+  const peer = new Port()
+  const closedSources: Array<'peer' | 'parent'> = []
+  createServicePort({
+    parent,
+    peerMode: true,
+    onClose: (source) => closedSources.push(source)
+  })
+  parent.emit('message', { data: { kind: 'core:attach-service' }, ports: [peer] })
+  peer.emit('close')
+  assert.deepEqual(closedSources, ['peer'])
+  parent.emit('close')
+  assert.deepEqual(closedSources, ['peer', 'parent'])
+})

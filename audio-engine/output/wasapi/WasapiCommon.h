@@ -128,6 +128,112 @@ inline bool isDeviceInUse(HRESULT hr) {
   return hr == AUDCLNT_E_DEVICE_IN_USE;
 }
 
+inline constexpr int kExclusiveDeviceInUseRetryDelaysMs[] = {25, 50, 75, 100, 150, 200};
+
+inline bool shouldRetryExclusiveInitWithDefaultPeriod(
+    HRESULT hr,
+    REFERENCE_TIME requestedDuration,
+    REFERENCE_TIME defaultPeriod) {
+  if (defaultPeriod <= requestedDuration) return false;
+  if (isDeviceInUse(hr) || isDeviceInvalidated(hr)) return false;
+  if (hr == AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED || hr == AUDCLNT_E_ENDPOINT_CREATE_FAILED) {
+    return false;
+  }
+  return true;
+}
+
+struct ExclusiveEndpointHolder {
+  uint32_t pid = 0;
+  std::string processName;
+  bool isSelfExecutable = false;
+  bool isZombieProcess = false;
+};
+
+struct ExclusiveInitFailureClassification {
+  const char* reasonCode = "backend_open_failure";
+  std::string message;
+};
+
+inline ExclusiveInitFailureClassification describeExclusiveInitFailure(
+    HRESULT hr,
+    const std::string& formatSummary,
+    const std::vector<ExclusiveEndpointHolder>& holders = {}) {
+  if (isDeviceInUse(hr)) {
+    for (const auto& holder : holders) {
+      if (holder.isSelfExecutable && holder.isZombieProcess) {
+        return {
+            "device_in_use",
+            "WASAPI 独占初始化失败：音频设备被未退出的旧 TwilightEcho 进程 (PID " +
+                std::to_string(holder.pid) +
+                ") 持续占用（USB 音频驱动可能卡死，请尝试重新插拔 DAC 或重启电脑）",
+        };
+      }
+    }
+    for (const auto& holder : holders) {
+      if (holder.isSelfExecutable) {
+        return {
+            "device_in_use",
+            "WASAPI 独占初始化失败：音频设备正被旧 TwilightEcho 音频进程 (PID " +
+                std::to_string(holder.pid) + ") 占用",
+        };
+      }
+    }
+    if (!holders.empty()) {
+      std::string holderText;
+      for (size_t i = 0; i < holders.size(); ++i) {
+        if (i > 0) holderText += ", ";
+        holderText += holders[i].processName.empty() ? "未知进程" : holders[i].processName;
+        if (holders[i].pid != 0) {
+          holderText += " (PID " + std::to_string(holders[i].pid) + ")";
+        }
+      }
+      return {
+          "device_in_use",
+          "WASAPI 独占初始化失败：音频设备正被其他程序占用（" + holderText + "）",
+      };
+    }
+    return {
+        "device_in_use",
+        "WASAPI 独占初始化失败：音频设备正被其他程序或驱动占用",
+    };
+  }
+  if (hr == AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED) {
+    return {
+        "exclusive_not_allowed",
+        "WASAPI 独占初始化失败：系统或设备未允许独占模式（请检查系统声音设置中的独占模式选项）",
+    };
+  }
+  if (isDeviceInvalidated(hr)) {
+    return {
+        "device_invalidated",
+        "WASAPI 独占初始化失败：音频设备已断开或系统音频服务未运行",
+    };
+  }
+  if (hr == AUDCLNT_E_ENDPOINT_CREATE_FAILED) {
+    return {
+        "endpoint_create_failed",
+        "WASAPI 独占初始化失败：无法创建硬件音频端点（驱动可能未就绪或仍处于占用状态）",
+    };
+  }
+  if (hr == AUDCLNT_E_CPUUSAGE_EXCEEDED) {
+    return {
+        "backend_open_failure",
+        "WASAPI 独占初始化失败：音频引擎保护时长或 CPU 占用超限",
+    };
+  }
+  if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED || hr == AUDCLNT_E_BUFFER_SIZE_ERROR ||
+      hr == AUDCLNT_E_INVALID_DEVICE_PERIOD) {
+    return {
+        "backend_open_failure",
+        "WASAPI 独占初始化失败：设备拒绝请求的缓冲周期或缓冲区大小",
+    };
+  }
+  return {
+      "backend_open_failure",
+      "WASAPI 独占 init failure：设备拒绝协商格式 " + formatSummary,
+  };
+}
+
 inline bool isDefaultDeviceAlias(const std::string& deviceId) {
   return deviceId.empty() || deviceId == "auto" || deviceId == "default" || deviceId == "System Default" ||
          deviceId == "system default" || deviceId == "system-default" || deviceId == "系统默认";
