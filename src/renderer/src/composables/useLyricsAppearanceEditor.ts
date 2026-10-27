@@ -3,6 +3,7 @@ import {
   DEFAULT_LYRICS_APPEARANCE,
   cloneLyricsAppearance,
   normalizeLyricsAppearance,
+  patchLyricsTargetStyle,
   syncLegacyLyricsAppearance,
   LYRICS_STYLE_TARGETS,
   type LyricsAppearanceSettings,
@@ -50,6 +51,7 @@ export interface LyricsAppearanceEditor {
     key: K,
     value: LyricsAppearanceSettings[K]
   ) => void
+  syncFontToAll: () => void
   syncFontSizeToAll: () => void
   resetTarget: () => void
   resetAll: () => void
@@ -119,13 +121,7 @@ export function useLyricsAppearanceEditor(): LyricsAppearanceEditor {
   }
 
   function patchStyle<K extends keyof LyricsTextStyle>(key: K, value: LyricsTextStyle[K]): void {
-    commit({
-      ...draft.value,
-      styles: {
-        ...draft.value.styles,
-        [activeTarget.value]: { ...style.value, [key]: value }
-      }
-    })
+    commit(patchLyricsTargetStyle(draft.value, activeTarget.value, { [key]: value }))
   }
 
   function setGlobal<K extends keyof LyricsAppearanceSettings>(
@@ -140,6 +136,15 @@ export function useLyricsAppearanceEditor(): LyricsAppearanceEditor {
         } as Partial<LyricsAppearanceSettings>)
       : { ...draft.value, [key]: value }
     commit(next)
+  }
+
+  function syncFontToAll(): void {
+    commit(
+      syncLegacyLyricsAppearance(draft.value, {
+        fontFamily: style.value.fontFamily,
+        customFontFamily: style.value.customFontFamily
+      })
+    )
   }
 
   /**
@@ -220,6 +225,7 @@ export function useLyricsAppearanceEditor(): LyricsAppearanceEditor {
     canSavePreset,
     patchStyle,
     setGlobal,
+    syncFontToAll,
     syncFontSizeToAll,
     resetTarget,
     resetAll,
