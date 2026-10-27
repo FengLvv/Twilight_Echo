@@ -605,6 +605,57 @@ function normalizeInactiveOpacity(
   )
 }
 
+export function hasSameLyricsFont(
+  a: Pick<LyricsTextStyle, 'fontFamily' | 'customFontFamily'>,
+  b: Pick<LyricsTextStyle, 'fontFamily' | 'customFontFamily'>
+): boolean {
+  if (a.fontFamily !== b.fontFamily) return false
+  return a.fontFamily !== 'custom' || a.customFontFamily.trim() === b.customFontFamily.trim()
+}
+
+/**
+ * Applies a style patch to `target`. When `target` is `'normal'` and the patch
+ * changes the font (`fontFamily` or `customFontFamily`), any other style layer
+ * that was still sharing `normal`'s previous font follows along automatically
+ * (and the top-level legacy `fontFamily` stays in sync), while layers that the
+ * user deliberately gave a distinct font keep their override.
+ */
+export function patchLyricsTargetStyle(
+  appearance: LyricsAppearanceSettings,
+  target: LyricsStyleTarget,
+  patch: Partial<LyricsTextStyle>
+): LyricsAppearanceSettings {
+  const currentStyle = appearance.styles[target]
+  const nextStyle: LyricsTextStyle = { ...currentStyle, ...patch }
+  const isFontPatch = patch.fontFamily !== undefined || patch.customFontFamily !== undefined
+  if (!isFontPatch || target !== 'normal') {
+    return {
+      ...appearance,
+      styles: {
+        ...appearance.styles,
+        [target]: nextStyle
+      }
+    }
+  }
+
+  const styles = { ...appearance.styles, normal: nextStyle }
+  for (const layer of LYRICS_STYLE_TARGETS) {
+    if (layer === 'normal') continue
+    if (hasSameLyricsFont(appearance.styles[layer], currentStyle)) {
+      styles[layer] = {
+        ...appearance.styles[layer],
+        fontFamily: nextStyle.fontFamily,
+        customFontFamily: nextStyle.customFontFamily
+      }
+    }
+  }
+  return {
+    ...appearance,
+    fontFamily: nextStyle.fontFamily,
+    styles
+  }
+}
+
 export function syncLegacyLyricsAppearance(
   appearance: LyricsAppearanceSettings,
   patch: Partial<
@@ -620,11 +671,13 @@ export function syncLegacyLyricsAppearance(
       | 'activeColor'
       | 'karaokeColor'
     >
-  >
+  > & { customFontFamily?: string }
 ): LyricsAppearanceSettings {
-  const next = cloneLyricsAppearance({ ...appearance, ...patch })
+  const { customFontFamily, ...legacyPatch } = patch
+  const next = cloneLyricsAppearance({ ...appearance, ...legacyPatch })
   for (const target of LYRICS_STYLE_TARGETS) {
     if (patch.fontFamily !== undefined) next.styles[target].fontFamily = patch.fontFamily
+    if (customFontFamily !== undefined) next.styles[target].customFontFamily = customFontFamily
     if (patch.fontSize !== undefined) next.styles[target].fontSize = patch.fontSize
     if (patch.align !== undefined) next.styles[target].align = patch.align
     if (patch.colorMode !== undefined) next.styles[target].colorMode = patch.colorMode

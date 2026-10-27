@@ -27,6 +27,7 @@ const {
   canSavePreset,
   patchStyle,
   setGlobal,
+  syncFontToAll,
   syncFontSizeToAll,
   resetTarget,
   resetAll,
@@ -297,17 +298,22 @@ watch(
             </div>
             <div class="control-field control-field--wide font-field">
               <span>字体</span>
-              <button
-                type="button"
-                class="font-trigger"
-                :aria-expanded="fontMenuOpen"
-                @click="toggleFontMenu"
-              >
-                <span :style="{ fontFamily: previewStyle(activeTarget).fontFamily }">{{
-                  fontLabel
-                }}</span>
-                <i class="pi pi-chevron-down"></i>
-              </button>
+              <div class="font-control-row">
+                <button
+                  type="button"
+                  class="font-trigger"
+                  :aria-expanded="fontMenuOpen"
+                  @click="toggleFontMenu"
+                >
+                  <span :style="{ fontFamily: previewStyle(activeTarget).fontFamily }">{{
+                    fontLabel
+                  }}</span>
+                  <i class="pi pi-chevron-down"></i>
+                </button>
+                <button type="button" class="sync-font-button" @click="syncFontToAll">
+                  同步到全部
+                </button>
+              </div>
               <div v-if="fontMenuOpen" class="font-menu">
                 <input
                   v-model="fontPicker.query.value"
@@ -1058,6 +1064,7 @@ html[data-theme='dark'] .lyrics-customizer {
   background: var(--te-card-bg);
 }
 .preset-save button,
+.sync-font-button,
 .sync-size-button {
   min-height: 38px;
   padding: 0 14px;
@@ -1081,7 +1088,13 @@ html[data-theme='dark'] .lyrics-customizer {
 .font-field {
   position: relative;
 }
+.font-control-row {
+  display: flex;
+  gap: 8px;
+}
 .font-trigger {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
