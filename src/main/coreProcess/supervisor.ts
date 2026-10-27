@@ -28,6 +28,7 @@ interface Peer {
   service: CoreServiceKind
   exited: boolean
   exit: Promise<void>
+  silencing?: Promise<boolean>
 }
 interface Pending {
   epoch: string
@@ -206,7 +207,7 @@ export class CoreSupervisor extends EventEmitter {
         break
       case 'core:service-close': {
         const peer = this.peers.get(raw.leaseId)
-        if (peer) terminateProcess(peer.child)
+        if (peer) void this.closePeer(peer)
         break
       }
       case 'core:client-message': {
@@ -569,8 +570,18 @@ export class CoreSupervisor extends EventEmitter {
     this.peers.clear()
   }
 
+  private async closePeer(peer: Peer): Promise<void> {
+    if (peer.exited) return
+    if (peer.service === 'audio' || peer.service === 'audio-test') {
+      await this.silenceAudio(peer)
+    }
+    if (!peer.exited) terminateProcess(peer.child)
+  }
+
   private silenceAudio(audio: Peer): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    if (audio.exited) return Promise.resolve(true)
+    if (audio.silencing) return audio.silencing
+    const silencing = new Promise<boolean>((resolve) => {
       const requestId = randomUUID()
       const onMessage = (reply: AudioSupervisorReply) => {
         if (reply?.kind === 'supervisor:audio-stopped' && reply.requestId === requestId)
@@ -592,6 +603,8 @@ export class CoreSupervisor extends EventEmitter {
         done(false)
       }
     })
+    audio.silencing = silencing
+    return silencing
   }
 
   async retry(): Promise<void> {

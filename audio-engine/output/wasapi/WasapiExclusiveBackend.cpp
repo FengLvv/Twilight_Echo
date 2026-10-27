@@ -18,7 +18,9 @@
 #include "WasapiCommon.h"
 #include "WasapiFormatNegotiator.h"
 
+#include <audiopolicy.h>
 #include <avrt.h>
+#include <cctype>
 #include <mmdeviceapi.h>
 #include <propidl.h>
 #include <propsys.h>
@@ -134,6 +136,104 @@ std::string dopRuntimeEvidenceSummary(const DopBufferObservation& observation) {
   text += ")";
   return text;
 }
+
+std::string extractExecutableBaseName(const std::wstring& fullPath) {
+  if (fullPath.empty()) return {};
+  const size_t slashPos = fullPath.find_last_of(L"\\/");
+  const std::wstring baseWide = (slashPos == std::wstring::npos) ? fullPath : fullPath.substr(slashPos + 1);
+  return wasapi::wideToUtf8(baseWide.c_str());
+}
+
+std::string toLowerAscii(std::string value) {
+  for (char& ch : value) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return value;
+}
+
+std::string currentExecutableLowerBaseName() {
+  wchar_t buffer[MAX_PATH] = {};
+  const DWORD len = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+  if (len == 0 || len >= MAX_PATH) return {};
+  return toLowerAscii(extractExecutableBaseName(std::wstring(buffer, len)));
+}
+
+std::vector<wasapi::ExclusiveEndpointHolder> inspectActiveEndpointHolders(IMMDevice* endpointDevice) {
+  std::vector<wasapi::ExclusiveEndpointHolder> holders;
+  if (!endpointDevice) return holders;
+
+  Microsoft::WRL::ComPtr<IAudioSessionManager2> sessionManager;
+  if (FAILED(endpointDevice->Activate(
+          __uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, &sessionManager)) ||
+      !sessionManager) {
+    return holders;
+  }
+
+  Microsoft::WRL::ComPtr<IAudioSessionEnumerator> sessionEnumerator;
+  if (FAILED(sessionManager->GetSessionEnumerator(&sessionEnumerator)) || !sessionEnumerator) {
+    return holders;
+  }
+
+  int sessionCount = 0;
+  if (FAILED(sessionEnumerator->GetCount(&sessionCount)) || sessionCount <= 0) {
+    return holders;
+  }
+
+  const DWORD selfPid = GetCurrentProcessId();
+  const std::string selfBaseName = currentExecutableLowerBaseName();
+
+  for (int index = 0; index < sessionCount; ++index) {
+    Microsoft::WRL::ComPtr<IAudioSessionControl> sessionControl;
+    if (FAILED(sessionEnumerator->GetSession(index, &sessionControl)) || !sessionControl) continue;
+
+    AudioSessionState state = AudioSessionStateInactive;
+    if (FAILED(sessionControl->GetState(&state)) || state != AudioSessionStateActive) continue;
+
+    Microsoft::WRL::ComPtr<IAudioSessionControl2> sessionControl2;
+    if (FAILED(sessionControl.As(&sessionControl2)) || !sessionControl2) continue;
+    if (sessionControl2->IsSystemSoundsSession() == S_OK) continue;
+
+    DWORD pid = 0;
+    if (FAILED(sessionControl2->GetProcessId(&pid)) || pid == 0 || pid == selfPid) continue;
+
+    bool alreadyRecorded = false;
+    for (const auto& existing : holders) {
+      if (existing.pid == pid) {
+        alreadyRecorded = true;
+        break;
+      }
+    }
+    if (alreadyRecorded) continue;
+
+    wasapi::ExclusiveEndpointHolder holder;
+    holder.pid = static_cast<uint32_t>(pid);
+
+    wasapi::UniqueHandle procHandle(
+        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, pid));
+    if (procHandle) {
+      wchar_t imagePath[MAX_PATH] = {};
+      DWORD imagePathLen = MAX_PATH;
+      if (QueryFullProcessImageNameW(procHandle.get(), 0, imagePath, &imagePathLen) &&
+          imagePathLen > 0) {
+        holder.processName = extractExecutableBaseName(std::wstring(imagePath, imagePathLen));
+      }
+      DWORD exitCode = STILL_ACTIVE;
+      const bool exitCodeQueried = GetExitCodeProcess(procHandle.get(), &exitCode) != FALSE;
+      const bool waitSignaled = WaitForSingleObject(procHandle.get(), 0) == WAIT_OBJECT_0;
+      holder.isZombieProcess = (exitCodeQueried && exitCode != STILL_ACTIVE) || waitSignaled;
+    }
+
+    const std::string lowerProcName = toLowerAscii(holder.processName);
+    holder.isSelfExecutable =
+        (!selfBaseName.empty() && lowerProcName == selfBaseName) ||
+        lowerProcName == "twilightecho.exe" ||
+        lowerProcName == "twilight_echo.exe";
+
+    holders.push_back(std::move(holder));
+  }
+
+  return holders;
+}
 #endif
 
 }  // namespace
@@ -231,13 +331,20 @@ struct WasapiExclusiveBackend::Impl {
     if (error) *error = reason;
   }
 
-  bool fail(std::string* error, const std::string& reason) {
-    recordFailure("backend_open_failure", reason, error);
+  bool fail(
+      std::string* error,
+      const std::string& reason,
+      const char* reasonCode = "backend_open_failure") {
+    recordFailure(reasonCode, reason, error);
     return false;
   }
 
-  bool failHr(std::string* error, const std::string& reason, HRESULT hr) {
-    return fail(error, reason + " (错误码 " + hresultSuffix(hr) + ")");
+  bool failHr(
+      std::string* error,
+      const std::string& reason,
+      HRESULT hr,
+      const char* reasonCode = "backend_open_failure") {
+    return fail(error, reason + " (错误码 " + hresultSuffix(hr) + ")", reasonCode);
   }
 
   bool loadDeviceName() {
@@ -260,7 +367,11 @@ struct WasapiExclusiveBackend::Impl {
     return failHr(error, "WASAPI 独占 open failure：无法激活音频客户端", hr);
   }
 
-  bool initializeAudioClient(const WAVEFORMATEX* format, REFERENCE_TIME requestedDuration, std::string* error) {
+  bool initializeAudioClient(
+      const WAVEFORMATEX* format,
+      REFERENCE_TIME requestedDuration,
+      std::string* error,
+      HRESULT* outLastHr = nullptr) {
     DWORD streamFlags = AUDCLNT_STREAMFLAGS_NOPERSIST;
     if (!wasapiExclusivePushMode.load(std::memory_order_acquire)) {
       streamFlags |= AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -273,8 +384,9 @@ struct WasapiExclusiveBackend::Impl {
         format,
         nullptr);
     if (wasapi::isDeviceInUse(hr)) {
-      for (int attempt = 0; attempt < 5 && wasapi::isDeviceInUse(hr); ++attempt) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+      for (const int delayMs : wasapi::kExclusiveDeviceInUseRetryDelaysMs) {
+        if (!wasapi::isDeviceInUse(hr)) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
         if (!activateAudioClient(error)) return false;
         hr = audioClient->Initialize(
             AUDCLNT_SHAREMODE_EXCLUSIVE,
@@ -286,6 +398,7 @@ struct WasapiExclusiveBackend::Impl {
       }
     }
     if (hr == S_OK) {
+      if (outLastHr) *outLastHr = S_OK;
       bufferDuration = requestedDuration;
       return true;
     }
@@ -304,16 +417,19 @@ struct WasapiExclusiveBackend::Impl {
             format,
             nullptr);
         if (hr == S_OK) {
+          if (outLastHr) *outLastHr = S_OK;
           bufferDuration = alignedDuration;
           return true;
         }
       }
     }
 
-    return failHr(
-        error,
-        "WASAPI 独占 init failure：设备拒绝协商格式 " + outputFormatSummary(outputFormat),
-        hr);
+    if (outLastHr) *outLastHr = hr;
+    const auto holders = wasapi::isDeviceInUse(hr) ? inspectActiveEndpointHolders(device.Get())
+                                                   : std::vector<wasapi::ExclusiveEndpointHolder>{};
+    const auto classification =
+        wasapi::describeExclusiveInitFailure(hr, outputFormatSummary(outputFormat), holders);
+    return failHr(error, classification.message, hr, classification.reasonCode);
   }
 
   bool configureStream(const AudioFormat& requestedFormat, std::string* error) {
@@ -372,9 +488,11 @@ struct WasapiExclusiveBackend::Impl {
         defaultPeriod,
         minimumPeriod);
 
-    if (!initializeAudioClient(waveFormat, requestedDuration, error)) {
-      if (defaultPeriod > requestedDuration && activateAudioClient(error) &&
-          initializeAudioClient(waveFormat, defaultPeriod, error)) {
+    HRESULT initHr = S_OK;
+    if (!initializeAudioClient(waveFormat, requestedDuration, error, &initHr)) {
+      if (wasapi::shouldRetryExclusiveInitWithDefaultPeriod(initHr, requestedDuration, defaultPeriod) &&
+          activateAudioClient(error) &&
+          initializeAudioClient(waveFormat, defaultPeriod, error, &initHr)) {
         restoreNegotiatedReason();
         return true;
       }
