@@ -1,6 +1,7 @@
 import { readFileSync, renameSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import type { CoreSettingsRepository } from '../../core/persistence/settingsRepository.ts'
+import { musicMetadataSetupChoice } from '../../shared/musicIdentificationSchedule.ts'
 
 export type DevelopmentMetadataSetupResult =
   | { status: 'not-requested' | 'missing' | 'profile-mismatch' | 'settings-issue' | 'applied' }
@@ -12,17 +13,19 @@ export type DevelopmentMetadataSetupResult =
       message: string
     }
 
-interface DevelopmentMetadataSetupRequest {
+type DevelopmentMetadataSetupRequest = {
   version: 1
   profileRoot: string
   newImports: true
   history: false
   sources: ['musicbrainz']
-}
+} | { version: 2; profileRoot: string; enableAll: true }
 
 function validRequest(value: unknown): value is DevelopmentMetadataSetupRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const request = value as Record<string, unknown>
+  if (request.version === 2) return Object.keys(request).length === 3 &&
+    typeof request.profileRoot === 'string' && isAbsolute(request.profileRoot) && request.enableAll === true
   const keys = ['version', 'profileRoot', 'newImports', 'history', 'sources']
   return (
     Object.keys(request).length === keys.length &&
@@ -80,7 +83,9 @@ export function applyDevelopmentMetadataSetup(
 
   try {
     settings.update({
-      musicIdentification: {
+      musicIdentification: request.version === 2
+        ? musicMetadataSetupChoice(settings.read().musicIdentification, true)
+        : {
         ...settings.read().musicIdentification,
         newImports: true,
         history: false,

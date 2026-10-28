@@ -266,12 +266,15 @@ schemaVersion 3；API v3 继续接受 schemaVersion 1/2 和 `variables + stylesh
   `not_found / not_provided / unsupported`。请求故障走原异常通道，不用空正文掩盖错误。
   DTO 保留 provider、原生 ID、artist／release 层次及最多 8 条纯文本（每条最多 20,000 字符），
   每条保留原语言、来源页面、修订、署名、许可与可选用途声明；来源未说明语言时用 `und`。
+  release 可选 `releaseDate`，包含规范日历日期 `value`（`YYYY`、`YYYY-MM` 或 `YYYY-MM-DD`）及
+  `url / revision / attribution / license / licenseUrl / usage?`；只描述该发行，不是作品的首次发行日。
+  无正文但有日期也返回 `ok` 和空 `texts`。内置网易云按上海时区解释 `publishTime`，缺失值 0 不作为日期。
   可选 `artwork` 最多 3 条，携带 HTTPS `resource`、来源 `url`、`revision`、`attribution`、
   `license`、`licenseUrl` 和可选 `usage`；无正文但有图片时可以返回 `ok` 和空 `texts`。
   图片用途由宿主独立核准，不继承文字许可；原始资源 URL 只进入 Core 私有记录，界面仅获得图片句柄。
   `display / cache / crossSource / export` 受宿主部署已核准的文字权限进一步限制；未提供 usage 不表示允许所有用途。
   只有实际注册的新方法才参与能力路由；旧 `fetchArtistIntro(): string` 和 `fetchAlbumTracks(): Track[]` 不改变。
-  内置网易云核对原生 ID，匿名获取人物完整简介／头像和具体发行的简介／图片，保留取消上下文；
+  内置网易云核对原生 ID，匿名获取人物完整简介／头像和具体发行的简介／图片／日期，保留取消上下文；
   图片只取人物自身字段或该发行封面，不推断开放许可或物理压片。本地资料按字段兜底，不取代已有公共源或手工内容。
   已确认身份可在版本校验后的人工复核中补充尚未归属其他身份的网易云引用；该操作不替换原身份、不合并不同目标。
 - 网易云音乐是 Twilight Echo 自带基础 `MediaProvider` 插件：插件 ID 为

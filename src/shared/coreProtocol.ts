@@ -236,6 +236,8 @@ export interface CoreSnapshot {
   focusHistoryRevision?: number | null
   explorationRevision?: number | null
   entityMetadataRevision?: number | null
+  /** Identities, candidates and saved metadata; excludes task-only progress. */
+  entityMetadataContentRevision?: number | null
   pluginsRevision: number | null
   isStreamBuffering: boolean
   loading: boolean

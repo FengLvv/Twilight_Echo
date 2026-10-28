@@ -2473,7 +2473,23 @@ async function fetchAlbumMetadata(albumId, requestContext) {
   const album = data.album ?? data.data?.album
   if (!album || identityId(album.id) !== id) throw new Error('专辑资料身份不一致')
   const value = [album.description, album.briefDesc].find(v => typeof v === 'string' && v.trim()) ?? ''
-  return nativeTextMetadata('release', id, album.name, value.trim(), nativeMetadataImage(album.picUrl))
+  return nativeTextMetadata('release', id, album.name, value.trim(), nativeMetadataImage(album.picUrl), nativeReleaseDate(album.publishTime))
+}
+
+function nativeReleaseDate(value) {
+  if (typeof value !== 'number' && !(typeof value === 'string' && /^-?\d+$/.test(value))) return null
+  const timestamp = Number(value)
+  // Zero is the upstream missing-date sentinel; pre-1970 releases are valid.
+  if (!Number.isSafeInteger(timestamp) || timestamp === 0 || Math.abs(timestamp) > 8.64e15) return null
+  const date = new Date(timestamp)
+  if (date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date)
+  const part = type => parts.find(p => p.type === type)?.value
+  const year = part('year')
+  return /^\d{4}$/.test(year ?? '') && !parts.some(p => p.type === 'era')
+    ? `${year}-${part('month')}-${part('day')}` : null
 }
 
 function nativeMetadataImage(value) {
@@ -2488,13 +2504,14 @@ function nativeMetadataImage(value) {
   } catch { return null }
 }
 
-function nativeTextMetadata(kind, id, name, value, resource) {
-  if (!value && !resource) return { status: 'not_provided' }
+function nativeTextMetadata(kind, id, name, value, resource, releaseDate) {
+  if (!value && !resource && !releaseDate) return { status: 'not_provided' }
   const source = { url: `https://music.163.com/#/${kind === 'artist' ? 'artist' : 'album'}?id=${encodeURIComponent(id)}`,
     revision: '', attribution: '网易云音乐', license: '', licenseUrl: '' }
   return { status: 'ok', metadata: {
     schemaVersion: 1, provider: 'ncm', kind, id, name: identityText(name),
     texts: value ? [{ field: 'introduction', value: value.slice(0, 20000), language: 'und', ...source }] : [],
+    ...(releaseDate ? { releaseDate: { value: releaseDate, ...source } } : {}),
     ...(resource ? { artwork: [{ resource, ...source }] } : {})
   }}
 }

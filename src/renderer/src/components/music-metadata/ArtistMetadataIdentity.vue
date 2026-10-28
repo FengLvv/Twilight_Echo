@@ -23,7 +23,7 @@ const view = createArtistIdentityView({
       core.state.value?.epoch,
       core.state.value?.phase,
       core.state.value?.settingsRevision,
-      core.state.value?.entityMetadataRevision,
+      core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision,
       core.state.value?.catalogRevision,
       core.state.value?.libraryRevision
     ]),
@@ -59,10 +59,10 @@ watch(
   { immediate: true }
 )
 watch(
-  () => [
-    core.state.value?.entityMetadataRevision,
-    core.state.value?.catalogRevision,
-    core.state.value?.libraryRevision
+  [
+    () => core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision,
+    () => core.state.value?.catalogRevision,
+    () => core.state.value?.libraryRevision
   ],
   () => {
     void view.refresh()

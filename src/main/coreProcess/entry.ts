@@ -146,6 +146,7 @@ import { CoreMetadataService } from '../../core/library/metadataService.ts'
 import { MusicBrainzWikiProvider, MusicBrainzDetailsProvider } from '../../core/library/entityMetadataProvider.ts'
 import { PublicMusicSource } from '../../core/library/publicMusicSources.ts'
 import { metadataConfiguration } from './metadataConfiguration.ts'
+import { NCM_PUBLIC_METADATA_CONFIGURATION } from '../../shared/metadataCacheContext.ts'
 import { publicMetadataSources } from '../../shared/metadataProviders.ts'
 import { MusicBrainzIdentificationProvider, PlatformIdentificationProvider } from '../../core/library/musicIdentificationProvider.ts'
 import { resolveLocale } from '../../shared/i18n/locale.ts'
@@ -1579,7 +1580,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       enrichmentProviders: () => [new MusicBrainzDetailsProvider(() => entityMetadataPolicy), new PublicArtworkProvider(() => publicArtworkPolicy), ...publicMusicProviders, ...identificationPlatforms().map(provider => new PlatformMetadataProvider(provider.id, {
         inventory: identificationPlatforms,
         configuration: () => provider.id === 'ncm'
-          ? JSON.stringify(['public-metadata-v2', plugins!.providerMetadataContext(provider.id)])
+          ? NCM_PUBLIC_METADATA_CONFIGURATION
           : plugins!.providerMetadataContext(provider.id),
         usage: id => platformTextUsage(settings.read().musicIdentification.ncmLocalFallback !== false)[id] ?? null,
         ...(provider.id === 'ncm' || platformArtworkUsage()[provider.id] ? {
@@ -1643,7 +1644,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   if (metadataSetupFile) {
     if (entityMetadataPolicy.enabled && entityMetadataPolicy.publicServiceApproved) {
       const result = applyDevelopmentMetadataSetup(metadataSetupFile, config.root, settings)
-      if (result.status === 'applied') console.info('[dev.metadata] New-import metadata enabled; history remains off.')
+      if (result.status === 'applied') console.info('[dev.metadata] Requested music metadata preferences applied.')
       else if (result.status !== 'missing' && result.status !== 'not-requested')
         console.warn('[dev.metadata] One-time setup needs attention:', result)
     } else console.warn('[dev.metadata] One-time setup deferred: deployment metadata policy is disabled.')

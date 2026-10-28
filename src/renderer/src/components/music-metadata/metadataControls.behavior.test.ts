@@ -1174,7 +1174,7 @@ test('compiled introduction controls edit, keep a conflicting draft, confirm cle
 })
 
 test('compiled settings controls use actual capabilities, retain unavailable choices and persist via the original settings store', async (t) => {
-  const saved = ref({ musicIdentification: defaultMusicIdentificationSettings() })
+  const saved = ref({ musicIdentification: { ...defaultMusicIdentificationSettings(), sources: ['musicbrainz'] } })
   const writes: Partial<AppSettings>[] = []
   const snapshot = shallowRef({
     epoch: 'epoch1',

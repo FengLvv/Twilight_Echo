@@ -92,6 +92,9 @@ test('library read boundary keeps query semantics and bounds IDs and paths to on
     ),
     false
   )
+  assert.equal(validCoreLibraryReadPayload('library.collections', {
+    kind: 'albums', query: { limit: 200 }, platformContexts: { ncm: 'caller-injected' }
+  }, query), false)
   for (const name of ['library.byIds', 'library.paths.lookup']) {
     const key = name === 'library.byIds' ? 'ids' : 'paths'
     assert.equal(
@@ -105,6 +108,18 @@ test('library read boundary keeps query semantics and bounds IDs and paths to on
     )
     assert.equal(validCoreLibraryReadPayload(name, { [key]: ['id\0tail'] }, query), false)
   }
+})
+
+test('collection reads forward Core-owned metadata options only for albums', async () => {
+  const calls: unknown[][] = []
+  const database = { queryCollections: async (...args: unknown[]) => {
+    calls.push(args)
+    return { items: [], offset: 0, total: 0, revision: 1 }
+  } } as unknown as Parameters<typeof executeLibraryRead>[0]
+  const options = { platformContexts: { ncm: 'trusted' }, now: 2000 }
+  await executeLibraryRead(database, { name: 'library.collections', payload: { kind: 'albums' } }, options)
+  await executeLibraryRead(database, { name: 'library.collections', payload: { kind: 'artists' } }, options)
+  assert.deepEqual(calls, [['albums', undefined, options], ['artists', undefined]])
 })
 
 test('artwork resolves database-owned origins through the platform and returns display handles only', async () => {

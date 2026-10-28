@@ -255,6 +255,29 @@ test('refresh stays on the chosen page; removing that page returns to the first 
   view.dispose()
 })
 
+test('task-only progress leaves saved metadata untouched; committed content still refreshes it', async t => {
+  const snapshot = shallowRef({ epoch: 'one', catalogRevision: 1, libraryRevision: 1,
+    entityMetadataRevision: 1, entityMetadataContentRevision: 0, settingsRevision: 1 })
+  let reads = 0
+  const view = createEntityMetadataView(api({ detail: async id => { reads++; return detail(id) } }))
+  const stop = observeEntityMetadataView(view, { target: () => target, language: () => 'en', snapshot: () => snapshot.value })
+  t.after(() => { stop(); view.dispose() })
+  await tick()
+  const painted = view.state.value.detail
+  for (let revision = 2; revision <= 6; revision++) {
+    snapshot.value = { ...snapshot.value, entityMetadataRevision: revision }
+    await nextTick()
+  }
+  assert.equal(reads, 1)
+  assert.equal(view.state.value.detail, painted)
+  snapshot.value = { ...snapshot.value, entityMetadataRevision: 7, entityMetadataContentRevision: 1 }
+  await nextTick(); await tick()
+  assert.equal(reads, 2)
+  snapshot.value = { ...snapshot.value, settingsRevision: 2 }
+  await nextTick(); await tick()
+  assert.equal(reads, 3, 'permission changes remain immediate even without content progress')
+})
+
 test('switching selected entities cancels old detail and never flashes its late response', async () => {
   const old = deferred<EntityMetadataDetail>(),
     signals: AbortSignal[] = []

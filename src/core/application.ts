@@ -301,6 +301,8 @@ export class CoreApplication {
         ? this.dependencies.tags?.getLinkRevision() ?? null : null,
       entityMetadataRevision: !identity || identity.permissions.includes('library:read')
         ? this.dependencies.metadata?.entities?.getRevision() ?? null : null,
+      entityMetadataContentRevision: !identity || identity.permissions.includes('library:read')
+        ? this.dependencies.metadata?.entities?.getContentRevision() ?? null : null,
       pluginsRevision:
         !identity || identity.permissions.includes('plugins:read') ? this.pluginsRevision : null,
       presentationRevision:
@@ -1904,7 +1906,14 @@ export class CoreApplication {
       case 'library.artwork':
         if (!this.dependencies.artwork) throw failure('NOT_READY', 'Artwork is unavailable')
         return executeLibraryArtwork(this.dependencies.library, request.payload, this.dependencies.artwork, signal)
-      case 'library.collections':
+      case 'library.collections': {
+        const entities = this.dependencies.metadata?.entities
+        const platformContexts = entities?.platformContexts() ?? {}
+        const page = await executeLibraryRead(this.dependencies.library, request, { platformContexts, now: Date.now() })
+        if (JSON.stringify(platformContexts) !== JSON.stringify(entities?.platformContexts() ?? {}))
+          throw failure('STALE_REVISION', '资料授权已变化，请重新读取')
+        return page
+      }
       case 'library.byIds':
       case 'library.paths.lookup':
         return executeLibraryRead(this.dependencies.library, request)

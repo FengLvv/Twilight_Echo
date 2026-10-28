@@ -64,14 +64,18 @@ export class CoreEntityMetadataService {
   private readonly options: EntityMetadataOptions
   private schedulePending = true
   private revision = 0
+  private contentRevision = 0
   constructor(options: EntityMetadataOptions) {
     this.options = options
   }
-  private notifyChanged() {
+  private notifyChanged(contentChanged = false) {
     this.revision++
+    if (contentChanged) this.contentRevision++
     this.options.changed()
   }
   getRevision() { return this.revision }
+  /** Task queue progress does not invalidate already displayed music metadata. */
+  getContentRevision() { return this.contentRevision }
   policy(): EntityMetadataPolicyView {
     const policy = metadataPolicyView(this.options.policy())
     const providers = this.options.enrichmentProviders?.()
@@ -315,7 +319,7 @@ export class CoreEntityMetadataService {
   refreshIdentification(cancelAutomatic = false, changedProvider?: string) {
     this.schedulePending = true
     // Account/permission changes also invalidate text already visible in an open page.
-    this.notifyChanged()
+    this.notifyChanged(true)
     if (this.active && ((cancelAutomatic && this.active.automatic) ||
       (!!changedProvider && changedProvider === this.active.provider))) {
       this.needsRecovery = true
@@ -382,7 +386,7 @@ export class CoreEntityMetadataService {
   restoreIdentity(request: import('../../shared/musicIdentification.ts').IdentificationHistoryReview) {
     return this.request(async () => {
       const result = await this.options.database.identificationRestore(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       this.refreshIdentification()
       return result
     })
@@ -393,7 +397,7 @@ export class CoreEntityMetadataService {
   decideIdentity(request: IdentificationDecision) {
     return this.request(async () => {
       const result = await this.options.database.identificationDecide(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       this.refreshIdentification()
       return result
     })
@@ -401,7 +405,7 @@ export class CoreEntityMetadataService {
   detachIdentity(linkId: string, revision: number) {
     return this.request(async () => {
       const result = await this.options.database.identificationDetach(linkId, revision, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       this.refreshIdentification()
       return result
     })
@@ -432,7 +436,7 @@ export class CoreEntityMetadataService {
   decide(request: EntityMetadataDecision) {
     return this.request(async () => {
       const result = await this.options.database.metadataDecide(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       this.refreshIdentification()
       return result
     })
@@ -444,7 +448,7 @@ export class CoreEntityMetadataService {
         revision,
         this.options.now()
       )
-      this.notifyChanged()
+      this.notifyChanged(true)
       this.refreshIdentification()
       return result
     })
@@ -452,21 +456,21 @@ export class CoreEntityMetadataService {
   override(request: EntityMetadataOverride) {
     return this.request(async () => {
       const result = await this.options.database.metadataOverride(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       return result
     })
   }
   sourcePreference(request: EntityMetadataSourcePreference) {
     return this.request(async () => {
       const result = await this.options.database.metadataSourcePreference(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       return result
     })
   }
   artworkOverride(request: EntityMetadataArtworkOverride) {
     return this.request(async () => {
       const result = await this.options.database.metadataArtworkOverride(request, this.options.now())
-      this.notifyChanged()
+      this.notifyChanged(true)
       return result
     })
   }
@@ -667,9 +671,11 @@ export class CoreEntityMetadataService {
             facts: result.facts.filter((f) => f.field !== 'introduction'),
             outcome: 'partial'
           }
-        await database.metadataFinish(work, result, now(), this.automation())
+        const committed = await database.metadataFinish(work, result, now(), this.automation())
         if (result.state === 'identified') this.schedulePending = true
-        this.notifyChanged()
+        this.notifyChanged(
+          committed && ['identified', 'needs_review', 'completed', 'legacy_result'].includes(result.state)
+        )
       }
       this.active = null
     }

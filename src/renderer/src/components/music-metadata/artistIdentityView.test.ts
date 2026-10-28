@@ -264,14 +264,19 @@ test('compiled identity slot updates the visible name/avatar and withdraws revok
     epoch: 'one',
     settingsRevision: 1,
     entityMetadataRevision: 1,
+    entityMetadataContentRevision: 0,
+    sequence: 1,
     catalogRevision: 1,
     libraryRevision: 1
   })
   let result: EntityMetadataDetail | null = detail()
+  let reads = 0
   const core = {
     state,
-    query: async (name: string) =>
-      name === 'catalog.query' ? page() : (result ?? { ...detail(), facts: [], artwork: [] })
+    query: async (name: string) => {
+      reads++
+      return name === 'catalog.query' ? page() : (result ?? { ...detail(), facts: [], artwork: [] })
+    }
   }
   const Identity = component('../music-metadata/ArtistMetadataIdentity.vue', {
     './artistProfileChoice.ts': profileChoice,
@@ -300,6 +305,13 @@ test('compiled identity slot updates the visible name/avatar and withdraws revok
   await settle()
   assert.match(ui.text(), /Canonical namePhotographer/)
   assert.equal(ui.nodes().find((n) => n.tag === 'img')?.props.src, 'avatar-handle')
+  const before = reads
+  state.value = { ...state.value, entityMetadataRevision: 2, sequence: 2 }
+  await settle()
+  assert.equal(reads, before, 'task-only progress and playback ticks do not reload artist cards')
+  state.value = { ...state.value, entityMetadataContentRevision: 1 }
+  await settle()
+  assert.ok(reads > before, 'committed metadata still refreshes artist cards')
   result = null
   state.value = { ...state.value, settingsRevision: 2 }
   await nextTick()

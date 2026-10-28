@@ -74,6 +74,7 @@ import {
 import CoverImg from './CoverImg.vue'
 import AlbumCard from './song-list/AlbumCard.vue'
 import AlbumDetailHeader from './song-list/AlbumDetailHeader.vue'
+import { useAlbumReleaseDate } from './song-list/albumReleaseDate.ts'
 import ArtistDetailPage from './song-list/ArtistDetailPage.vue'
 import type { ArtistSection } from './song-list/artistDetailView.ts'
 import EntityMetadataPanel from './music-metadata/EntityMetadataPanel.vue'
@@ -671,7 +672,7 @@ const currentAlbumSummary = computed(() => {
   return {
     name: album.name,
     artist: album.artist,
-    releaseDate: album.releaseDate,
+    releaseDate: currentAlbumReleaseDate.value,
     trackCount: album.trackCount ?? album.tracks?.length ?? tableTrackCount.value,
     durationText: albumDurationText.value,
     formatText: albumFormatText.value,
@@ -1238,6 +1239,15 @@ const databaseAlbumPages = createLibraryCollectionPages(
   1
 )
 const databaseAlbumState = databaseAlbumPages.state
+const currentAlbumReleaseDate = useAlbumReleaseDate(() => currentAlbum.value)
+watch([
+  () => core.state.value?.epoch,
+  () => core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision,
+  () => core.state.value?.settingsRevision
+], () => {
+  if (databaseGridEnabled.value && databaseGridKind.value === 'albums') databaseCollections.invalidate()
+  if (databaseAlbumEnabled.value) databaseAlbumPages.invalidate()
+})
 watch(
   () => ({ enabled: databaseAlbumEnabled.value, albumId: props.filter?.slice(6) }),
   ({ enabled, albumId }) => databaseAlbumPages.setQuery(enabled ? 'albums' : null, { albumId }),

@@ -1909,7 +1909,7 @@ export class LibraryDatabase {
       return this.getTracksByIds(patches.map((item) => item.id))
     })
   }
-  queryCollections(kind: LibraryCollectionKind, query: LibraryQuery = {}): LibraryCollectionPage {
+  queryCollections(kind: LibraryCollectionKind, query: LibraryQuery = {}, metadata?: import('../../shared/entityMetadata.ts').EntityMetadataReadOptions): LibraryCollectionPage {
     validateLibraryQuery(query)
     this.assertContentRevision(query.contentRevision)
     if (kind === 'playlists') {
@@ -1930,7 +1930,8 @@ export class LibraryDatabase {
       aliases,
       (sql, params) => this.statement(sql).all(...params) as Row[]
     )
-    return kind === 'albums' || kind === 'artists' ? this.catalogReferences.collections(page, kind, selection, aliases) : page
+    const referenced = kind === 'albums' || kind === 'artists' ? this.catalogReferences.collections(page, kind, selection, aliases) : page
+    return kind === 'albums' && metadata ? this.entityMetadata.collectionDates(referenced, metadata) : referenced
   }
   createLibraryQueue(query: LibraryQuery, selectedId?: string): LibraryQueueSnapshot {
     validateLibraryQuery(query)

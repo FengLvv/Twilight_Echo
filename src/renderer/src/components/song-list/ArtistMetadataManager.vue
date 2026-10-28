@@ -51,7 +51,7 @@ watch(
   { immediate: true }
 )
 watch(
-  () => [core.state.value?.entityMetadataRevision, core.state.value?.settingsRevision],
+  [() => core.state.value?.entityMetadataRevision, () => core.state.value?.settingsRevision],
   () => {
     void update.refresh()
   }

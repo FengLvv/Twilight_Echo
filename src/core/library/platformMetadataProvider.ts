@@ -10,6 +10,7 @@ import {
 import { MetadataHttpError } from './metadataHttp.ts'
 import type { MetadataDetailProvider } from './metadataDetailProvider.ts'
 import type { MetadataArtworkRecord } from '../../shared/musicArtwork.ts'
+import { ncmMetadataMethods } from '../../shared/metadataCacheContext.ts'
 export interface PlatformMetadataOptions {
   inventory(): Array<{
     id: string
@@ -122,7 +123,7 @@ export class PlatformMetadataProvider implements MetadataDetailProvider {
     return JSON.stringify([
       this.options.configuration?.() ?? current?.configuration,
       current?.enabled,
-      current?.supportedMethods,
+      this.providerId === 'ncm' ? ncmMetadataMethods(current?.supportedMethods ?? []) : current?.supportedMethods,
       this.options.usage(this.providerId),
       ...(this.options.artworkUsage || this.options.identity
         ? [
@@ -193,7 +194,9 @@ export class PlatformMetadataProvider implements MetadataDetailProvider {
     )
       throw new Error('Platform metadata identity mismatch')
     const approved = this.options.usage(this.providerId)
-    const facts: EntityMetadataFact[] = metadata.texts.flatMap((t) => {
+    const values = [...metadata.texts, ...(metadata.releaseDate
+      ? [{ ...metadata.releaseDate, field: 'releaseDate' as const, language: 'und' }] : [])]
+    const facts: EntityMetadataFact[] = values.flatMap((t) => {
       if (!approved) return []
       const usage = intersectMetadataUsage(approved, t.usage)
       if (

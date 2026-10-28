@@ -153,11 +153,11 @@ watch(
   { immediate: true }
 )
 watch(
-  () => [
-    core.state.value?.catalogRevision,
-    core.state.value?.libraryRevision,
-    core.state.value?.entityMetadataRevision,
-    core.state.value?.settingsRevision
+  [
+    () => core.state.value?.catalogRevision,
+    () => core.state.value?.libraryRevision,
+    () => core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision,
+    () => core.state.value?.settingsRevision
   ],
   (value, previous) => {
     void view.refresh(value[3] !== previous[3])
@@ -189,7 +189,7 @@ watch(
   { immediate: true }
 )
 watch(
-  () => [state.value.selected?.id, state.value.shared],
+  [() => state.value.selected?.id, () => state.value.shared],
   () => {
     expanded.value = false
   }

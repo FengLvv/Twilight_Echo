@@ -343,6 +343,16 @@ export interface PlatformEntityMetadata {
     licenseUrl: string
     usage?: MetadataUsage
   }>
+  /** This platform release's calendar date, not the album work's first release. */
+  releaseDate?: {
+    value: string
+    url: string
+    revision: string
+    attribution: string
+    license: string
+    licenseUrl: string
+    usage?: MetadataUsage
+  }
   /** Private resource URLs; Core projects approved images to session handles. */
   artwork?: Array<{
     resource: string

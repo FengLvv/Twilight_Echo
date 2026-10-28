@@ -71,6 +71,29 @@ const fixture = () => {
   return { api, calls }
 }
 
+test('background task reads coalesce without disabling an already available update action', async t => {
+  const f = fixture()
+  let hold = false, reads = 0, release!: () => void
+  const signals: AbortSignal[] = []
+  const model = createArtistMetadataUpdate({ ...f.api, policy: async signal => {
+    reads++; signals.push(signal)
+    if (hold) await new Promise<void>(resolve => { release = resolve })
+    return policy
+  } })
+  t.after(model.dispose)
+  await model.setContext({ entityId: 'selected', language: 'en' })
+  hold = true
+  const first = model.refresh(), next = model.refresh()
+  assert.equal(reads, 2)
+  assert.equal(model.state.value.loading, false)
+  assert.equal(model.state.value.policy, policy)
+  assert.equal(signals[1].aborted, false)
+  hold = false; release()
+  await Promise.all([first, next])
+  assert.equal(reads, 3)
+  assert.equal(model.state.value.loading, false)
+})
+
 test('opening is read-only; explicit providers ignore automatic history/import switches', async () => {
   const f = fixture(),
     view = createArtistMetadataUpdate(f.api)

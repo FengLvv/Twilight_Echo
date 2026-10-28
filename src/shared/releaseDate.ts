@@ -53,6 +53,19 @@ export function formatReleaseDate(value: unknown): string {
   return `${year}年${month ? `${Number(month)}月` : ''}${day ? `${Number(day)}日` : ''}`
 }
 
+/** File dates win. Only an authorised fact about this confirmed release is a display fallback. */
+export function collectionReleaseDate(album: {
+  releaseDate?: string
+  metadataReleaseDate?: { value: string; usage?: { display: boolean; cache: boolean; expiresAt?: number } }
+} | null | undefined, now = Date.now()): string | undefined {
+  const fileDate = normalizeReleaseDate(album?.releaseDate)
+  if (fileDate) return fileDate
+  const fact = album?.metadataReleaseDate
+  if (!fact || fact.usage && (!fact.usage.display || !fact.usage.cache ||
+    fact.usage.expiresAt !== undefined && fact.usage.expiresAt <= now)) return undefined
+  return normalizeReleaseDate(fact.value)
+}
+
 /** Majority year, then precision and frequency; source order breaks ties. */
 export function resolveAlbumReleaseDate(
   tracks: readonly { releaseDate?: string }[]

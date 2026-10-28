@@ -1,3 +1,5 @@
+import { normalizeReleaseDate } from './releaseDate.ts'
+
 /** Text and artwork rights are assessed separately. Missing provider terms need
  * an explicit deployment approval; access to an API is not that approval. */
 export interface MetadataUsage {
@@ -27,6 +29,16 @@ export interface PlatformEntityMetadata {
     licenseUrl: string
     usage?: MetadataUsage
   }>
+  /** This platform release's calendar date, not the album work's first release. */
+  releaseDate?: {
+    value: string
+    url: string
+    revision: string
+    attribution: string
+    license: string
+    licenseUrl: string
+    usage?: MetadataUsage
+  }
   /** Private resource URLs; Core projects approved images to session handles. */
   artwork?: Array<{
     resource: string
@@ -86,7 +98,7 @@ export function validPlatformMetadataResult(v: unknown): v is PlatformMetadataRe
   if (!keys(v, ['status', 'metadata']) || !object(v.metadata)) return false
   const m = v.metadata
   return (
-    keys(m, ['schemaVersion', 'provider', 'kind', 'id', 'name', 'texts', 'artwork']) &&
+    keys(m, ['schemaVersion', 'provider', 'kind', 'id', 'name', 'texts', 'artwork', 'releaseDate']) &&
     m.schemaVersion === 1 &&
     validMetadataProvider(m.provider) &&
     ['artist', 'release'].includes(String(m.kind)) &&
@@ -121,6 +133,16 @@ export function validPlatformMetadataResult(v: unknown): v is PlatformMetadataRe
         (t.licenseUrl === '' || metadataPageUrl(t.licenseUrl)) &&
         (t.usage === undefined || validMetadataUsage(t.usage))
     ) &&
+    (m.releaseDate === undefined || (
+      m.kind === 'release' && object(m.releaseDate) &&
+      keys(m.releaseDate, ['value', 'url', 'revision', 'attribution', 'license', 'licenseUrl', 'usage']) &&
+      text(m.releaseDate.value, 10) && !!m.releaseDate.value &&
+      normalizeReleaseDate(m.releaseDate.value) === m.releaseDate.value &&
+      metadataPageUrl(m.releaseDate.url) && text(m.releaseDate.revision, 256) &&
+      text(m.releaseDate.attribution, 2048) && text(m.releaseDate.license, 256) &&
+      (m.releaseDate.licenseUrl === '' || metadataPageUrl(m.releaseDate.licenseUrl)) &&
+      (m.releaseDate.usage === undefined || validMetadataUsage(m.releaseDate.usage))
+    )) &&
     (m.artwork === undefined ||
       (Array.isArray(m.artwork) &&
         m.artwork.length <= 3 &&

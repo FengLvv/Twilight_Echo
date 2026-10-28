@@ -77,14 +77,20 @@ export function createArtistMetadataUpdate(
     generation = 0,
     disposed = false
   let request: AbortController | null = null
-  async function refresh() {
+  let pending = false
+  const waiting: Array<() => void> = []
+  async function refresh(): Promise<void> {
     if (!context || disposed) return
-    request?.abort()
+    if (request) {
+      pending = true
+      await new Promise<void>(resolve => waiting.push(resolve))
+      return
+    }
     const controller = new AbortController(),
       expected = generation,
       id = context.entityId
     request = controller
-    state.value = { ...state.value, loading: true, error: '' }
+    state.value = { ...state.value, loading: !state.value.policy, error: '' }
     try {
       const [policy, jobs, identity] = await Promise.all([
         api.policy(controller.signal),
@@ -106,14 +112,28 @@ export function createArtistMetadataUpdate(
           loading: false,
           error: error instanceof Error ? error.message : String(error)
         }
+    } finally {
+      if (request === controller) {
+        request = null
+        if (pending) {
+          pending = false
+          await refresh()
+        } else waiting.splice(0).forEach(resolve => resolve())
+      }
     }
+  }
+  function cancelRead() {
+    request?.abort()
+    request = null
+    pending = false
+    waiting.splice(0).forEach(resolve => resolve())
   }
   return {
     state,
     refresh,
     setContext(next: typeof context) {
       generation++
-      request?.abort()
+      cancelRead()
       context = next
       state.value = {
         policy: null,
@@ -201,7 +221,7 @@ export function createArtistMetadataUpdate(
     dispose() {
       disposed = true
       generation++
-      request?.abort()
+      cancelRead()
       context = null
       state.value = { ...state.value, loading: false, submitting: false }
     }

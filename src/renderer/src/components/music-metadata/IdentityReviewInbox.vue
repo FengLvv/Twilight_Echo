@@ -18,7 +18,7 @@ watch(
     () => core.state.value?.epoch,
     () => core.state.value?.catalogRevision,
     () => core.state.value?.libraryRevision,
-    () => core.state.value?.entityMetadataRevision
+    () => core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision
   ],
   (value, previous) => {
     void view.refresh(!previous || value.slice(0, 3).some((v, i) => v !== previous[i]))

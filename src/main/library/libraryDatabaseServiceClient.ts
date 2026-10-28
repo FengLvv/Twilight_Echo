@@ -458,8 +458,8 @@ export class LibraryDatabaseServiceClient implements LibraryDatabaseWorkerApi {
   closeTrackSelection(id: string) {
     return this.call('closeTrackSelection', id)
   }
-  queryCollections(kind: LibraryCollectionKind, query?: LibraryQuery) {
-    return this.call('queryCollections', kind, query)
+  queryCollections(kind: LibraryCollectionKind, query?: LibraryQuery, metadata?: import('../../shared/entityMetadata.ts').EntityMetadataReadOptions) {
+    return this.call('queryCollections', kind, query, metadata)
   }
   lookupTracksByPaths(paths: string[], expectedRevision?: number) {
     return this.call('lookupTracksByPaths', paths, expectedRevision)
