@@ -6,6 +6,7 @@ import {
   LYRICS_APPEARANCE_SCHEMA_VERSION,
   cloneLyricsAppearance,
   normalizeLyricsAppearance,
+  patchLyricsTargetStyle,
   resolveCascadeSpeedFactor,
   syncLegacyLyricsAppearance
 } from './lyricsAppearance.ts'
@@ -298,4 +299,51 @@ test('legacy quick controls stay compatible with the independent style layers', 
   assert.equal(synced.styles.translation.color, '#abcdef')
   assert.equal(synced.styles.romanization.color, '#abcdef')
   assert.equal(synced.styles.active.color, '#fedcba')
+})
+
+test('normal layer font edits cascade to coupled layers while preserving per-layer font overrides', () => {
+  const fromSettings = syncLegacyLyricsAppearance(
+    cloneLyricsAppearance(DEFAULT_LYRICS_APPEARANCE),
+    { fontFamily: 'inter' }
+  )
+  const switchedInCustomizer = patchLyricsTargetStyle(fromSettings, 'normal', {
+    fontFamily: 'lxgw'
+  })
+
+  assert.equal(switchedInCustomizer.fontFamily, 'lxgw')
+  assert.equal(switchedInCustomizer.styles.normal.fontFamily, 'lxgw')
+  assert.equal(switchedInCustomizer.styles.active.fontFamily, 'lxgw')
+  assert.equal(switchedInCustomizer.styles.harmony.fontFamily, 'lxgw')
+  assert.equal(switchedInCustomizer.styles.translation.fontFamily, 'lxgw')
+  assert.equal(switchedInCustomizer.styles.romanization.fontFamily, 'lxgw')
+
+  const withCustomTranslation = patchLyricsTargetStyle(switchedInCustomizer, 'translation', {
+    fontFamily: 'sarasa'
+  })
+  assert.equal(withCustomTranslation.styles.translation.fontFamily, 'sarasa')
+  assert.equal(withCustomTranslation.styles.normal.fontFamily, 'lxgw')
+  assert.equal(withCustomTranslation.styles.active.fontFamily, 'lxgw')
+
+  const normalToCustomLocal = patchLyricsTargetStyle(
+    patchLyricsTargetStyle(withCustomTranslation, 'normal', { fontFamily: 'custom' }),
+    'normal',
+    { customFontFamily: 'Microsoft YaHei UI' }
+  )
+  assert.equal(normalToCustomLocal.fontFamily, 'custom')
+  assert.equal(normalToCustomLocal.styles.normal.fontFamily, 'custom')
+  assert.equal(normalToCustomLocal.styles.normal.customFontFamily, 'Microsoft YaHei UI')
+  assert.equal(normalToCustomLocal.styles.active.fontFamily, 'custom')
+  assert.equal(normalToCustomLocal.styles.active.customFontFamily, 'Microsoft YaHei UI')
+  assert.equal(
+    normalToCustomLocal.styles.translation.fontFamily,
+    'sarasa',
+    'a deliberately customized layer keeps its own font when normal changes'
+  )
+
+  const unified = syncLegacyLyricsAppearance(normalToCustomLocal, {
+    fontFamily: normalToCustomLocal.styles.normal.fontFamily,
+    customFontFamily: normalToCustomLocal.styles.normal.customFontFamily
+  })
+  assert.equal(unified.styles.translation.fontFamily, 'custom')
+  assert.equal(unified.styles.translation.customFontFamily, 'Microsoft YaHei UI')
 })

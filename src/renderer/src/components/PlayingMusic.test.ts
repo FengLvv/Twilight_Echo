@@ -243,6 +243,8 @@ test('font size is per layer, with an explicit action to unify it', () => {
     editor,
     /syncLegacyLyricsAppearance\(draft\.value, \{ fontSize: style\.value\.fontSize \}\)/
   )
+  assert.match(editor, /function syncFontToAll\(\): void/)
+  assert.match(editor, /patchLyricsTargetStyle\(draft\.value, activeTarget\.value/)
 })
 
 test('TTML alignment exposes only left and center while preserving ordinary right alignment', () => {
