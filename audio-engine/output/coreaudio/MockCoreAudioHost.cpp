@@ -41,7 +41,9 @@ bool MockCoreAudioHost::findOutputDevice(const std::string& requestedDeviceId, C
   }
   if (!requestedDeviceId.empty() && requestedDeviceId != "auto" && requestedDeviceId != "default") {
     for (const auto& device : devices) {
-      if (device.name == requestedDeviceId || std::to_string(device.id) == requestedDeviceId) {
+      if ((!device.uid.empty() && device.uid == requestedDeviceId) ||
+          device.name == requestedDeviceId ||
+          std::to_string(device.id) == requestedDeviceId) {
         if (outDeviceId) *outDeviceId = device.id;
         return true;
       }
@@ -56,6 +58,12 @@ bool MockCoreAudioHost::findOutputDevice(const std::string& requestedDeviceId, C
 std::string MockCoreAudioHost::deviceName(CoreAudioDeviceID deviceId) {
   const Device* device = findDevice(deviceId);
   return device ? device->name : std::string{};
+}
+
+std::string MockCoreAudioHost::deviceUid(CoreAudioDeviceID deviceId) {
+  const Device* device = findDevice(deviceId);
+  if (!device) return {};
+  return !device->uid.empty() ? device->uid : std::to_string(device->id);
 }
 
 int MockCoreAudioHost::outputChannelCount(CoreAudioDeviceID deviceId) {

@@ -635,7 +635,10 @@ export class OutputRouter {
         )
         let actualDeviceMatches = true
         if (options.expectedActualDeviceId) {
-          actualDeviceMatches = actualDeviceId === options.expectedActualDeviceId
+          actualDeviceMatches = actualDeviceId
+            ? actualDeviceId === options.expectedActualDeviceId
+            : !isDefaultAudioDeviceAlias(options.nextDevice) &&
+              acceptedDeviceNames.has(actualDevice)
         } else if (!isDefaultAudioDeviceAlias(options.nextDevice)) {
           actualDeviceMatches = actualDeviceId
             ? actualDeviceId === options.nextDevice

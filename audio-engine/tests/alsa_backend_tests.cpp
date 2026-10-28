@@ -267,6 +267,7 @@ void testAlsaHwDevicePathKind() {
     const OutputInfo info = backend.outputInfo();
     assert(info.accessMode == "direct");
     assert(info.devicePathKind == "hw");
+    assert(info.actualDeviceId == "hw:0,0");
     assert(info.exclusive);
   }
   {
@@ -276,6 +277,7 @@ void testAlsaHwDevicePathKind() {
     assert(backend.open("plughw:0,0", sourceFormat(48000, 16, 2, AudioSampleFormat::Int16Interleaved), &error));
     const OutputInfo info = backend.outputInfo();
     assert(info.devicePathKind == "plughw");
+    assert(info.actualDeviceId == "plughw:0,0");
     assert(info.accessMode == "plugin");
   }
   {
@@ -284,6 +286,7 @@ void testAlsaHwDevicePathKind() {
     std::string error;
     assert(backend.open("default", sourceFormat(48000, 16, 2, AudioSampleFormat::Int16Interleaved), &error));
     assert(backend.outputInfo().devicePathKind == "default");
+    assert(backend.outputInfo().actualDeviceId == "default");
   }
 }
 

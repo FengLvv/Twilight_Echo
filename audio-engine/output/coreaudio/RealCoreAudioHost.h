@@ -15,6 +15,7 @@ class RealCoreAudioHost final : public ICoreAudioHost {
 
   bool findOutputDevice(const std::string& requestedDeviceId, CoreAudioDeviceID* outDeviceId, std::string* error) override;
   std::string deviceName(CoreAudioDeviceID deviceId) override;
+  std::string deviceUid(CoreAudioDeviceID deviceId) override;
   int outputChannelCount(CoreAudioDeviceID deviceId) override;
   double getNominalSampleRate(CoreAudioDeviceID deviceId) override;
   bool setNominalSampleRate(CoreAudioDeviceID deviceId, double rate, std::string* error) override;

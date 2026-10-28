@@ -12,6 +12,7 @@ class MockCoreAudioHost final : public ICoreAudioHost {
  public:
   struct Device {
     CoreAudioDeviceID id = 1;
+    std::string uid;
     std::string name = "Mock CoreAudio";
     int channelCount = 2;
     double nominalSampleRate = 48000.0;
@@ -66,6 +67,7 @@ class MockCoreAudioHost final : public ICoreAudioHost {
 
   bool findOutputDevice(const std::string& requestedDeviceId, CoreAudioDeviceID* outDeviceId, std::string* error) override;
   std::string deviceName(CoreAudioDeviceID deviceId) override;
+  std::string deviceUid(CoreAudioDeviceID deviceId) override;
   int outputChannelCount(CoreAudioDeviceID deviceId) override;
   double getNominalSampleRate(CoreAudioDeviceID deviceId) override;
   bool setNominalSampleRate(CoreAudioDeviceID deviceId, double rate, std::string* error) override;

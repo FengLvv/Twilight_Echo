@@ -174,6 +174,10 @@ std::string RealCoreAudioHost::deviceName(CoreAudioDeviceID deviceId) {
   return coreaudio::deviceString(deviceId, kAudioObjectPropertyName);
 }
 
+std::string RealCoreAudioHost::deviceUid(CoreAudioDeviceID deviceId) {
+  return coreaudio::deviceString(deviceId, kAudioDevicePropertyDeviceUID);
+}
+
 int RealCoreAudioHost::outputChannelCount(CoreAudioDeviceID deviceId) {
   return coreaudio::outputChannelCount(deviceId);
 }

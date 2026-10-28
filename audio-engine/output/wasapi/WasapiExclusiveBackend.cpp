@@ -244,6 +244,7 @@ struct WasapiExclusiveBackend::Impl {
   OutputInfo::Diagnostics diagnostics;
   DopRuntimeFacts dopRuntimeFacts;
   std::string deviceName = "系统默认";
+  std::string deviceId;
   // Buffer duration and event/push mode are consumed by the render thread and
   // by IAudioClient::Initialize. Keep the two fields the backend actually
   // owns atomic so control-plane updates cannot race the realtime callback.
@@ -294,6 +295,7 @@ struct WasapiExclusiveBackend::Impl {
   AudioFormat openRequestedFormat;
 
   void resetFailureInfo() {
+    deviceId.clear();
     OutputInfo::Diagnostics lifetime = diagnostics;
     diagnostics = {};
     diagnostics.lifetimeUnderrunCount = lifetime.lifetimeUnderrunCount;
@@ -316,6 +318,7 @@ struct WasapiExclusiveBackend::Impl {
     outputInfo.devicePathKind = "default";
     outputInfo.deviceName = deviceName;
     outputInfo.actualDeviceName = deviceName;
+    outputInfo.actualDeviceId = deviceId;
     outputInfo.diagnostics = diagnostics;
     renderBufferLatencyMs.store(0.0);
     firstDopBufferObservation = {};
@@ -356,7 +359,22 @@ struct WasapiExclusiveBackend::Impl {
       deviceName = wasapi::wideToUtf8(value.pwszVal);
     }
     PropVariantClear(&value);
+    std::lock_guard lock(infoMutex);
+    outputInfo.deviceName = deviceName;
+    outputInfo.actualDeviceName = deviceName;
     return true;
+  }
+
+  bool loadDeviceId() {
+    if (!device) return false;
+    LPWSTR rawId = nullptr;
+    const HRESULT hr = device->GetId(&rawId);
+    if (FAILED(hr)) return false;
+    deviceId = wasapi::wideToUtf8(rawId);
+    CoTaskMemFree(rawId);
+    std::lock_guard lock(infoMutex);
+    outputInfo.actualDeviceId = deviceId;
+    return !deviceId.empty();
   }
 
   bool activateAudioClient(std::string* error) {
@@ -439,6 +457,7 @@ struct WasapiExclusiveBackend::Impl {
       dopRuntimeFacts = negotiator.dopRuntimeFacts();
       outputInfo.deviceName = deviceName;
       outputInfo.actualDeviceName = deviceName;
+      outputInfo.actualDeviceId = deviceId;
       outputInfo.diagnostics = diagnostics;
       return false;
     }
@@ -448,6 +467,7 @@ struct WasapiExclusiveBackend::Impl {
     dopRuntimeFacts = negotiator.dopRuntimeFacts();
     outputInfo.deviceName = deviceName;
     outputInfo.actualDeviceName = deviceName;
+    outputInfo.actualDeviceId = deviceId;
     outputInfo.diagnostics = diagnostics;
     waveFormatBytes.assign(
         reinterpret_cast<const uint8_t*>(negotiator.waveFormat()),
@@ -1021,6 +1041,11 @@ struct WasapiExclusiveBackend::Impl {
     if (FAILED(hr)) return false;
 
     loadDeviceName();
+    if (!loadDeviceId() && !wasapi::isDefaultDeviceAlias(openDeviceId)) {
+      deviceId = openDeviceId;
+      std::lock_guard lock(infoMutex);
+      outputInfo.actualDeviceId = deviceId;
+    }
     if (!activateAudioClient(nullptr)) return false;
     if (!configureStream(openRequestedFormat, nullptr)) return false;
     if (!attachEventAndRenderClient(nullptr)) return false;
@@ -1231,6 +1256,11 @@ bool WasapiExclusiveBackend::open(const std::string& deviceId, const AudioFormat
   }
 
   impl_->loadDeviceName();
+  if (!impl_->loadDeviceId() && !wasapi::isDefaultDeviceAlias(deviceId)) {
+    impl_->deviceId = deviceId;
+    std::lock_guard lock(impl_->infoMutex);
+    impl_->outputInfo.actualDeviceId = impl_->deviceId;
+  }
   if (!impl_->activateAudioClient(error)) return failAfterCom();
   if (!impl_->configureStream(requestedFormat, error)) return failAfterCom();
   if (!impl_->attachEventAndRenderClient(error)) return failAfterCom();

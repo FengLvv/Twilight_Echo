@@ -476,3 +476,40 @@ test('DSD route ACK accepts the configured secondary route only with matching na
     }
   }
 })
+
+test('WASAPI exclusive profile applies during active playback with actualDeviceId or friendly-name fallback', async (t) => {
+  for (const reportActualDeviceId of [true, false]) {
+    const h = harness()
+    t.after(() => h.manager.destroy())
+    const endpointId = '{0.0.0.00000000}.{c6b7be0f-c11c-4788-9bcb-0478a392d0c3}'
+    const friendlyName = '数字输出 (DETHONRAY USBDAC Clarinet)'
+    h.setDevices([
+      { id: 'a', label: 'Speakers', isDefault: true },
+      { id: endpointId, platformStableId: endpointId, label: friendlyName, isDefault: false }
+    ])
+    h.info.state = 'playing'
+    h.info.source = 'song.flac'
+    const setDevice = h.native.SetOutputDevice
+    h.native.SetOutputDevice = (device) => {
+      setDevice(device)
+      if (device === endpointId) {
+        h.info.outputInfo.actualDeviceName = friendlyName
+        h.info.outputInfo.actualDeviceId = reportActualDeviceId ? endpointId : ''
+      }
+    }
+    const exclusiveProfile = normalizeAudioDeviceProfile({
+      ...h.profile,
+      id: 'usb-dac-exclusive',
+      name: friendlyName,
+      stableDeviceId: endpointId,
+      backend: 'wasapi',
+      exclusiveMode: true
+    })!
+    await h.manager.saveDeviceProfile(exclusiveProfile)
+    await h.manager.applyDeviceProfile(exclusiveProfile.id)
+    assert.equal(h.manager.getDeviceProfiles().activeProfileId, exclusiveProfile.id)
+    assert.equal((await h.manager.getAudioOutputState()).device, endpointId)
+    assert.equal((await h.manager.getAudioOutputState()).exclusiveMode, true)
+    assert.equal((await h.manager.getPlaybackInfo()).state, 'playing')
+  }
+})

@@ -181,9 +181,11 @@ void testCoreAudioHogAcquireRelease() {
   auto host = makeHost();
   auto* rawHost = host.get();
   rawHost->existingHogOwnerPid = -1;
+  rawHost->devices[0].uid = "AppleUSBAudioEngine:Clarinet:1";
   CoreAudioExclusiveBackend backend(std::move(host));
   std::string error;
   assert(backend.open("auto", sourceFormat(), &error));
+  assert(backend.outputInfo().actualDeviceId == "AppleUSBAudioEngine:Clarinet:1");
   assert(rawHost->hogModeOwnerPidCalls == 1);
   assert(rawHost->acquireHogModeCalls == 1);
   assert(rawHost->releaseHogModeCalls == 0);
@@ -194,9 +196,11 @@ void testCoreAudioHogAcquireRelease() {
 void testCoreAudioSharedCloseStopsAudioUnitBeforeDispose() {
   auto host = makeHost();
   auto* rawHost = host.get();
+  rawHost->devices[0].uid = "BuiltInSpeakerDevice";
   CoreAudioBackend backend(std::move(host));
   std::string error;
   assert(backend.open("auto", sourceFormat(), &error));
+  assert(backend.outputInfo().actualDeviceId == "BuiltInSpeakerDevice");
   assert(backend.start([](float*, size_t frames) { return frames; }, nullptr, &error));
 
   backend.close();

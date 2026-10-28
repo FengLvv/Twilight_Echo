@@ -27,7 +27,7 @@
 - `outputInfo.backend`：用户选择的后端，例如 `wasapi`、`wasapi-exclusive`、`asio`、`coreaudio`、`alsa`。
 - `outputInfo.actualBackend`：实际运行后端，应该与后端实现和 fallback 状态一致。
 - `outputInfo.deviceName` / `actualDeviceName`：请求设备名与实际设备显示名。`auto` 会解析为平台默认输出设备。
-- `outputInfo.actualDeviceId`：backend 实际打开的 platform stable device ID；Windows WASAPI Shared 的 legacy 与 miniaudio provider 都会上报该字段，并由 route ACK 优先校验它，同名设备不能只比较 `actualDeviceName`。当用户选择 `auto`、播放中的系统默认端点变化时，main 会重放完整 backend/device/config 事务，并要求 ACK 的该字段匹配新观察到的默认 endpoint 后才 commit；idle 时只更新待打开的 `auto` 偏好。其它旧 backend 未上报时保持可选兼容字段。
+- `outputInfo.actualDeviceId`：backend 实际打开的 platform stable device ID；Windows WASAPI Shared（legacy 与 miniaudio provider）、WASAPI Exclusive、ASIO、macOS CoreAudio Shared/Exclusive 与 Linux ALSA 都会上报该字段，并由 route ACK 优先校验它，同名设备不能只比较 `actualDeviceName`。当用户选择 `auto`、播放中的系统默认端点变化时，main 会重放完整 backend/device/config 事务，并要求 ACK 的该字段匹配新观察到的默认 endpoint 后才 commit；idle 时只更新待打开的 `auto` 偏好。其它旧 backend 未上报时保持可选兼容字段。
 - `outputInfo.outputSampleRate` / `outputBitDepth` / `outputChannels` / `outputSampleFormat`：引擎
   callback/render 格式；`outputChannels` 是实际 callback 通道数，不从源文件通道数推断；
   `outputSampleFormat` 仅在 active provider 可直接观测时返回，未知时为空字符串。
