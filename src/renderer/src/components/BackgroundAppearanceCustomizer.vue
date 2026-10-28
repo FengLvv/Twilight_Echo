@@ -1513,8 +1513,31 @@ watch(tone, (value) => emit('toneChange', value === 'dark' ? 'dark' : 'pureWhite
           <option v-for="option in fontFamilyOptions" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
+          <option
+            v-if="settings.fontFamily.startsWith('local:')"
+            :value="settings.fontFamily"
+          >
+            {{ settings.fontFamily.slice(6) }}
+          </option>
         </select></label
       >
+      <label class="appearance-quick-row"
+        >本机字体<input
+          type="text"
+          aria-label="本机字体名称"
+          maxlength="96"
+          placeholder="例如 Microsoft YaHei UI"
+          :value="settings.fontFamily.startsWith('local:') ? settings.fontFamily.slice(6) : ''"
+          @change="
+            changeQuickSetting({
+              fontFamily: ($event.target as HTMLInputElement).value.trim()
+                ? normalizeAppFontFamily(
+                    `local:${($event.target as HTMLInputElement).value.trim()}`
+                  )
+                : 'system'
+            })
+          "
+      /></label>
     </div>
     <div v-else class="appearance-quick-body">
       <div class="appearance-quick-materials">

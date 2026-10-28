@@ -250,6 +250,15 @@ function updateLyricsLayoutField(
 }
 const { installed, load: loadFonts } = useLyricsFontPicker()
 onMounted(loadFonts)
+const customLocalFont = computed(() =>
+  settings.value.fontFamily.startsWith('local:') ? settings.value.fontFamily.slice(6) : ''
+)
+function setCustomFontFamily(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value.trim()
+  const fontFamily = raw ? normalizeAppFontFamily(`local:${raw}`) : 'system'
+  if (settings.value.fontFamily !== fontFamily)
+    void updateSettings({ fontFamily }).catch(() => undefined)
+}
 defineExpose({
   reveal,
   findSetting,
@@ -360,11 +369,29 @@ defineExpose({
                 {{ option.label }}
               </option>
               <optgroup label="系统已安装字体">
+                <option
+                  v-if="customLocalFont && !installed.includes(customLocalFont)"
+                  :value="`local:${customLocalFont}`"
+                >
+                  {{ customLocalFont }}
+                </option>
                 <option v-for="family in installed" :key="family" :value="`local:${family}`">
                   {{ family }}
                 </option>
               </optgroup>
             </select>
+          </div>
+          <div data-setting-id="global-font-custom" class="setting-item">
+            <strong>本机字体名称</strong>
+            <input
+              type="text"
+              class="preview-select wide"
+              aria-label="本机字体名称"
+              maxlength="96"
+              placeholder="例如 Microsoft YaHei UI"
+              :value="customLocalFont"
+              @change="setCustomFontFamily"
+            />
           </div>
           <FontRenderingSettings />
         </template>
@@ -686,9 +713,11 @@ defineExpose({
   flex: 1 1 180px;
   min-width: 0;
 }
-.appearance-properties-panel :deep(select) {
+.appearance-properties-panel :deep(select),
+.appearance-properties-panel :deep(input[type='text']) {
   max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
 }
 .appearance-properties-panel :deep(.section-block) {
   margin-top: 0;

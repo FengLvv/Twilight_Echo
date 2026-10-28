@@ -83,7 +83,6 @@ export function useLyricsFontPicker(): LyricsFontPicker {
       .filter(
         (family) => !normalizedQuery.value || family.toLowerCase().includes(normalizedQuery.value)
       )
-      .slice(0, 200)
       .map((family) => ({
         key: `installed:${family}`,
         label: family,
