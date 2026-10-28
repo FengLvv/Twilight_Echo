@@ -426,7 +426,8 @@ test('bundled plugins are compatible with the current application version', asyn
 test('converts descriptors to the host manifest sent to plugin processes', async () => {
   const manifest = validatePluginManifest({
     ...validManifest,
-    signature: { schemaVersion: 1 }
+    signature: { schemaVersion: 1 },
+    androidRuntime: { apiVersion: 1, entry: 'android.js', permissions: ['network', 'settings'], networkHosts: ['music.163.com'] }
   })
   const descriptor = {
     ...manifest,

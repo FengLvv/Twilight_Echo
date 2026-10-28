@@ -11,5 +11,11 @@
     "twilightEcho": ">=0.20.0"
   },
   "apiVersion": 1,
-  "permissions": ["network", "settings", "library:read", "library:write"]
+  "permissions": ["network", "settings", "library:read", "library:write"],
+  "androidRuntime": {
+    "apiVersion": 1,
+    "entry": "android.js",
+    "permissions": ["network", "settings"],
+    "networkHosts": ["music.163.com", "interface.music.163.com", "interface3.music.163.com"]
+  }
 }
