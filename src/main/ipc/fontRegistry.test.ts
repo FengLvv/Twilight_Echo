@@ -1,9 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {
   parseWindowsFontFamilies,
   listInstalledFontFamilies,
-  createFontFamilyLoader
+  createFontFamilyLoader,
+  repairShiftJisGbkMojibake,
+  extractFontFamiliesFromFile
 } from './fontRegistry.ts'
 
 test('font loader shares one pending query and caches the successful catalog', async () => {
@@ -136,4 +141,111 @@ test('parseWindowsFontFamilies keeps a style-only name rather than dropping it',
   const families = parseWindowsFontFamilies('    Bold (TrueType)    REG_SZ    bold.ttf')
 
   assert.deepEqual(families, ['Bold'])
+})
+
+test('parseWindowsFontFamilies retains more than 600 families without truncating English fonts after M', () => {
+  const lines: string[] = []
+  for (let i = 0; i < 650; i++) {
+    lines.push(`    中文字体${String(i).padStart(4, '0')} (TrueType)    REG_SZ    zh${i}.ttf`)
+  }
+  lines.push('    Microsoft JhengHei UI (TrueType)    REG_SZ    msjh.ttc')
+  lines.push('    Segoe Print (TrueType)    REG_SZ    segoepr.ttf')
+  lines.push('    Source Han Sans JP (OpenType)    REG_SZ    SourceHanSansJP.otf')
+  lines.push('    Yu Gothic (TrueType)    REG_SZ    YuGothR.ttc')
+  lines.push('    Symbol (TrueType)    REG_SZ    symbol.ttf')
+
+  const families = parseWindowsFontFamilies(lines.join('\r\n'))
+  assert.equal(families.length, 655)
+  for (const expected of [
+    'Microsoft JhengHei UI',
+    'Segoe Print',
+    'Source Han Sans JP',
+    'Yu Gothic',
+    'Symbol'
+  ]) {
+    assert.ok(families.includes(expected), `expected ${expected} not to be truncated`)
+  }
+})
+
+test('parseWindowsFontFamilies repairs Shift-JIS-as-GBK mojibake and strips OpenType Pro/Std weight suffixes', () => {
+  assert.equal(repairShiftJisGbkMojibake('FOT-拀巼柧挬 Pro M'), 'FOT-筑紫明朝 Pro M')
+  assert.equal(repairShiftJisGbkMojibake('宋体'), '宋体')
+  assert.equal(repairShiftJisGbkMojibake('微软雅黑'), '微软雅黑')
+
+  const families = parseWindowsFontFamilies(
+    [
+      '    FOT-拀巼柧挬 Pro M (OpenType)    REG_SZ    FOT-TsukuMinPro-M.otf',
+      '    FOT-TsukuMin Pro M (OpenType)    REG_SZ    FOT-TsukuMinPro-M.otf',
+      '    A-OTF Shin Go Pro DB (OpenType)    REG_SZ    A-OTF-ShinGoPro-DeBold.otf'
+    ].join('\r\n')
+  )
+
+  assert.ok(families.includes('FOT-筑紫明朝 Pro'))
+  assert.ok(families.includes('FOT-TsukuMin Pro'))
+  assert.ok(families.includes('A-OTF Shin Go Pro'))
+  assert.ok(!families.includes('FOT-拀巼柧挬 Pro M'))
+  assert.ok(!families.includes('FOT-TsukuMin Pro M'))
+})
+
+test('extractFontFamiliesFromFile prefers OpenType Name ID 16 typographic family over GDI per-weight Name ID 1', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'twilight-font-test-'))
+  try {
+    const fontPath = path.join(tmpDir, 'FOT-TsukuMinPro-M.otf')
+    const encodeUtf16Be = (text: string): Buffer => {
+      const buf = Buffer.allocUnsafe(text.length * 2)
+      for (let i = 0; i < text.length; i++) {
+        buf.writeUInt16BE(text.charCodeAt(i), i * 2)
+      }
+      return buf
+    }
+    // Padded Shift-JIS for "FOT-筑紫明朝 Pro": ASCII with 0x00 high byte + Shift-JIS 2-byte kanji
+    const paddedSjisJa = Buffer.from([
+      0x00, 0x46, 0x00, 0x4f, 0x00, 0x54, 0x00, 0x2d, 0x92, 0x7d, 0x8e, 0x87, 0x96, 0xbe, 0x92,
+      0xa9, 0x00, 0x20, 0x00, 0x50, 0x00, 0x72, 0x00, 0x6f
+    ])
+    const records = [
+      { platformId: 3, encodingId: 1, languageId: 0x0409, nameId: 1, data: encodeUtf16Be('FOT-TsukuMin Pro M') },
+      { platformId: 3, encodingId: 1, languageId: 0x0409, nameId: 16, data: encodeUtf16Be('FOT-TsukuMin Pro') },
+      { platformId: 3, encodingId: 2, languageId: 0x0411, nameId: 16, data: paddedSjisJa }
+    ]
+
+    const stringPool = Buffer.concat(records.map((r) => r.data))
+    const nameHeader = Buffer.alloc(6 + records.length * 12)
+    nameHeader.writeUInt16BE(0, 0)
+    nameHeader.writeUInt16BE(records.length, 2)
+    nameHeader.writeUInt16BE(nameHeader.length, 4)
+    let strOffset = 0
+    records.forEach((rec, idx) => {
+      const off = 6 + idx * 12
+      nameHeader.writeUInt16BE(rec.platformId, off)
+      nameHeader.writeUInt16BE(rec.encodingId, off + 2)
+      nameHeader.writeUInt16BE(rec.languageId, off + 4)
+      nameHeader.writeUInt16BE(rec.nameId, off + 6)
+      nameHeader.writeUInt16BE(rec.data.length, off + 8)
+      nameHeader.writeUInt16BE(strOffset, off + 10)
+      strOffset += rec.data.length
+    })
+    const nameTable = Buffer.concat([nameHeader, stringPool])
+
+    const sfntHeader = Buffer.alloc(12 + 16)
+    sfntHeader.write('OTTO', 0, 'ascii')
+    sfntHeader.writeUInt16BE(1, 4)
+    sfntHeader.write('name', 12, 'ascii')
+    sfntHeader.writeUInt32BE(0, 16)
+    sfntHeader.writeUInt32BE(28, 20)
+    sfntHeader.writeUInt32BE(nameTable.length, 24)
+
+    fs.writeFileSync(fontPath, Buffer.concat([sfntHeader, nameTable]))
+
+    const extracted = extractFontFamiliesFromFile(fontPath)
+    assert.deepEqual(extracted.sort(), ['FOT-TsukuMin Pro', 'FOT-筑紫明朝 Pro'].sort())
+
+    const parsed = parseWindowsFontFamilies(
+      `    FOT-拀巼柧挬 Pro M (OpenType)    REG_SZ    ${fontPath}`,
+      { resolveFileFamilies: (file) => extractFontFamiliesFromFile(file) }
+    )
+    assert.deepEqual(new Set(parsed), new Set(['FOT-TsukuMin Pro', 'FOT-筑紫明朝 Pro']))
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
 })

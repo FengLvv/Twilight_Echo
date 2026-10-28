@@ -183,6 +183,12 @@ window.runCapabilities = async () => {
     confirmed.fontFamily === 'local:Fixture Sans' && writes.length === 1,
     'font did not use immediate legacy setting'
   )
+  await choose(drawer().querySelector('[aria-label="本机字体名称"]'), 'FOT-TsukuMin Pro')
+  expect(
+    confirmed.fontFamily === 'local:FOT-TsukuMin Pro' &&
+      drawer().querySelector('[aria-label="界面字体"]').value === 'local:FOT-TsukuMin Pro',
+    'manual local font input did not update settings and select option'
+  )
   await click('清晰')
   expect(confirmed.fontRendering === 'crisp', 'font rendering disconnected')
   await showSetting('color-mode')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useLyricsFontPicker } from '@renderer/composables/useLyricsFontPicker'
 import MiniPlayerSettingsSection from './MiniPlayerSettingsSection.vue'
 import ThemeControlsSettings from './ThemeControlsSettings.vue'
@@ -24,8 +24,19 @@ const { settings, updateSettings } = useSettingsStore()
 const { installed, load: loadFonts } = useLyricsFontPicker()
 onMounted(loadFonts)
 
+const customLocalFont = computed(() =>
+  settings.value.fontFamily.startsWith('local:') ? settings.value.fontFamily.slice(6) : ''
+)
+
 function setFontFamily(event: Event): void {
   const fontFamily = normalizeAppFontFamily((event.target as HTMLSelectElement).value)
+  if (settings.value.fontFamily === fontFamily) return
+  void updateSettings({ fontFamily })
+}
+
+function setCustomFontFamily(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value.trim()
+  const fontFamily = raw ? normalizeAppFontFamily(`local:${raw}`) : 'system'
   if (settings.value.fontFamily === fontFamily) return
   void updateSettings({ fontFamily })
 }
@@ -105,16 +116,43 @@ function toggleSetting(key: BooleanSettingKey): void {
             <strong>界面字体</strong>
             <span>更换界面的正文、标题与圆体字体；“默认”跟随当前主题自带的字体。</span>
           </div>
-          <select class="preview-select wide" :value="settings.fontFamily" @change="setFontFamily">
+          <select
+            class="preview-select wide"
+            aria-label="界面字体"
+            :value="settings.fontFamily"
+            @change="setFontFamily"
+          >
             <option v-for="option in fontFamilyOptions" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
             <optgroup label="系统已安装字体">
+              <option
+                v-if="customLocalFont && !installed.includes(customLocalFont)"
+                :value="`local:${customLocalFont}`"
+              >
+                {{ customLocalFont }}
+              </option>
               <option v-for="family in installed" :key="family" :value="`local:${family}`">
                 {{ family }}
               </option>
             </optgroup>
           </select>
+        </div>
+        <hr />
+        <div data-setting-id="global-font-custom" class="setting-item">
+          <div class="setting-copy">
+            <strong>本机字体名称</strong>
+            <span>可直接输入系统已安装的字体家族名（如 FOT-TsukuMin Pro），清空则恢复默认。</span>
+          </div>
+          <input
+            type="text"
+            class="preview-select wide"
+            aria-label="本机字体名称"
+            maxlength="96"
+            placeholder="例如 Microsoft YaHei UI"
+            :value="customLocalFont"
+            @change="setCustomFontFamily"
+          />
         </div>
         <hr />
         <FontRenderingSettings />
