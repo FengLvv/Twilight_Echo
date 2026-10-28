@@ -1006,6 +1006,9 @@ if(TAE_BUILD_TESTS)
   add_test(NAME twilight_audio_flac_tail_continuation
     COMMAND twilight_audio_performance_gate --verify-flac-tail)
   set_tests_properties(twilight_audio_flac_tail_continuation PROPERTIES TIMEOUT 20 SKIP_RETURN_CODE 77)
+  add_test(NAME twilight_audio_automix_continuation
+    COMMAND twilight_audio_performance_gate --verify-automix-transport)
+  set_tests_properties(twilight_audio_automix_continuation PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
 
   add_executable(twilight_dst_decoder_tests
     tests/dst_decoder_tests.cpp

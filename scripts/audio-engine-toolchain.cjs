@@ -28,6 +28,8 @@ const PERSISTED_MINGW_VARIABLES = [
 const MINGW_EXPECTED_CTESTS = Object.freeze([
   'twilight_audio_engine_smoke',
   'twilight_audio_pcm_transparency',
+  'twilight_audio_flac_tail_continuation',
+  'twilight_audio_automix_continuation',
   'twilight_dsp_unit',
   'twilight_convolver_unit',
   'twilight_loudness_realtime_unit',

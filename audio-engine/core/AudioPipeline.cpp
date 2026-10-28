@@ -1926,9 +1926,11 @@ struct AudioPipeline::AutoMixGeneration {
           spec->binding.sample_rate, &error)) {
         std::snprintf(reason, n, "continuation_seek_failed"); return 0;
       }
-      // The bounded preparation token must never be retained by the live
-      // continuation decoder after the job is joined and freed.
-      stream->decoder->setInterrupt(nullptr, nullptr);
+      // Only opening/seeking borrows the preparation token. Detach it before
+      // the worker starts: the job frees it while this stream is still live,
+      // and decodeLoop checks cancellation again when it reaches EOF.
+      // Keep the decoder's stream-owned stopRequested interrupt installed.
+      stream->externalCancel = nullptr;
       stream->prepareFloatReadScratch(g.renderFrames);
       stream->crossfadeConsumedFrames.store(spec->next_end, std::memory_order_release);
       // The prepared incoming lane and its decoder continuation are one deck.

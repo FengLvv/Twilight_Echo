@@ -504,6 +504,62 @@ void verifyAutoMixWindowOwnership() {
   assert(!parseAutoMixWindows(request, "currentWindows", "currentFeatures", merged.get(), &error));
   std::cout << "PASS context-owned beats and voice, missing voice and coverage gaps\n";
 }
+void verifyAutoMixQueueContinuation(
+    const QueueItem& current, const QueueItem& next, const std::string& request) {
+  resetBackend();
+  TwilightAudioEngine engine;
+  assert(engine.setVolume(.5) == TAE_RESULT_OK);
+  assert(engine.setDspConfig("{\"gapless\":true,\"crossfadeSeconds\":0,\"fftEnabled\":false}") == TAE_RESULT_OK);
+  assert(engine.setAutoMixMode("natural") == TAE_RESULT_OK);
+  const auto row = [](const QueueItem& item) {
+    return "{\"id\":\"" + json_utils::escape(item.id) + "\",\"source\":\"" +
+        json_utils::escape(item.source) + "\"}";
+  };
+  QueueItem last = current;
+  last.id = "automix-last";
+  assert(engine.loadQueue("[" + row(current) + "," + row(next) + "," + row(last) + "]", 0) == TAE_RESULT_OK);
+  assert(engine.play(current.source, 0) == TAE_RESULT_OK);
+  auto backend = latestBackend();
+  std::vector<float> scratch(kCallbackFrames * kChannels);
+  backend->render(scratch.data(), kCallbackFrames);
+  assert(engine.prepareAutoMix(request) == TAE_RESULT_OK);
+  auto info = engine.getPlaybackInfoJson();
+  const auto readyDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (json_utils::fieldString(info, "autoMixState") == "preparing" &&
+         std::chrono::steady_clock::now() < readyDeadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    info = engine.getPlaybackInfoJson();
+  }
+  assert(json_utils::fieldString(info, "autoMixState") == "ready");
+  const auto plan = json_utils::fieldNumber(info, "autoMixPlanId").value_or(0);
+  assert(plan > 0 && engine.submitAutoMix(static_cast<uint64_t>(plan)) == TAE_RESULT_OK);
+  bool mixed = false, advanced = false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+  for (unsigned i = 0; std::chrono::steady_clock::now() < deadline; ++i) {
+    backend = latestBackend();
+    RenderCallback render;
+    {
+      std::lock_guard lock(backend->mutex);
+      if (backend->started) render = backend->render;
+    }
+    if (render) render(scratch.data(), kCallbackFrames);
+    if (i % 8 == 0) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    info = engine.getPlaybackInfoJson();
+    mixed = mixed || json_utils::fieldString(info, "autoMixState") == "mixing";
+    if (json_utils::fieldNumber(info, "queueIndex") == 2) {
+      advanced = true;
+      break;
+    }
+  }
+  if (!advanced) std::cerr << "AutoMix queue did not advance after continuation EOF: " << info << '\n';
+  assert(mixed && advanced);
+  assert(json_utils::fieldString(info, "source") == last.source);
+  assert(json_utils::fieldString(info, "state") == "playing");
+  assert(json_utils::fieldNumber(json_utils::fieldObject(info, "naturalBoundaries"), "trackSerial") == 2);
+  assert(engine.stop() == TAE_RESULT_OK);
+  std::cout << "PASS AutoMix queue automatically starts the third track after the mixed-in track ends\n";
+}
+
 void verifyAutoMixTransport(const std::filesystem::path& root) {
   const auto a = writePcmWav(root / "automix-a.wav", 24.125, false, 421, 48000);
   const auto b = writePcmWav(root / "automix-b.wav", 24.125, false, 523, 44100);
@@ -693,7 +749,39 @@ void verifyAutoMixTransport(const std::filesystem::path& root) {
              100.0 * performance.totalCallbackNanoseconds /
                      performance.totalDeadlineNanoseconds <
                  kPipelineMeanDeadlineLoadLimitPercent);
+      // Preparation has already joined/freed its cancellation token. Keep
+      // rendering the incoming decoder all the way to EOF, not just its first
+      // block: a borrowed preparation token can otherwise suppress EOF and
+      // leave the queue playing silence forever after a successful overlap.
+      bool ended = false;
+      const auto endDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      for (unsigned i = 0; std::chrono::steady_clock::now() < endDeadline; ++i) {
+        backend->render(scratch.data(), kCallbackFrames);
+        if (i % 8 == 0) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        status = pipeline.status();
+        assert(!pipeline.consumeTrackStarted(nullptr));
+        if (pipeline.consumeEnded()) {
+          ended = true;
+          break;
+        }
+      }
+      if (!ended) {
+        OutputInfo::Diagnostics health;
+        pipeline.sampleDecodeHealth(health);
+        std::cerr << "AutoMix continuation did not reach EOF: mode=" << mode
+                  << " cue=" << cue << " position=" << status.positionSeconds
+                  << " duration=" << status.stream.durationSeconds
+                  << " stage=" << health.decodeStage << " eof=" << health.decodeEof
+                  << " stopped=" << health.decodeStopRequested << '\n';
+      }
+      assert(ended);
+      assert(status.currentItem.id == next.id && status.state == PipelineState::Stopped);
+      assert(std::abs(status.positionSeconds - status.stream.durationSeconds) < 0.001);
+      assert(!pipeline.consumeEnded());
+      assert(!pipeline.consumeDecodeError(&error));
       pipeline.stop();
+      if (!cue && std::string(mode) == "natural")
+        verifyAutoMixQueueContinuation(current, next, request);
       // A source hash mismatch must never produce a ready plan.
       assert(pipeline.play(current, next, 0, "controlled-pump", "controlled", 1,
                            "{\"gapless\":true,\"fftEnabled\":false}", true,
@@ -1267,6 +1355,12 @@ int main(int argc, char** argv) {
   ScopedControlledBackendFactory controlledBackendFactory;
   if (argc == 2 && std::string(argv[1]) == "--verify-flac-tail")
     return verifyFlacTailContinuation();
+  if (argc == 2 && std::string(argv[1]) == "--verify-automix-transport") {
+    const auto root = std::filesystem::temp_directory_path() / "twilight-automix-transport";
+    std::filesystem::create_directories(root);
+    verifyAutoMixTransport(root);
+    return 0;
+  }
   if (argc == 3 && std::string(argv[1]) == "--verify-pcm")
     return verifyPcmTransparency(std::filesystem::u8path(argv[2]));
   if (argc == 2 && std::string(argv[1]) == "--verify-neutral-pcm") {
