@@ -20,6 +20,9 @@ import {
   type RemoteBrowseResult
 } from '../../shared/remoteControl.ts'
 import { RemoteCommandError, type RemoteHttpServer } from '../cast/httpServer.ts'
+import { RemoteCoreBridge } from './coreBridge.ts'
+import type { RemoteMediaResolver } from './media.ts'
+import type { RemoteCoreRpcContext, RemoteProviderSession } from '../../shared/remoteCoreBridge.ts'
 
 export interface CoreRemoteOptions {
   server: RemoteHttpServer
@@ -33,6 +36,8 @@ export interface CoreRemoteOptions {
   resolveCover(handle: string | null): Promise<string | null>
   failed(error: unknown): void
   now(): number
+  media?: RemoteMediaResolver
+  providerSession?(): Promise<RemoteProviderSession>
 }
 type TrackToken =
   | { kind: 'library'; id: string; query: LibraryQuery }
@@ -62,7 +67,8 @@ export class CoreRemoteService {
     { resolve(value: unknown): void; reject(error: unknown): void }
   >()
   private readonly tokens = new Map<string, Token>()
-  private readonly commands = new Set<Promise<void>>()
+  private readonly commands = new Set<Promise<unknown>>()
+  private readonly bridge: RemoteCoreBridge
   private readonly controller = new AbortController()
   private syncKey = ''
   private syncWork: Promise<unknown> = Promise.resolve()
@@ -72,9 +78,19 @@ export class CoreRemoteService {
   private stopped = false
   constructor(options: CoreRemoteOptions) {
     this.options = options
+    this.bridge = new RemoteCoreBridge({
+      snapshot: () => this.current,
+      request: this.request.bind(this),
+      playback: options.playback,
+      resolveCover: options.resolveCover,
+      signal: this.controller.signal,
+      failed: options.failed,
+      media: options.media,
+      providerSession: options.providerSession
+    })
     options.server.setCommandHandler((command) => this.command(command))
     options.server.setBrowseHandler((request) => this.browse(request))
-    options.server.setCoreRpcHandler?.((envelope) => this.handleCoreRpc(envelope))
+    options.server.setCoreRpcHandler?.((envelope, principal, context) => this.handleCoreRpc(envelope, principal, context))
   }
   attach(application: Pick<CoreApplication, 'connect' | 'disconnect' | 'request'>): void {
     if (this.application) throw new Error('Remote Core client already attached')
@@ -122,14 +138,21 @@ export class CoreRemoteService {
   private request<K extends keyof CoreQueries>(
     kind: 'query',
     name: K,
-    payload: CoreQueries[K]['input']
+    payload: CoreQueries[K]['input'],
+    epoch?: string
   ): Promise<CoreQueries[K]['output']>
   private request<K extends keyof CoreCommands>(
     kind: 'command',
     name: K,
-    payload: CoreCommands[K]
+    payload: CoreCommands[K],
+    epoch?: string
   ): Promise<unknown>
-  private request(kind: 'query' | 'command', name: string, payload: unknown): Promise<never> {
+  private request(
+    kind: 'query' | 'command',
+    name: string,
+    payload: unknown,
+    epoch?: string
+  ): Promise<never> {
     if (!this.application || !this.current || this.stopped)
       return Promise.reject(new RemoteCommandError('core_not_ready'))
     const requestId = randomUUID()
@@ -140,7 +163,7 @@ export class CoreRemoteService {
         name,
         payload,
         requestId,
-        epoch: this.current!.epoch
+        epoch: epoch ?? this.current!.epoch
       } as CoreRequestEnvelope).catch((error) => {
         this.pending.delete(requestId)
         reject(error)
@@ -200,41 +223,7 @@ export class CoreRemoteService {
     })
   }
   private projectCoreSnapshotForBridge(state: CoreSnapshot): Record<string, unknown> {
-    const mode = state.playback?.playMode
-    const wirePlayMode =
-      mode === 'repeat'
-        ? 'single'
-        : mode === 'listLoop'
-          ? 'loop'
-          : mode === 'shuffle'
-            ? 'shuffle'
-            : mode === 'heart'
-              ? 'heart'
-              : 'sequence'
-    return {
-      protocolVersion: state.protocolVersion,
-      epoch: state.epoch,
-      sequence: state.sequence,
-      phase: state.phase,
-      playback: state.playback
-        ? {
-            ...state.playback,
-            playMode: wirePlayMode
-          }
-        : null,
-      track: state.track,
-      queue: state.queue,
-      error: state.error,
-      isStreamBuffering: state.isStreamBuffering,
-      loading: state.loading,
-      migrationRequired: state.migrationRequired,
-      mute: state.mute,
-      libraryRevision: state.libraryRevision,
-      playlistsRevision: state.playlistsRevision,
-      audioRevision: state.audioRevision,
-      settingsRevision: state.settingsRevision,
-      lyricsRevision: state.lyricsRevision
-    }
+    return this.bridge.projectSnapshot(state)
   }
   status() {
     return this.options.server.getStatus()
@@ -253,10 +242,13 @@ export class CoreRemoteService {
       .catch(() => {})
       .then(async () => {
         if (this.stopped) return
-        if (settings.remoteControlEnabled)
+        if (settings.remoteControlEnabled) {
+          // Refresh cached SSE references after a disabled bridge has been cleared.
+          this.publish()
           await this.options.server.start(settings.remoteControlPort, { mode: 'full' })
-        else {
+        } else {
           this.tokens.clear()
+          this.bridge.clear()
           if (this.options.castActive())
             await this.options.server.start(settings.remoteControlPort, { mode: 'mediaOnly' })
           else await this.options.server.stop()
@@ -272,8 +264,13 @@ export class CoreRemoteService {
   }
   rotatePin() {
     this.tokens.clear()
-    return { pin: this.options.server.rotatePin(), status: this.status() }
+    this.bridge.clear()
+    const pin = this.options.server.rotatePin()
+    this.publish()
+    return { pin, status: this.status() }
   }
+  decidePairing(requestId: string, allow: boolean) { return this.options.server.decidePairing(requestId, allow) }
+  revokeDevice(id: string) { return this.options.server.revokeDevice(id) }
   async browse(request: RemoteBrowseRequest): Promise<RemoteBrowseResult> {
     const state = this.ready()
     const { offset, limit, query } = request
@@ -547,231 +544,14 @@ export class CoreRemoteService {
       throw error
     }
   }
-  async handleCoreRpc(raw: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const requestId = typeof raw.requestId === 'string' ? raw.requestId : ''
-    const kind = raw.kind === 'command' ? 'command' : 'query'
-    const name = typeof raw.name === 'string' ? raw.name : ''
-    const payload =
-      raw.payload && typeof raw.payload === 'object' && !Array.isArray(raw.payload)
-        ? (raw.payload as Record<string, unknown>)
-        : {}
-    const epoch = this.current?.epoch ?? 'epoch-unavailable'
-
-    if (this.stopped || !this.application || !this.current || this.current.phase !== 'ready') {
-      return {
-        kind: 'response',
-        requestId,
-        epoch,
-        ok: false,
-        error: { code: 'NOT_READY', message: 'Desktop Core is not ready' }
-      }
-    }
-
-    try {
-      // 1. Mobile / Cross-Platform Bridge Queries
-      if (kind === 'query') {
-        if (name === 'core.getSnapshot') {
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: this.projectCoreSnapshotForBridge(this.current)
-          }
-        }
-        if (name === 'playback.getQueueWindow') {
-          const queue = this.current.queue
-          const offset = typeof payload.offset === 'number' ? payload.offset : 0
-          const limit = typeof payload.limit === 'number' ? payload.limit : 50
-          if (!queue) {
-            return {
-              kind: 'response',
-              requestId,
-              epoch: this.current.epoch,
-              ok: true,
-              value: {
-                queueId: 'default',
-                revision: 0,
-                total: 0,
-                offset,
-                limit,
-                currentIndex: -1,
-                currentOccurrenceId: null,
-                items: []
-              }
-            }
-          }
-          const page = await this.request('query', 'queue.page', {
-            id: queue.id,
-            revision: queue.revision,
-            offset,
-            limit,
-            ...(typeof payload.search === 'string' ? { search: payload.search } : {})
-          })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: {
-              queueId: queue.id,
-              revision: page.revision,
-              total: page.total,
-              offset: page.offset,
-              limit,
-              currentIndex: queue.index,
-              currentOccurrenceId: queue.occurrenceId,
-              items: page.items.map((item) => ({
-                occurrenceId: item.queueEntryId,
-                index: item.position,
-                track: item.track
-              }))
-            }
-          }
-        }
-        if (name === 'search.songs') {
-          const queryText = typeof payload.query === 'string' ? payload.query : ''
-          const offset = typeof payload.offset === 'number' ? payload.offset : 0
-          const limit = typeof payload.limit === 'number' ? payload.limit : 100
-          const page = await this.request('query', 'library.tracks', {
-            search: queryText,
-            searchLiteral: true,
-            sort: 'insertion',
-            direction: 'asc',
-            offset,
-            limit
-          })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: {
-              query: queryText,
-              total: page.total,
-              items: page.tracks
-            }
-          }
-        }
-        if (name === 'playlists.list' && Object.keys(payload).length === 0) {
-          const page = await this.request('query', 'playlists.catalog', {
-            offset: 0,
-            limit: 100
-          })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: page.items.map((row) => ({
-              id: row.id,
-              name: row.name,
-              trackIds: [],
-              trackCount: row.count,
-              updatedAtMs: 0
-            }))
-          }
-        }
-      }
-
-      // 2. Mobile / Cross-Platform Bridge Commands
-      if (kind === 'command') {
-        if (name === 'playback.setVolume') {
-          const volume = typeof payload.volume === 'number' ? payload.volume : 1
-          await this.request('command', 'playback.volume', { volume })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: { snapshot: this.projectCoreSnapshotForBridge(this.current) }
-          }
-        }
-        if (name === 'playback.setPlayMode') {
-          const rawMode = typeof payload.mode === 'string' ? payload.mode : 'sequence'
-          const desktopMode =
-            rawMode === 'single'
-              ? 'repeat'
-              : rawMode === 'loop'
-                ? 'listLoop'
-                : rawMode === 'shuffle'
-                  ? 'shuffle'
-                  : rawMode === 'heart'
-                    ? 'heart'
-                    : 'sequential'
-          await this.request('command', 'playback.mode', { mode: desktopMode })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: { snapshot: this.projectCoreSnapshotForBridge(this.current) }
-          }
-        }
-        if (name === 'playback.selectQueueIndex') {
-          const queue = this.current.queue
-          if (!queue) {
-            throw Object.assign(new Error('No active queue'), { code: 'NOT_FOUND' })
-          }
-          const index = typeof payload.index === 'number' ? payload.index : 0
-          const page = await this.request('query', 'queue.page', {
-            id: queue.id,
-            revision: queue.revision,
-            offset: index,
-            limit: 1
-          })
-          const item = page.items[0]
-          const occurrenceId =
-            item?.queueEntryId ??
-            (typeof payload.occurrenceId === 'string' ? payload.occurrenceId : `occ-${index}`)
-          await this.request('command', 'queue.select', {
-            id: queue.id,
-            revision: queue.revision,
-            index,
-            occurrenceId
-          })
-          return {
-            kind: 'response',
-            requestId,
-            epoch: this.current.epoch,
-            ok: true,
-            value: { snapshot: this.projectCoreSnapshotForBridge(this.current) }
-          }
-        }
-      }
-
-      // 3. Direct passthrough for standard Desktop Core queries & commands
-      const value = await (
-        this.request as (
-          reqKind: 'query' | 'command',
-          reqName: string,
-          reqPayload: unknown
-        ) => Promise<unknown>
-      )(kind, name, payload)
-      return {
-        kind: 'response',
-        requestId,
-        epoch: this.current.epoch,
-        ok: true,
-        value:
-          kind === 'command' && (value == null || typeof value !== 'object')
-            ? { snapshot: this.projectCoreSnapshotForBridge(this.current) }
-            : value
-      }
-    } catch (err) {
-      const code =
-        typeof (err as { code?: unknown })?.code === 'string'
-          ? ((err as { code: string }).code as string)
-          : 'FAILED'
-      const message = err instanceof Error ? err.message : String(err)
-      return {
-        kind: 'response',
-        requestId,
-        epoch: this.current?.epoch ?? epoch,
-        ok: false,
-        error: { code, message }
-      }
-    }
+  handleCoreRpc(raw: Record<string, unknown>, principal?: string, context?: RemoteCoreRpcContext): Promise<Record<string, unknown>> {
+    const work = this.bridge.handle(raw, principal, context)
+    this.commands.add(work)
+    void work.then(
+      () => this.commands.delete(work),
+      () => this.commands.delete(work)
+    )
+    return work
   }
   async shutdown(): Promise<void> {
     this.stopped = true
@@ -785,6 +565,7 @@ export class CoreRemoteService {
       pending.reject(new RemoteCommandError('core_not_ready'))
     this.pending.clear()
     this.tokens.clear()
+    this.bridge.clear()
     await Promise.allSettled([...this.commands])
     await this.syncWork.catch(() => {})
     await this.options.server.stop()

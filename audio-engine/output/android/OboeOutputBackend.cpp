@@ -14,6 +14,7 @@
 #if defined(__ANDROID__)
 #include <aaudio/AAudio.h>
 #include <android/log.h>
+#include <dlfcn.h>
 #endif
 
 namespace twilight::audio {
@@ -43,6 +44,29 @@ bool deviceIdRequestsExclusive(const std::string& deviceId) {
 
 #if defined(__ANDROID__)
 constexpr const char* kLogTag = "TwilightOboeBackend";
+
+// Resolve API 34 queries dynamically so the same library still loads on API 26.
+void readHardwareFormat(AAudioStream* stream, OutputInfo& info) {
+  using Query = int32_t (*)(AAudioStream*);
+  static const auto rate = reinterpret_cast<Query>(dlsym(RTLD_DEFAULT, "AAudioStream_getHardwareSampleRate"));
+  static const auto channels = reinterpret_cast<Query>(dlsym(RTLD_DEFAULT, "AAudioStream_getHardwareChannelCount"));
+  static const auto format = reinterpret_cast<Query>(dlsym(RTLD_DEFAULT, "AAudioStream_getHardwareFormat"));
+  info.hardwareSampleRate = rate ? std::max(0, rate(stream)) : 0;
+  info.hardwareChannels = channels ? std::max(0, channels(stream)) : 0;
+  const int32_t hardwareFormat = format ? format(stream) : AAUDIO_FORMAT_INVALID;
+  switch (hardwareFormat) {
+    case AAUDIO_FORMAT_PCM_I16:
+      info.hardwareSampleFormat = "int16"; info.hardwareBitDepth = 16; break;
+    case AAUDIO_FORMAT_PCM_I24_PACKED:
+      info.hardwareSampleFormat = "int24"; info.hardwareBitDepth = 24; break;
+    case AAUDIO_FORMAT_PCM_I32:
+      info.hardwareSampleFormat = "int32"; info.hardwareBitDepth = 32; break;
+    case AAUDIO_FORMAT_PCM_FLOAT:
+      info.hardwareSampleFormat = "float32"; info.hardwareBitDepth = 32; break;
+    default:
+      info.hardwareSampleFormat.clear(); info.hardwareBitDepth = 0; break;
+  }
+}
 
 int32_t parseAndroidDeviceId(const std::string& deviceId) {
   if (deviceId.empty() || deviceId == "auto" || deviceId == "default" ||
@@ -160,6 +184,14 @@ struct OboeOutputBackend::Impl {
       self->diagnostics.lastError = message;
       self->info.diagnostics = self->diagnostics;
       self->info.deviceRecovered = false;
+      self->info.outputReleased = true;
+      self->info.exclusive = false;
+      self->info.outputPerfect = false;
+      self->info.actualDeviceId.clear();
+      self->info.hardwareSampleRate = 0;
+      self->info.hardwareBitDepth = 0;
+      self->info.hardwareChannels = 0;
+      self->info.hardwareSampleFormat.clear();
       localEventCb = self->eventCallback;
     }
 
@@ -428,10 +460,10 @@ bool OboeOutputBackend::open(
   impl_->info = {};
   impl_->info.exclusive = isExclusive;
   impl_->info.accessMode = isExclusive ? "exclusive" : "shared";
-  impl_->info.supportsOutputPerfect = isExclusive && !resampled;
+  impl_->info.supportsOutputPerfect = false;
   impl_->info.sourceExact = sourceExact;
-  impl_->info.outputPerfect = isExclusive && sourceExact && !resampled;
-  impl_->info.pcmPassthrough = isExclusive && !resampled;
+  impl_->info.outputPerfect = false;
+  impl_->info.pcmPassthrough = false;
   impl_->info.resampled = resampled;
   impl_->info.conversionInfo.sampleRateConverted = sampleRateConverted;
   impl_->info.conversionInfo.channelLayoutConverted = channelLayoutConverted;
@@ -449,13 +481,16 @@ bool OboeOutputBackend::open(
   impl_->info.actualDeviceId =
       (actualDeviceId != AAUDIO_UNSPECIFIED && actualDeviceId > 0)
           ? std::to_string(actualDeviceId)
-          : impl_->currentDeviceId;
+          : "";
   impl_->info.driverName = "AAudio";
   impl_->info.actualDriverName = "AAudio";
   impl_->info.actualOutputFormat = sampleFormatToString(impl_->format.sampleFormat);
   impl_->info.actualSampleRate = impl_->format.sampleRate;
   impl_->info.actualBitDepth = impl_->format.bitDepth;
   impl_->info.actualChannels = impl_->format.channelCount;
+  impl_->info.requestedSampleRate = requestedFormat.sampleRate;
+  impl_->info.requestedSampleFormat = sampleFormatToString(requestedFormat.sampleFormat);
+  readHardwareFormat(stream, impl_->info);
   impl_->info.bufferSizeFrames = impl_->latencyFrames;
   impl_->info.latencyFrames = impl_->latencyFrames;
   impl_->info.latencyInfo.bufferLatencyMs = bufferMs;
@@ -475,8 +510,8 @@ bool OboeOutputBackend::open(
         "Android AAudio exclusive output negotiated a different sample rate, channel count, or PCM format";
     impl_->info.capabilityReason = impl_->info.perfectReason;
   } else {
-    impl_->info.perfectReasonCode.clear();
-    impl_->info.perfectReason.clear();
+    impl_->info.perfectReasonCode = "android_system_path";
+    impl_->info.perfectReason = "Android AAudio exclusive PCM stream";
     impl_->info.capabilityReason = "Android AAudio exclusive low-latency output path";
   }
   impl_->info.diagnostics = impl_->diagnostics;
@@ -690,7 +725,10 @@ AudioFormat OboeOutputBackend::outputFormat() const {
 OutputInfo OboeOutputBackend::outputInfo() const {
   std::lock_guard lock(impl_->mutex);
 #if defined(__ANDROID__)
-  if (impl_->aaudioStream) {
+  if (impl_->aaudioStream && !impl_->info.outputReleased) {
+    const int32_t deviceId = AAudioStream_getDeviceId(impl_->aaudioStream);
+    impl_->info.actualDeviceId = deviceId > 0 ? std::to_string(deviceId) : "";
+    readHardwareFormat(impl_->aaudioStream, impl_->info);
     const int32_t xruns = AAudioStream_getXRunCount(impl_->aaudioStream);
     if (xruns > 0) {
       impl_->diagnostics.driverXrunCount = static_cast<uint64_t>(xruns);

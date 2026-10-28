@@ -1,4 +1,5 @@
 import { CoreApplication } from './application.ts'
+import { defaultPortableDspSettings, normalizePortableDspSettings, type PortableDspSettings, type PortableDspScene } from '../shared/portableAudio.ts'
 import { CoreBookmarksService } from './bookmarks/service.ts'
 import { CoreLyricsService } from './lyrics/service.ts'
 import { CorePlayerPresentationService } from './playback/presentationService.ts'
@@ -465,6 +466,8 @@ export interface CoreEqConfigView {
   bandsDb: number[]
   bitPerfect: boolean
   gapless: boolean
+  dsp?: PortableDspSettings
+  scenes?: PortableDspScene[]
 }
 
 export const PORTABLE_EQ_PRESETS: Record<string, readonly number[]> = {
@@ -483,7 +486,9 @@ export function createDefaultEqConfig(): CoreEqConfigView {
     preampDb: 0,
     bandsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     bitPerfect: false,
-    gapless: true
+    gapless: true,
+    dsp: defaultPortableDspSettings(),
+    scenes: []
   }
 }
 
@@ -510,7 +515,9 @@ export function applyEqConfigPatch(
     preampDb: typeof patch.preampDb === 'number' ? clampDb(patch.preampDb) : current.preampDb,
     bandsDb: nextBands,
     bitPerfect: typeof patch.bitPerfect === 'boolean' ? patch.bitPerfect : current.bitPerfect,
-    gapless: typeof patch.gapless === 'boolean' ? patch.gapless : current.gapless
+    gapless: typeof patch.gapless === 'boolean' ? patch.gapless : current.gapless,
+    dsp: patch.dsp ? normalizePortableDspSettings(patch.dsp) : structuredClone(current.dsp ?? defaultPortableDspSettings()),
+    scenes: Array.isArray(patch.scenes) ? structuredClone(patch.scenes.slice(0, 32)) : structuredClone(current.scenes ?? [])
   }
 }
 
@@ -672,7 +679,10 @@ interface StoredQueueRecord {
   }>
 }
 
+const PORTABLE_ENVELOPE_SCHEMA = 'portable-core/1'
+
 interface PersistedEnvelope {
+  schema?: typeof PORTABLE_ENVELOPE_SCHEMA
   session: PlaybackSessionData<TrackData> | null
   queues: Array<{
     id: string
@@ -688,6 +698,7 @@ interface PersistedEnvelope {
   bookmarks?: PlaybackBookmarksDocument
   lyricsManagement?: LyricsManagementDocument
   playlists?: Playlist[]
+  /** Read-only input from hosts that kept a parallel playlist list. */
   customPlaylists?: CorePlaylistView[]
   eqConfig?: CoreEqConfigView
 }
@@ -704,7 +715,10 @@ class PortableQueueAndLibraryStore {
   private libraryRevisionCounter = 1
   private queueIdCounter = 0
   private entryIdCounter = 0
+  /** Known records: library rows plus tracks only referenced by a queue. */
   private readonly tracks = new Map<string, LibraryTrackRecord>()
+  /** Library membership. Queueing a track never makes it a library row. */
+  private readonly libraryIds = new Set<string>()
   private readonly queues = new Map<string, StoredQueueRecord>()
   private readonly buildingQueues = new Map<
     string,
@@ -719,18 +733,73 @@ class PortableQueueAndLibraryStore {
   constructor(initialTracks: readonly TrackData[] = []) {
     for (const track of initialTracks) {
       this.tracks.set(track.id, toTrackRecord(track))
+      this.libraryIds.add(track.id)
     }
   }
 
   upsertTracks(items: readonly TrackData[]): void {
     for (const item of items) {
       this.tracks.set(item.id, toTrackRecord(item))
+      this.libraryIds.add(item.id)
     }
     this.libraryRevisionCounter++
   }
 
+  /** A platform scan is the whole local library; queue-only records stay
+   * reachable through their queue rows and are dropped once unreferenced. */
+  replaceLibraryTracks(items: readonly TrackData[]): void {
+    this.libraryIds.clear()
+    for (const item of items) {
+      this.tracks.set(item.id, toTrackRecord(item))
+      this.libraryIds.add(item.id)
+    }
+    this.pruneDetachedTracks()
+    this.libraryRevisionCounter++
+  }
+
+  /** Remembers queue-only records without changing library membership. */
+  rememberTracks(items: readonly TrackData[]): void {
+    for (const item of items) this.rememberTrack(item)
+  }
+
+  private rememberTrack(track: TrackData | LibraryTrackRecord): void {
+    if (!this.libraryIds.has(track.id)) this.tracks.set(track.id, toTrackRecord(track))
+  }
+
+  private pruneDetachedTracks(): void {
+    const referenced = new Set<string>()
+    for (const queue of this.queues.values())
+      for (const row of queue.rows) referenced.add(row.trackId)
+    for (const id of [...this.tracks.keys()])
+      if (!this.libraryIds.has(id) && !referenced.has(id)) this.tracks.delete(id)
+  }
+
+  /** Library row, remembered queue record, or a persisted queue snapshot. */
+  getTrack(id: string): LibraryTrackRecord | null {
+    const known = this.tracks.get(id)
+    if (known) return structuredClone(known)
+    for (const queue of this.queues.values()) {
+      const row = queue.rows.find((candidate) => candidate.trackId === id && candidate.snapshot)
+      if (row?.snapshot) return structuredClone(row.snapshot)
+    }
+    return null
+  }
+
+  isLibraryTrack(id: string): boolean {
+    return this.libraryIds.has(id)
+  }
+
   getAllTracks(): LibraryTrackRecord[] {
-    return [...this.tracks.values()].map((t) => structuredClone(t))
+    return this.libraryTracks().map((t) => structuredClone(t))
+  }
+
+  private libraryTracks(): LibraryTrackRecord[] {
+    const list: LibraryTrackRecord[] = []
+    for (const id of this.libraryIds) {
+      const track = this.tracks.get(id)
+      if (track) list.push(track)
+    }
+    return list
   }
 
   getLibraryRevision(): number {
@@ -739,7 +808,8 @@ class PortableQueueAndLibraryStore {
 
   exportState(): Pick<PersistedEnvelope, 'queues' | 'tracks'> {
     return {
-      tracks: [...this.tracks.values()].map((t) => structuredClone(t)),
+      // Queue rows carry their own snapshots; only library rows are durable here.
+      tracks: this.libraryTracks().map((t) => structuredClone(t)),
       queues: [...this.queues.values()].map((q) => ({
         id: q.id,
         revision: q.revision,
@@ -758,8 +828,11 @@ class PortableQueueAndLibraryStore {
       for (const track of state.tracks) {
         if (track && typeof track.id === 'string') {
           this.tracks.set(track.id, structuredClone(track))
+          this.libraryIds.add(track.id)
         }
       }
+      // Restored rows are new content to anything that read the empty store.
+      this.libraryRevisionCounter++
     }
     if (Array.isArray(state.queues)) {
       this.queues.clear()
@@ -817,7 +890,7 @@ class PortableQueueAndLibraryStore {
   async buildQueue(command: LibraryQueueBuildCommand): Promise<LibraryQueueBuildReply> {
     if (command.kind === 'begin') {
       this.buildingQueues.set(command.id, {
-        id: this.nextQueueId(),
+        id: typeof command.id === 'string' && command.id ? command.id : this.nextQueueId(),
         order: command.order,
         sequence: 0,
         rows: []
@@ -833,11 +906,12 @@ class PortableQueueAndLibraryStore {
     if (command.kind === 'append') {
       for (const item of command.items) {
         const snapshot = item.localSnapshot ?? item.snapshot ?? this.tracks.get(item.id) ?? null
-        if (snapshot) {
-          this.tracks.set(item.id, toTrackRecord(snapshot))
-        }
+        if (snapshot) this.rememberTrack(snapshot)
         staging.rows.push({
-          queueEntryId: this.nextEntryId(),
+          queueEntryId:
+            'occurrenceId' in item && typeof item.occurrenceId === 'string' && item.occurrenceId
+              ? item.occurrenceId
+              : this.nextEntryId(),
           originalOrder:
             typeof item.originalPosition === 'number'
               ? item.originalPosition
@@ -1043,7 +1117,7 @@ class PortableQueueAndLibraryStore {
         if (edit.items) {
           for (const item of edit.items) {
             const snapshot = item.snapshot ?? this.tracks.get(item.id) ?? null
-            if (snapshot) this.tracks.set(item.id, toTrackRecord(snapshot))
+            if (snapshot) this.rememberTrack(snapshot)
             newRows.push({
               queueEntryId: this.nextEntryId(),
               originalOrder: record.rows.length + newRows.length,
@@ -1175,6 +1249,7 @@ class PortableQueueAndLibraryStore {
 
   async deleteQueue(id: string, _expectedRevision: number): Promise<void> {
     this.queues.delete(id)
+    this.pruneDetachedTracks()
   }
 
   async readNeighbor(
@@ -1203,15 +1278,15 @@ class PortableQueueAndLibraryStore {
   async getMetadata(): Promise<LibraryMetadata> {
     return {
       revision: this.libraryRevisionCounter,
-      trackCount: this.tracks.size,
-      fileCount: this.tracks.size,
+      trackCount: this.libraryIds.size,
+      fileCount: this.libraryIds.size,
       folders: [],
       exclusions: []
     }
   }
 
   async queryTracks(query: LibraryQuery = {}): Promise<LibraryPage> {
-    let list = [...this.tracks.values()]
+    let list = this.libraryTracks()
     if (query.ids) {
       const idSet = new Set(query.ids)
       list = list.filter((t) => idSet.has(t.id))
@@ -1239,9 +1314,8 @@ class PortableQueueAndLibraryStore {
 
   async getTracksByIds(ids: string[]): Promise<LibraryPage> {
     const found = ids
-      .map((id) => this.tracks.get(id))
+      .map((id) => this.getTrack(id))
       .filter((t): t is LibraryTrackRecord => Boolean(t))
-      .map((t) => structuredClone(t))
     return {
       tracks: found,
       versions: {},
@@ -1256,7 +1330,7 @@ class PortableQueueAndLibraryStore {
     query: LibraryQuery = {}
   ): Promise<LibraryCollectionPage> {
     const groups = new Map<string, LibraryCollectionSummary>()
-    for (const track of this.tracks.values()) {
+    for (const track of this.libraryTracks()) {
       if (kind === 'albums') {
         const albumName = String(track.album || 'Unknown Album').trim() || 'Unknown Album'
         const key = `album:${albumName.toLowerCase()}`
@@ -1388,7 +1462,7 @@ class PortableQueueAndLibraryStore {
 
   async lookupTracksByPaths(paths: string[]) {
     const byPath = new Map<string, string>()
-    for (const track of this.tracks.values()) {
+    for (const track of this.libraryTracks()) {
       if (track.filePath) {
         byPath.set(track.filePath, track.id)
       }
@@ -1401,7 +1475,7 @@ class PortableQueueAndLibraryStore {
 
   async lookupPlaylistTracks(request: { entries: Array<{ id?: string; filePath?: string }> }) {
     const byPath = new Map<string, string>()
-    for (const track of this.tracks.values()) {
+    for (const track of this.libraryTracks()) {
       if (track.filePath) {
         byPath.set(track.filePath, track.id)
       }
@@ -1409,7 +1483,7 @@ class PortableQueueAndLibraryStore {
     return {
       revision: this.libraryRevisionCounter,
       ids: request.entries.map((entry) => {
-        if (entry.id && this.tracks.has(entry.id)) return entry.id
+        if (entry.id && this.libraryIds.has(entry.id)) return entry.id
         if (entry.filePath && byPath.has(entry.filePath)) return byPath.get(entry.filePath)!
         return null
       })
@@ -1425,11 +1499,15 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
   private readonly port: PortableAudioEnginePort
   private readonly listeners = new Map<string, Set<(...args: any[]) => void>>()
   private queueItems: AudioEngineQueueItem[] = []
-  private queueCursor = 0
-  private queueRevision = 0
   private queueTokenCounter = 0
-  private currentQueueToken = 'portable-token-0'
+  /** Empty until a queue load commits; an uncertain native reply revokes it. */
+  private currentQueueToken = ''
   private playMode: PlayMode = 'sequential'
+  /** Latest native observation; natural-end checks read it, never a guess. */
+  private info: PlaybackInfo | null = null
+  private transportRevision = 0
+  private continuationIntent = 0
+  private endEligible = false
   private unsubscribePort: PortableUnsubscribe | null = null
 
   constructor(port: PortableAudioEnginePort) {
@@ -1453,8 +1531,19 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
     }
   }
 
+  private nextQueueToken(): string {
+    this.queueTokenCounter++
+    return `portable-token-${this.queueTokenCounter}`
+  }
+
+  private revokePlaybackEnd(): void {
+    this.endEligible = false
+    this.continuationIntent++
+  }
+
   private handlePortEvent(event: PortableAudioNativeEvent): void {
     if (event.type === 'playback-info') {
+      this.info = event.info
       const enriched: PlaybackInfo = {
         ...event.info,
         queueToken: event.info.queueToken ?? this.currentQueueToken
@@ -1467,6 +1556,7 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
       return
     }
     if (event.type === 'crashed') {
+      this.revokePlaybackEnd()
       this.emitEvent('crashed', { reason: event.reason ?? 'Native audio engine crashed' })
       return
     }
@@ -1499,7 +1589,9 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
   }
 
   async getPlaybackInfo(): Promise<PlaybackInfo> {
-    return this.port.getSnapshot()
+    const info = await this.port.getSnapshot()
+    this.info = info
+    return info
   }
 
   getQueueSnapshot(): readonly AudioEngineQueueItem[] {
@@ -1510,9 +1602,25 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
     selection: NativeQueueSelection
     intent: number
   } | null {
-    return null
+    const info = this.info
+    if (!info || !this.endEligible || !this.currentQueueToken) return null
+    const item = this.queueItems[info.queueIndex]
+    const failure = info.outputInfo?.diagnostics?.lastError || info.diagnostics?.lastError
+    if (info.state !== 'stopped' || info.upcomingTrack || failure || !item || item.source !== info.source)
+      return null
+    return {
+      selection: {
+        queueToken: this.currentQueueToken,
+        index: info.queueIndex,
+        id: item.id,
+        source: item.source
+      },
+      intent: this.transportRevision
+    }
   }
 
+  /** Opens the next decoder only after a confirmed natural end. Every await is
+   * fenced against a later transport command; unknown outcomes escape. */
   async continueAfterPlaybackEnd(request: {
     expected: {
       selection: NativeQueueSelection
@@ -1523,16 +1631,65 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
     isCurrent(): boolean
     onSelected(): void
   }): Promise<boolean> {
-    if (!request.isCurrent()) return false
-    this.queueItems = [structuredClone(request.item)]
-    this.queueCursor = 0
-    this.queueRevision++
-    this.queueTokenCounter++
-    this.currentQueueToken = `portable-token-${this.queueTokenCounter}`
-    request.onSelected()
-    await this.port.loadQueue(this.queueItems, 0)
-    await this.port.play(request.item.source, 0)
-    return true
+    await this.getPlaybackInfo()
+    const end = this.getPlaybackEnd()
+    const expected = request.expected
+    if (
+      !request.isCurrent() ||
+      !end ||
+      end.intent !== expected.intent ||
+      end.selection.queueToken !== expected.selection.queueToken ||
+      end.selection.index !== expected.selection.index ||
+      end.selection.id !== expected.selection.id ||
+      end.selection.source !== expected.selection.source
+    )
+      return false
+    const loading = this.loadQueue([request.item], 0)
+    const loadRevision = this.transportRevision
+    const loadIntent = this.continuationIntent
+    await loading
+    if (
+      this.queueItems.length === 1 &&
+      this.currentQueueToken &&
+      this.queueItems[0].queueEntryId === request.item.queueEntryId &&
+      this.queueItems[0].source === request.item.source
+    )
+      request.onSelected()
+    if (
+      !request.isCurrent() ||
+      loadRevision !== this.transportRevision ||
+      loadIntent !== this.continuationIntent
+    )
+      return false
+    const changingMode = this.setPlayMode(request.playMode)
+    const modeRevision = this.transportRevision
+    const modeIntent = this.continuationIntent
+    await changingMode
+    if (
+      !request.isCurrent() ||
+      modeRevision !== this.transportRevision ||
+      modeIntent !== this.continuationIntent
+    )
+      return false
+    let playIntent = 0
+    const playing = this.play(
+      request.item.source,
+      0,
+      () => request.isCurrent() && playIntent === this.continuationIntent
+    )
+    playIntent = this.continuationIntent
+    const playRevision = this.transportRevision
+    try {
+      const result = await playing
+      if (result.superseded) return false
+      if (!result.nativeStarted) throw new Error('afterglow_requires_native_playback')
+      return true
+    } catch (error) {
+      // Never stop a later user action while retiring this automatic attempt.
+      if (playRevision === this.transportRevision && playIntent === this.continuationIntent)
+        await this.stop()
+      throw error
+    }
   }
 
   async start(): Promise<void> {
@@ -1540,81 +1697,73 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
   }
 
   async loadQueue(items: AudioEngineQueueItem[], startIndex = 0): Promise<void> {
-    this.queueItems = items.map((item) => structuredClone(item))
-    this.queueCursor =
-      items.length === 0 ? 0 : Math.max(0, Math.min(items.length - 1, startIndex))
-    this.queueRevision++
-    this.queueTokenCounter++
-    this.currentQueueToken = `portable-token-${this.queueTokenCounter}`
-    await this.port.loadQueue(this.queueItems, this.queueCursor)
+    const revision = ++this.transportRevision
+    this.revokePlaybackEnd()
+    const nextQueue = items.map((item) => structuredClone(item))
+    const nextIndex =
+      nextQueue.length === 0 ? 0 : Math.max(0, Math.min(nextQueue.length - 1, startIndex))
+    this.currentQueueToken = ''
+    await this.port.loadQueue(nextQueue, nextIndex)
+    if (revision !== this.transportRevision) return
+    this.queueItems = nextQueue
+    this.currentQueueToken = this.nextQueueToken()
   }
 
+  /** Android has no native compare-and-rebind, so the portable adapter checks
+   * the decoder before and after a non-interrupting LoadQueue. A race with a
+   * natural track change revokes queue authority instead of guessing. */
   async rebindQueue(rebind: NativeQueueRebind): Promise<NativeQueueCommit | null> {
-    this.queueItems = rebind.items.map((item) => structuredClone(item))
-    this.queueCursor =
-      rebind.items.length === 0
-        ? 0
-        : Math.max(0, Math.min(rebind.items.length - 1, rebind.startIndex))
-    this.queueRevision++
-    this.queueTokenCounter++
-    this.currentQueueToken = `portable-token-${this.queueTokenCounter}`
-    await this.port.loadQueue(this.queueItems, this.queueCursor)
+    const { expected, startIndex, playMode } = rebind
+    const previousToken = this.currentQueueToken
+    const current = this.queueItems[expected.index]
+    const selected = rebind.items[startIndex]
+    if (
+      !previousToken ||
+      expected.queueToken !== previousToken ||
+      !Number.isInteger(expected.index) ||
+      !Number.isInteger(startIndex) ||
+      !current ||
+      current.id !== expected.id ||
+      current.source !== expected.source ||
+      !selected ||
+      selected.id !== current.id ||
+      selected.source !== current.source ||
+      selected.cueRange?.startSeconds !== current.cueRange?.startSeconds ||
+      selected.cueRange?.endSeconds !== current.cueRange?.endSeconds ||
+      (selected.cueRange?.virtualPregapSeconds ?? 0) !==
+        (current.cueRange?.virtualPregapSeconds ?? 0)
+    )
+      return null
+    const revision = ++this.transportRevision
+    this.currentQueueToken = ''
+    const superseded = () => new Error('Native queue handoff superseded; queue authority must be refreshed')
+    const before = await this.port.getSnapshot()
+    if (revision !== this.transportRevision) throw superseded()
+    this.info = before
+    if (
+      before.state === 'stopped' ||
+      before.queueIndex !== expected.index ||
+      before.source !== expected.source
+    ) {
+      this.currentQueueToken = previousToken
+      return null
+    }
+    const nextQueue = rebind.items.map((item) => structuredClone(item))
+    await this.port.loadQueue(nextQueue, startIndex)
+    if (revision !== this.transportRevision) throw superseded()
+    if (playMode !== this.playMode) {
+      await this.port.setPlayMode(playMode)
+      if (revision !== this.transportRevision) throw superseded()
+      this.playMode = playMode
+    }
+    const after = await this.port.getSnapshot()
+    if (revision !== this.transportRevision) throw superseded()
+    this.info = after
+    if (after.source !== selected.source || after.queueIndex !== startIndex)
+      throw new Error('Native queue handoff raced a track change; queue authority must be refreshed')
+    this.queueItems = nextQueue
+    this.currentQueueToken = this.nextQueueToken()
     return { queueToken: this.currentQueueToken }
-  }
-
-  async appendQueueItems(items: AudioEngineQueueItem[]): Promise<number | null> {
-    const firstIndex = this.queueItems.length
-    this.queueItems.push(...items.map((item) => structuredClone(item)))
-    this.queueRevision++
-    await this.port.loadQueue(this.queueItems, this.queueCursor)
-    return firstIndex
-  }
-
-  async updateQueueItemSource(index: number, source: string): Promise<boolean> {
-    if (index < 0 || index >= this.queueItems.length) return false
-    this.queueItems[index] = { ...this.queueItems[index], source }
-    this.queueRevision++
-    return true
-  }
-
-  async getQueueState() {
-    return {
-      revision: this.queueRevision,
-      size: this.queueItems.length,
-      currentIndex: this.queueItems.length > 0 ? this.queueCursor : -1,
-      upcomingIndex:
-        this.queueCursor + 1 < this.queueItems.length ? this.queueCursor + 1 : -1,
-      playMode: this.playMode === 'heart' ? 'sequential' : this.playMode
-    }
-  }
-
-  async selectQueueIndex(index: number): Promise<boolean> {
-    if (index < 0 || index >= this.queueItems.length) return false
-    this.queueCursor = index
-    if (this.port.selectQueueIndex) {
-      return this.port.selectQueueIndex(index)
-    }
-    return true
-  }
-
-  async next(): Promise<boolean> {
-    if (this.queueCursor + 1 < this.queueItems.length) {
-      this.queueCursor++
-    }
-    if (this.port.next) {
-      return this.port.next()
-    }
-    return true
-  }
-
-  async previous(): Promise<boolean> {
-    if (this.queueCursor > 0) {
-      this.queueCursor--
-    }
-    if (this.port.previous) {
-      return this.port.previous()
-    }
-    return true
   }
 
   async play(
@@ -1622,26 +1771,48 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
     position = 0,
     requested?: () => boolean
   ): Promise<AudioEnginePlayResult> {
-    if (requested && !requested()) {
-      return { nativeStarted: false, fallbackReason: 'Playback request was superseded' }
+    if (!source) throw new Error('playback source is empty')
+    const revision = ++this.transportRevision
+    this.revokePlaybackEnd()
+    const superseded: AudioEnginePlayResult = {
+      nativeStarted: false,
+      fallbackReason: '',
+      superseded: true
     }
-    return this.port.play(source, position)
+    // Callers capture their intent after this synchronous prologue.
+    await undefined
+    if (revision !== this.transportRevision || requested?.() === false) return superseded
+    const result = await this.port.play(source, position)
+    if (revision !== this.transportRevision) return superseded
+    this.endEligible = result.nativeStarted
+    return result
   }
 
   async pause(): Promise<void> {
+    this.transportRevision++
+    this.revokePlaybackEnd()
     await this.port.pause()
   }
 
   async stop(): Promise<void> {
+    this.transportRevision++
+    this.revokePlaybackEnd()
     await this.port.stop()
   }
 
   async seek(position: number): Promise<void> {
+    const revision = ++this.transportRevision
+    this.revokePlaybackEnd()
     await this.port.seek(position)
+    if (revision !== this.transportRevision) return
+    const info = await this.port.getSnapshot()
+    if (revision !== this.transportRevision) return
+    this.info = info
+    this.endEligible = info.state === 'playing'
   }
 
   async seekConfirmed(position: number): Promise<void> {
-    await this.port.seek(position)
+    await this.seek(position)
   }
 
   async setVolume(volume: number): Promise<void> {
@@ -1653,8 +1824,15 @@ class PortablePlaybackEngineAdapter implements CorePlaybackEngine {
   }
 
   async setPlayMode(mode: PlayMode): Promise<void> {
-    this.playMode = mode
+    if (mode === this.playMode) return
+    const revision = this.transportRevision
+    const endEligible = this.endEligible && this.info?.state === 'playing'
+    this.revokePlaybackEnd()
+    const intent = this.continuationIntent
     await this.port.setPlayMode(mode)
+    if (revision !== this.transportRevision || intent !== this.continuationIntent) return
+    this.playMode = mode
+    this.endEligible = endEligible
   }
 }
 
@@ -1668,9 +1846,14 @@ export interface PortableMusicCoreHost {
   readonly application: CoreApplication
   readonly playback: CorePlaybackSession
   readonly settings: CoreSettingsService
+  readonly bookmarks: CoreBookmarksService
+  readonly lyrics: CoreLyricsService
+  readonly playlists: CorePlaylistService
   readonly queueStore: PortableQueueAndLibraryStore
   initialize(): Promise<void>
   seedTracks(tracks: readonly TrackData[]): void
+  /** A full platform scan replaces library membership; queued tracks stay playable. */
+  replaceLibraryTracks(tracks: readonly TrackData[]): void
   playTracks(tracks: readonly TrackData[], startIndex?: number): Promise<void>
   getSnapshot(): CoreSnapshot
   getSnapshotJson(): string
@@ -1678,18 +1861,16 @@ export interface PortableMusicCoreHost {
   dispatchRequestJson(messageJson: string): void
   subscribeMessages(listener: (message: CoreClientMessage) => void): PortableUnsubscribe
   subscribeMessagesJson(listener: (messageJson: string) => void): PortableUnsubscribe
-  /** Phase 3 custom playlist CRUD capabilities */
-  createCustomPlaylist(name: string, trackIds?: readonly string[]): CorePlaylistView
-  deleteCustomPlaylist(playlistId: string): boolean
-  renameCustomPlaylist(playlistId: string, name: string): CorePlaylistView | null
-  addTracksToCustomPlaylist(playlistId: string, trackIds: readonly string[]): CorePlaylistView | null
-  removeTrackFromCustomPlaylist(playlistId: string, trackId: string): CorePlaylistView | null
-  listCustomPlaylists(): CorePlaylistView[]
+  /** Durable documents last acknowledged by the session store. */
+  getBookmarksDocument(): PlaybackBookmarksDocument
+  getLyricsDocument(): LyricsManagementDocument
+  getPlaylists(): Playlist[]
   /** Phase 3 library collections aggregation */
   getLibraryCollections(): CoreLibraryCollectionsView
   /** Phase 3 EQ & DSP configuration */
   getEqConfig(): CoreEqConfigView
-  setEqConfig(patch: Partial<CoreEqConfigView>): CoreEqConfigView
+  /** The audio engine applies the patch before it commits; a rejection keeps the old config. */
+  setEqConfig(patch: Partial<CoreEqConfigView>): Promise<CoreEqConfigView>
   /** Platform safety brake (Section 5.4: audio focus lost / route noisy / service stopping). */
   triggerPlatformSafetyBrake(reason: string): Promise<void>
   shutdown(): Promise<void>
@@ -1745,9 +1926,8 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
   let lyricsRevision = 0
   let playlistsState: Playlist[] = []
   let playlistsRevision = 0
-  let customPlaylists: CorePlaylistView[] = []
-  let customPlaylistIdCounter = 0
   let eqConfig: CoreEqConfigView = createDefaultEqConfig()
+  let eqTail: Promise<unknown> = Promise.resolve()
   let envelopeLoaded = false
   let envelopeLoadPromise: Promise<void> | null = null
 
@@ -1801,10 +1981,33 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
         playlistsRevision = initialRev
       }
       if (Array.isArray(parsed.customPlaylists)) {
-        customPlaylists = structuredClone(parsed.customPlaylists)
+        // Playlists now have one owner; fold the old parallel list into it once.
+        const known = new Set(playlistsState.map((playlist) => playlist.id))
+        for (const legacy of parsed.customPlaylists) {
+          if (!legacy || typeof legacy.id !== 'string' || known.has(legacy.id)) continue
+          const at = new Date(Number(legacy.updatedAtMs) || clock.nowUnixMs()).toISOString()
+          playlistsState.push({
+            id: legacy.id,
+            name: String(legacy.name || 'Untitled Playlist'),
+            trackIds: Array.isArray(legacy.trackIds) ? legacy.trackIds.map(String) : [],
+            createdAt: at,
+            updatedAt: at
+          })
+        }
+        playlistsRevision = initialRev
       }
       if (parsed.eqConfig) {
-        eqConfig = applyEqConfigPatch(createDefaultEqConfig(), parsed.eqConfig)
+        try {
+          eqConfig = applyEqConfigPatch(createDefaultEqConfig(), parsed.eqConfig)
+        } catch (error) {
+          // A stored DSP graph this build rejects must not keep the library offline.
+          eqConfig = createDefaultEqConfig()
+          options.onFatalError?.(
+            new Error(
+              `Stored audio settings were reset: ${error instanceof Error ? error.message : String(error)}`
+            )
+          )
+        }
       }
       envelopeLoaded = true
     })().finally(() => {
@@ -1820,6 +2023,7 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
       .then(async () => {
         const exported = queueStore.exportState()
         const envelope: PersistedEnvelope = {
+          schema: PORTABLE_ENVELOPE_SCHEMA,
           session: currentSessionData,
           queues: exported.queues,
           tracks: exported.tracks,
@@ -1827,7 +2031,6 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
           bookmarks: bookmarksDoc,
           lyricsManagement: lyricsDoc,
           playlists: playlistsState,
-          customPlaylists,
           eqConfig
         }
         const res = await options.sessionStore.save(
@@ -2184,6 +2387,11 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
       currentSettings = normalizeAppSettings({ ...currentSettings, ...patch }, settingsEnv)
       settingsRevision++
       appInstance?.changed()
+      void persistEnvelope().catch((error) => {
+        options.onFatalError?.(error instanceof Error ? error : new Error(String(error)))
+      })
+      if (Object.hasOwn(patch, 'playbackResumeMode'))
+        void playbackSession.flush().catch(() => {})
       return structuredClone(currentSettings)
     }
   }
@@ -2386,95 +2594,32 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
     }
   }
 
-  const createCustomPlaylist = (name: string, trackIds: readonly string[] = []): CorePlaylistView => {
-    customPlaylistIdCounter += 1
-    const cleanName = String(name || 'Untitled Playlist').trim() || 'Untitled Playlist'
-    const uniqueTracks = [...new Set(trackIds.map((id) => String(id)).filter((id) => id.length > 0))]
-    const created: CorePlaylistView = {
-      id: `pl-${clock.nowUnixMs()}-${customPlaylistIdCounter}`,
-      name: cleanName,
-      trackIds: uniqueTracks,
-      trackCount: uniqueTracks.length,
-      updatedAtMs: clock.nowUnixMs()
-    }
-    customPlaylists.push(created)
-    playlistsRevision++
-    void persistEnvelope()
-    application.changed()
-    return structuredClone(created)
-  }
-
-  const deleteCustomPlaylist = (playlistId: string): boolean => {
-    const idx = customPlaylists.findIndex((p) => p.id === playlistId)
-    if (idx < 0) return false
-    customPlaylists.splice(idx, 1)
-    playlistsRevision++
-    void persistEnvelope()
-    application.changed()
-    return true
-  }
-
-  const renameCustomPlaylist = (playlistId: string, name: string): CorePlaylistView | null => {
-    const target = customPlaylists.find((p) => p.id === playlistId)
-    if (!target) return null
-    const cleanName = String(name || '').trim()
-    if (!cleanName) return structuredClone(target)
-    target.name = cleanName
-    target.updatedAtMs = clock.nowUnixMs()
-    playlistsRevision++
-    void persistEnvelope()
-    application.changed()
-    return structuredClone(target)
-  }
-
-  const addTracksToCustomPlaylist = (
-    playlistId: string,
-    trackIds: readonly string[]
-  ): CorePlaylistView | null => {
-    const target = customPlaylists.find((p) => p.id === playlistId)
-    if (!target) return null
-    const merged = new Set(target.trackIds)
-    for (const rawId of trackIds) {
-      const id = String(rawId || '').trim()
-      if (id.length > 0) merged.add(id)
-    }
-    target.trackIds = [...merged]
-    target.trackCount = target.trackIds.length
-    target.updatedAtMs = clock.nowUnixMs()
-    playlistsRevision++
-    void persistEnvelope()
-    application.changed()
-    return structuredClone(target)
-  }
-
-  const removeTrackFromCustomPlaylist = (
-    playlistId: string,
-    trackId: string
-  ): CorePlaylistView | null => {
-    const target = customPlaylists.find((p) => p.id === playlistId)
-    if (!target) return null
-    target.trackIds = target.trackIds.filter((id) => id !== trackId)
-    target.trackCount = target.trackIds.length
-    target.updatedAtMs = clock.nowUnixMs()
-    playlistsRevision++
-    void persistEnvelope()
-    application.changed()
-    return structuredClone(target)
-  }
-
   return {
     epoch,
     protocolVersion: CORE_PROTOCOL_VERSION,
     application,
     playback: playbackSession,
     settings: settingsService,
+    bookmarks: bookmarksService,
+    lyrics: lyricsService,
+    playlists: playlistsService,
     queueStore,
     async initialize() {
       await ensureEnvelopeLoaded()
+      // Desktop restores the engine volume before the Core starts; a portable engine boots at
+      // its own default, so the remembered volume is applied before playback reads it.
+      await options.audioEngine.setVolume(currentSettings.softwareVolume)
       await application.initialize()
     },
     seedTracks(tracks) {
       queueStore.upsertTracks(tracks)
+      application.changed()
+    },
+    replaceLibraryTracks(tracks) {
+      queueStore.replaceLibraryTracks(tracks)
+      void persistEnvelope().catch((error) => {
+        options.onFatalError?.(error instanceof Error ? error : new Error(String(error)))
+      })
       application.changed()
     },
     async playTracks(tracks, startIndex = 0) {
@@ -2526,13 +2671,14 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
         messageSubscribers.delete(wrapped)
       }
     },
-    createCustomPlaylist,
-    deleteCustomPlaylist,
-    renameCustomPlaylist,
-    addTracksToCustomPlaylist,
-    removeTrackFromCustomPlaylist,
-    listCustomPlaylists() {
-      return structuredClone(customPlaylists)
+    getBookmarksDocument() {
+      return clonePlaybackBookmarksDocument(bookmarksDoc)
+    },
+    getLyricsDocument() {
+      return cloneLyricsManagementDocument(lyricsDoc)
+    },
+    getPlaylists() {
+      return structuredClone(playlistsState)
     },
     getLibraryCollections() {
       return aggregateLibraryCollections(queueStore.getAllTracks())
@@ -2541,11 +2687,19 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
       return structuredClone(eqConfig)
     },
     setEqConfig(patch) {
-      eqConfig = applyEqConfigPatch(eqConfig, patch)
-      void options.audioEngine.setDspConfig?.(structuredClone(eqConfig))
-      void persistEnvelope()
-      application.changed()
-      return structuredClone(eqConfig)
+      // Serialized so a slow engine apply cannot commit over a later edit.
+      const work = eqTail
+        .catch(() => undefined)
+        .then(async () => {
+          const next = applyEqConfigPatch(eqConfig, patch)
+          await options.audioEngine.setDspConfig?.(structuredClone(next))
+          eqConfig = next
+          application.changed()
+          await persistEnvelope()
+          return structuredClone(eqConfig)
+        })
+      eqTail = work
+      return work
     },
     async triggerPlatformSafetyBrake(_reason) {
       await playbackSession.pause()
@@ -2561,1181 +2715,3 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
 }
 
 export { CORE_PROTOCOL_VERSION, libraryQueueResumeMode }
-
-// ============================================================================
-// Embedded JS Bridge Host (`globalThis.__TWILIGHT_PORTABLE_CORE__`)
-// ============================================================================
-
-interface EmbeddedTrackView {
-  id: string
-  queueEntryId?: string
-  title: string
-  artist: string
-  artists?: string[]
-  album: string
-  source?: string
-  duration: number
-  format?: string
-  sampleRate?: number
-  bitDepth?: number
-  bitrate?: number
-}
-
-interface EmbeddedBookmarkView {
-  id: string
-  trackId: string
-  positionSec: number
-  label: string
-  createdAtMs: number
-}
-
-interface EmbeddedLyricLine {
-  timeMs: number
-  text: string
-  translation?: string | null
-}
-
-interface EmbeddedAudioSnapshot {
-  engineSessionId: string
-  state: string
-  positionMs: number
-  durationMs: number | null
-  volume: number
-  playbackRate: number
-  playMode: string
-  queueIndex: number
-  codec: string | null
-  sampleRate: number | null
-  bitDepth: number | null
-  channels: number | null
-  outputBackend: string | null
-  actualSampleRate: number | null
-  actualBitDepth: number | null
-  outputPerfect: boolean
-}
-
-const EMBEDDED_DEMO_TRACKS: readonly EmbeddedTrackView[] = [
-  {
-    id: 'track-twilight-overture',
-    queueEntryId: 'occ-0-track-twilight-overture',
-    title: 'Twilight Overture (Hi-Res Master)',
-    artist: 'Aether Ensemble',
-    artists: ['Aether Ensemble'],
-    album: 'Echoes of Dusk',
-    source: 'content://media/external/audio/media/1001',
-    duration: 248.0,
-    format: 'FLAC',
-    sampleRate: 96000,
-    bitDepth: 24,
-    bitrate: 2822
-  },
-  {
-    id: 'track-nocturne-in-cobalt',
-    queueEntryId: 'occ-1-track-nocturne-in-cobalt',
-    title: 'Nocturne in Cobalt',
-    artist: 'Lumina Quartet',
-    artists: ['Lumina Quartet'],
-    album: 'Midnight Resonance',
-    source: 'content://media/external/audio/media/1002',
-    duration: 312.0,
-    format: 'FLAC',
-    sampleRate: 192000,
-    bitDepth: 24,
-    bitrate: 4608
-  },
-  {
-    id: 'track-solstice-drift',
-    queueEntryId: 'occ-2-track-solstice-drift',
-    title: 'Solstice Drift',
-    artist: 'Kairo & Sorel',
-    artists: ['Kairo', 'Sorel'],
-    album: 'Horizon Line',
-    source: 'content://media/external/audio/media/1003',
-    duration: 196.0,
-    format: 'WAV',
-    sampleRate: 48000,
-    bitDepth: 24,
-    bitrate: 2304
-  }
-]
-
-const EMBEDDED_DEMO_LYRICS: Record<string, readonly EmbeddedLyricLine[]> = {
-  'track-twilight-overture': [
-    { timeMs: 0, text: 'Twilight Overture — Aether Ensemble', translation: '暮光序曲 — 以太合奏团' },
-    { timeMs: 6500, text: 'When the amber sun sinks beneath the glass horizon', translation: '当琥珀色的夕阳沉入琉璃地平线' },
-    { timeMs: 14000, text: 'Strings awaken in the hush of the concert hall', translation: '弦音在音乐厅的静谧中苏醒' },
-    { timeMs: 22400, text: 'A distant echo answers from the northern ridge', translation: '远方的回声自北岭应和' }
-  ],
-  'track-nocturne-in-cobalt': [
-    { timeMs: 0, text: 'Nocturne in Cobalt — Lumina Quartet', translation: '钴蓝夜曲 — 流光四重奏' },
-    { timeMs: 8000, text: 'Cobalt rain traces silver lines on the windowpane', translation: '钴蓝色的雨在窗棂勾勒银线' }
-  ],
-  'track-solstice-drift': [
-    { timeMs: 0, text: 'Solstice Drift — Kairo & Sorel', translation: '至日漂流 — Kairo & Sorel' },
-    { timeMs: 5800, text: 'Warm analog waves meet the winter solstice wind', translation: '温暖的模拟声浪邂逅冬至的微风' }
-  ]
-}
-
-interface EmbeddedBridgeState {
-  epoch: string
-  protocolVersion: number
-  sequence: number
-  queueRevision: number
-  libraryRevision: number
-  playlistsRevision: number
-  lyricsRevision: number
-  sessionStoreRevision: string | null
-  lastRequestId: string | null
-  libraryTracks: EmbeddedTrackView[]
-  queueTracks: EmbeddedTrackView[]
-  currentQueueIndex: number
-  currentPlayMode: string
-  favoriteTrackIds: string[]
-  bookmarks: EmbeddedBookmarkView[]
-  playlists: CorePlaylistView[]
-  eqConfig: CoreEqConfigView
-  customLyrics: Record<
-    string,
-    { trackId: string; source: string; synced: boolean; lines: EmbeddedLyricLine[] }
-  >
-  latestAudioSnapshot: EmbeddedAudioSnapshot
-  idCounter: number
-}
-
-function parseEmbeddedLrcLines(rawText: string): { synced: boolean; lines: EmbeddedLyricLine[] } {
-  const rawLines = String(rawText || '')
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-  const timedMap = new Map<number, EmbeddedLyricLine>()
-  const untimed: EmbeddedLyricLine[] = []
-  const timeRegex = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g
-
-  for (const rawLine of rawLines) {
-    const trimmed = rawLine.trim()
-    if (!trimmed) continue
-    const matches = [...trimmed.matchAll(timeRegex)]
-    if (matches.length === 0) {
-      if (!/^\[(ti|ar|al|by|offset):/i.test(trimmed)) {
-        untimed.push({ timeMs: untimed.length * 4000, text: trimmed, translation: null })
-      }
-      continue
-    }
-    const textContent = trimmed.replace(timeRegex, '').trim()
-    if (!textContent) continue
-    for (const match of matches) {
-      const minutes = Number(match[1] || 0)
-      const seconds = Number(match[2] || 0)
-      const fracRaw = match[3] || '0'
-      const millis =
-        fracRaw.length === 1
-          ? Number(fracRaw) * 100
-          : fracRaw.length === 2
-            ? Number(fracRaw) * 10
-            : Number(fracRaw.slice(0, 3))
-      const timeMs = minutes * 60_000 + seconds * 1000 + millis
-      const existing = timedMap.get(timeMs)
-      if (existing) {
-        if (!existing.translation) {
-          existing.translation = textContent
-        }
-      } else {
-        timedMap.set(timeMs, { timeMs, text: textContent, translation: null })
-      }
-    }
-  }
-
-  if (timedMap.size > 0) {
-    const sorted = [...timedMap.values()].sort((a, b) => a.timeMs - b.timeMs)
-    return { synced: true, lines: sorted }
-  }
-  return { synced: false, lines: untimed }
-}
-
-function createInitialEmbeddedBridgeState(): EmbeddedBridgeState {
-  return {
-    epoch: 'epoch-js-default',
-    protocolVersion: CORE_PROTOCOL_VERSION,
-    sequence: 1,
-    queueRevision: 1,
-    libraryRevision: 1,
-    playlistsRevision: 1,
-    lyricsRevision: 1,
-    sessionStoreRevision: null,
-    lastRequestId: null,
-    libraryTracks: structuredClone(EMBEDDED_DEMO_TRACKS) as EmbeddedTrackView[],
-    queueTracks: structuredClone(EMBEDDED_DEMO_TRACKS) as EmbeddedTrackView[],
-    currentQueueIndex: 0,
-    currentPlayMode: 'sequence',
-    favoriteTrackIds: [],
-    bookmarks: [],
-    playlists: [],
-    eqConfig: createDefaultEqConfig(),
-    customLyrics: {},
-    latestAudioSnapshot: {
-      engineSessionId: 'tae-embedded-session',
-      state: 'paused',
-      positionMs: 0,
-      durationMs: 248000,
-      volume: 1.0,
-      playbackRate: 1.0,
-      playMode: 'sequence',
-      queueIndex: 0,
-      codec: 'FLAC',
-      sampleRate: 96000,
-      bitDepth: 24,
-      channels: 2,
-      outputBackend: 'oboe',
-      actualSampleRate: 96000,
-      actualBitDepth: 24,
-      outputPerfect: true
-    },
-    idCounter: 0
-  }
-}
-
-let activeEmbeddedHostState: EmbeddedBridgeState = createInitialEmbeddedBridgeState()
-
-function getHostBridge(): {
-  invokePort?: (portName: string, methodName: string, argsJson: string) => string
-  emitCoreEvent?: (eventJson: string) => void
-} | null {
-  const g = globalThis as Record<string, any>
-  if (g.__TWILIGHT_HOST_BRIDGE__ && typeof g.__TWILIGHT_HOST_BRIDGE__ === 'object') {
-    return g.__TWILIGHT_HOST_BRIDGE__
-  }
-  return null
-}
-
-function invokeHostBridgePort(
-  portName: string,
-  methodName: string,
-  args: Record<string, unknown> = {}
-): { ok: boolean; value?: any; error?: { code: string; message: string; retryable?: boolean } } | null {
-  const bridge = getHostBridge()
-  if (!bridge || typeof bridge.invokePort !== 'function') return null
-  try {
-    const raw = bridge.invokePort(portName, methodName, JSON.stringify(args))
-    if (typeof raw === 'string' && raw.length > 0) {
-      return JSON.parse(raw)
-    }
-  } catch {
-    // Ignore host bridge invocation failure in fallback environments
-  }
-  return null
-}
-
-function nowEmbeddedUnixMs(): number {
-  const res = invokeHostBridgePort('clock', 'nowUnixMs', {})
-  if (res && res.ok && typeof res.value === 'number') {
-    return res.value
-  }
-  return Date.now()
-}
-
-function buildEmbeddedLyricsForTrack(track: EmbeddedTrackView) {
-  const custom = activeEmbeddedHostState.customLyrics[track.id]
-  if (custom && Array.isArray(custom.lines) && custom.lines.length > 0) {
-    return {
-      trackId: track.id,
-      source: custom.source || 'online',
-      synced: custom.synced !== false,
-      lines: [...custom.lines]
-    }
-  }
-  const demoLines = EMBEDDED_DEMO_LYRICS[track.id]
-  if (demoLines) {
-    return {
-      trackId: track.id,
-      source: 'embedded',
-      synced: true,
-      lines: [...demoLines]
-    }
-  }
-  const durationSec = Math.max(30, Number(track.duration) || 30)
-  const stepMs = Math.round(Math.max(4, durationSec / 7) * 1000)
-  return {
-    trackId: track.id,
-    source: 'generated',
-    synced: true,
-    lines: [
-      { timeMs: 0, text: `♪ ${track.title} — ${track.artist}`, translation: `专辑：${track.album}` },
-      { timeMs: stepMs, text: 'Streaming through Twilight Echo Audio Core', translation: '通过 Twilight Echo 原生音频核心播放' },
-      { timeMs: stepMs * 2, text: 'Every detail rendered in pure resolution', translation: '每一处细节皆以纯净解析呈现' }
-    ]
-  }
-}
-
-function fetchEmbeddedOnlineLyrics(
-  trackId: string,
-  title: string,
-  artist: string,
-  album: string,
-  customUrl?: string
-): { trackId: string; source: string; synced: boolean; lines: EmbeddedLyricLine[] } | null {
-  const st = activeEmbeddedHostState
-  const targetUrl =
-    customUrl && customUrl.trim().length > 0
-      ? customUrl.trim()
-      : `https://lrclib.net/api/get?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}&album_name=${encodeURIComponent(album)}`
-  const netRes = invokeHostBridgePort('network', 'request', {
-    url: targetUrl,
-    method: 'GET',
-    timeoutMs: 8000,
-    headers: { Accept: 'application/json, text/plain;q=0.9' }
-  })
-  const rawBody =
-    netRes && netRes.ok && netRes.value
-      ? typeof netRes.value.bodyUtf8 === 'string'
-        ? netRes.value.bodyUtf8
-        : typeof netRes.value.bodyText === 'string'
-          ? netRes.value.bodyText
-          : null
-      : null
-  if (rawBody !== null) {
-    const status = Number(netRes?.value?.statusCode ?? 200)
-    const bodyText = rawBody.trim()
-    if (status >= 200 && status < 300 && bodyText.length > 0) {
-      let rawLrc = bodyText
-      try {
-        const parsedJson = JSON.parse(bodyText)
-        if (parsedJson && typeof parsedJson === 'object') {
-          rawLrc = String(parsedJson.syncedLyrics || parsedJson.plainLyrics || parsedJson.lrc || '')
-        }
-      } catch {
-        // Treat bodyText directly as LRC text
-      }
-      const parsedLrc = parseEmbeddedLrcLines(rawLrc)
-      if (parsedLrc.lines.length > 0) {
-        const record = {
-          trackId,
-          source: 'online',
-          synced: parsedLrc.synced,
-          lines: parsedLrc.lines
-        }
-        st.customLyrics[trackId] = record
-        st.lyricsRevision += 1
-        return record
-      }
-    }
-  }
-  return null
-}
-
-function buildEmbeddedSnapshot(errorMessage: string | null = null) {
-  const st = activeEmbeddedHostState
-  const currentTrack = st.queueTracks[st.currentQueueIndex] ?? null
-  const nextIndex = st.queueTracks.length > 0 ? (st.currentQueueIndex + 1) % st.queueTracks.length : -1
-  const nextTrack = nextIndex >= 0 ? st.queueTracks[nextIndex] : null
-  const upcomingTrack = nextTrack
-    ? {
-        id: nextTrack.id,
-        queueEntryId: nextTrack.queueEntryId || `occ-${nextIndex}-${nextTrack.id}`,
-        title: nextTrack.title,
-        artist: nextTrack.artist,
-        album: nextTrack.album,
-        duration: nextTrack.duration
-      }
-    : null
-
-  const audio = st.latestAudioSnapshot
-  const mappedState =
-    audio.state === 'playing' || audio.state === 'paused' || audio.state === 'loading' || audio.state === 'error'
-      ? audio.state
-      : 'stopped'
-
-  const routeRes = invokeHostBridgePort('audioDevice', 'getActiveRoute', {})
-  const activeRoute = routeRes && routeRes.ok && routeRes.value ? routeRes.value : null
-  const resolvedOutputBackend =
-    activeRoute && typeof activeRoute.routeType === 'string' && activeRoute.routeType !== 'speaker'
-      ? `${audio.outputBackend || 'oboe'}:${activeRoute.routeType}`
-      : audio.outputBackend || 'oboe'
-  const routeSampleRate =
-    activeRoute && typeof activeRoute.activeSampleRate === 'number' && activeRoute.activeSampleRate > 0
-      ? activeRoute.activeSampleRate
-      : activeRoute && typeof activeRoute.sampleRateHz === 'number' && activeRoute.sampleRateHz > 0
-        ? activeRoute.sampleRateHz
-        : null
-  const resolvedActualSampleRate = routeSampleRate || audio.actualSampleRate || 96000
-  const routeBitDepth =
-    activeRoute && typeof activeRoute.maxBitDepth === 'number' && activeRoute.maxBitDepth > 0
-      ? activeRoute.maxBitDepth
-      : activeRoute && typeof activeRoute.bitDepth === 'number' && activeRoute.bitDepth > 0
-        ? activeRoute.bitDepth
-        : null
-  const resolvedActualBitDepth = routeBitDepth || audio.actualBitDepth || 24
-  const routeBitPerfectCapable =
-    activeRoute && typeof activeRoute.isUsbHiResCapable === 'boolean'
-      ? activeRoute.isUsbHiResCapable
-      : activeRoute && typeof activeRoute.isBitPerfectCapable === 'boolean'
-        ? activeRoute.isBitPerfectCapable
-        : true
-
-  const collections = aggregateLibraryCollections(st.libraryTracks)
-
-  return {
-    protocolVersion: st.protocolVersion,
-    epoch: st.epoch,
-    sequence: st.sequence,
-    phase: 'ready',
-    playback: {
-      state: mappedState,
-      position: (audio.positionMs || 0) / 1000,
-      duration:
-        audio.durationMs && audio.durationMs > 0
-          ? audio.durationMs / 1000
-          : currentTrack?.duration ?? 0,
-      volume: audio.volume ?? 1.0,
-      playbackRate: audio.playbackRate ?? 1.0,
-      playMode: st.currentPlayMode,
-      queueIndex: st.currentQueueIndex,
-      queueRevision: st.queueRevision,
-      upcomingQueueIndex: nextIndex >= 0 ? nextIndex : null,
-      nativePlaybackActive: mappedState === 'playing',
-      codec: audio.codec || currentTrack?.format || 'FLAC',
-      bitrate: currentTrack?.bitrate || 1411,
-      sourceSampleRate: audio.sampleRate || currentTrack?.sampleRate || 96000,
-      sourceBitDepth: audio.bitDepth || currentTrack?.bitDepth || 24,
-      sourceChannels: audio.channels || 2,
-      outputBackend: resolvedOutputBackend,
-      actualSampleRate: resolvedActualSampleRate,
-      actualBitDepth: resolvedActualBitDepth,
-      actualChannels: 2,
-      outputPerfect: Boolean(st.eqConfig.bitPerfect && !st.eqConfig.enabled && routeBitPerfectCapable),
-      gaplessActive: st.eqConfig.gapless,
-      preloadReady: upcomingTrack !== null,
-      upcomingTrack
-    },
-    track: currentTrack,
-    queue: {
-      id: 'default',
-      revision: st.queueRevision,
-      total: st.queueTracks.length,
-      index: st.currentQueueIndex,
-      occurrenceId: currentTrack
-        ? currentTrack.queueEntryId || `occ-${st.currentQueueIndex}-${currentTrack.id}`
-        : null
-    },
-    error: errorMessage,
-    libraryRevision: st.libraryRevision,
-    playlistsRevision: st.playlistsRevision,
-    lyricsRevision: st.lyricsRevision,
-    favoriteTrackIds: [...st.favoriteTrackIds],
-    bookmarks: [...st.bookmarks],
-    playlists: structuredClone(st.playlists),
-    albums: collections.albums,
-    artists: collections.artists,
-    eqConfig: structuredClone(st.eqConfig),
-    currentLyrics: currentTrack ? buildEmbeddedLyricsForTrack(currentTrack) : null,
-    libraryTrackCount: st.libraryTracks.length
-  }
-}
-
-function persistEmbeddedSession() {
-  const st = activeEmbeddedHostState
-  const payload = JSON.stringify({
-    queueRevision: st.queueRevision,
-    currentQueueIndex: st.currentQueueIndex,
-    playMode: st.currentPlayMode,
-    favoriteTrackIds: st.favoriteTrackIds,
-    bookmarks: st.bookmarks,
-    playlists: st.playlists,
-    eqConfig: st.eqConfig
-  })
-  const res = invokeHostBridgePort('sessionStore', 'save', {
-    payloadJson: payload,
-    expectedRevision: st.sessionStoreRevision
-  })
-  if (res && res.ok && res.value) {
-    if (res.value.ok && typeof res.value.revision === 'string') {
-      st.sessionStoreRevision = res.value.revision
-    } else if (typeof res.value.actualRevision === 'string') {
-      st.sessionStoreRevision = res.value.actualRevision
-    }
-  }
-}
-
-function publishEmbeddedEvent(errorMessage: string | null = null) {
-  const st = activeEmbeddedHostState
-  st.sequence += 1
-  const snapshot = buildEmbeddedSnapshot(errorMessage)
-  const bridge = getHostBridge()
-  if (bridge && typeof bridge.emitCoreEvent === 'function') {
-    try {
-      bridge.emitCoreEvent(
-        JSON.stringify({
-          epoch: st.epoch,
-          sequence: st.sequence,
-          snapshot
-        })
-      )
-    } catch {
-      // Ignore bridge emit error
-    }
-  }
-  return snapshot
-}
-
-const globalNamespace = globalThis as Record<string, unknown>
-globalNamespace.__TWILIGHT_PORTABLE_CORE__ = {
-  CORE_PROTOCOL_VERSION,
-  PORTABLE_EQ_PRESETS,
-  createPortableMusicCoreHost,
-  createHost: createPortableMusicCoreHost,
-  ensurePortableRuntimeGlobals,
-  aggregateLibraryCollections,
-  applyEqConfigPatch,
-  parseEmbeddedLrcLines,
-  bootHost(rawConfig?: string | { epoch?: string; protocolVersion?: number }) {
-    const cfg =
-      typeof rawConfig === 'string' && rawConfig.trim().length > 0
-        ? (JSON.parse(rawConfig) as { epoch?: string; protocolVersion?: number })
-        : typeof rawConfig === 'object' && rawConfig !== null
-          ? rawConfig
-          : {}
-    activeEmbeddedHostState = createInitialEmbeddedBridgeState()
-    if (cfg.epoch) activeEmbeddedHostState.epoch = cfg.epoch
-    if (cfg.protocolVersion) activeEmbeddedHostState.protocolVersion = cfg.protocolVersion
-
-    // Restore persisted session from host bridge if available
-    const loaded = invokeHostBridgePort('sessionStore', 'load', {})
-    if (loaded && loaded.ok && loaded.value && typeof loaded.value.payloadJson === 'string') {
-      activeEmbeddedHostState.sessionStoreRevision = loaded.value.revision ?? null
-      try {
-        const parsed = JSON.parse(loaded.value.payloadJson)
-        if (typeof parsed.queueRevision === 'number') activeEmbeddedHostState.queueRevision = parsed.queueRevision
-        if (typeof parsed.currentQueueIndex === 'number') activeEmbeddedHostState.currentQueueIndex = parsed.currentQueueIndex
-        if (typeof parsed.playMode === 'string') activeEmbeddedHostState.currentPlayMode = parsed.playMode
-        if (Array.isArray(parsed.favoriteTrackIds)) activeEmbeddedHostState.favoriteTrackIds = parsed.favoriteTrackIds
-        if (Array.isArray(parsed.bookmarks)) activeEmbeddedHostState.bookmarks = parsed.bookmarks
-        if (Array.isArray(parsed.playlists)) activeEmbeddedHostState.playlists = parsed.playlists
-        if (parsed.eqConfig) {
-          activeEmbeddedHostState.eqConfig = applyEqConfigPatch(createDefaultEqConfig(), parsed.eqConfig)
-        }
-      } catch {
-        // Ignore malformed stored session
-      }
-    }
-
-    if (activeEmbeddedHostState.queueTracks.length > 0) {
-      invokeHostBridgePort('audioEngine', 'loadQueue', {
-        tracks: activeEmbeddedHostState.queueTracks,
-        startIndex: activeEmbeddedHostState.currentQueueIndex
-      })
-    }
-    const snapRes = invokeHostBridgePort('audioEngine', 'getSnapshot', {})
-    if (snapRes && snapRes.ok && snapRes.value && typeof snapRes.value === 'object') {
-      activeEmbeddedHostState.latestAudioSnapshot = {
-        ...activeEmbeddedHostState.latestAudioSnapshot,
-        ...snapRes.value
-      }
-    }
-    publishEmbeddedEvent()
-
-    return JSON.stringify({
-      ok: true,
-      epoch: activeEmbeddedHostState.epoch,
-      protocolVersion: activeEmbeddedHostState.protocolVersion
-    })
-  },
-  handleRequest(
-    rawEnvelope?:
-      | string
-      | {
-          kind?: string
-          requestId?: string
-          epoch?: string
-          name?: string
-          expectedRevision?: number | null
-          payload?: Record<string, any>
-        }
-  ) {
-    const env =
-      typeof rawEnvelope === 'string' && rawEnvelope.trim().length > 0
-        ? (JSON.parse(rawEnvelope) as {
-            kind?: string
-            requestId?: string
-            epoch?: string
-            name?: string
-            expectedRevision?: number | null
-            payload?: Record<string, any>
-          })
-        : typeof rawEnvelope === 'object' && rawEnvelope !== null
-          ? rawEnvelope
-          : {}
-    const st = activeEmbeddedHostState
-    const requestId = env.requestId ?? 'req-unknown'
-    st.lastRequestId = requestId
-    const name = env.name ?? ''
-    const payload = env.payload ?? {}
-
-    if (env.kind === 'query') {
-      if (name === 'core.getSnapshot' || name === 'state.snapshot') {
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: buildEmbeddedSnapshot()
-        })
-      }
-      if (name === 'playback.getQueueWindow' || name === 'queue.page') {
-        const offset = Number(payload.offset ?? 0)
-        const limit = Number(payload.limit ?? 50)
-        const items = st.queueTracks.slice(offset, offset + limit).map((track, idx) => {
-          const absIndex = offset + idx
-          return {
-            occurrenceId: track.queueEntryId || `occ-${absIndex}-${track.id}`,
-            index: absIndex,
-            track
-          }
-        })
-        const currentTrack = st.queueTracks[st.currentQueueIndex]
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: {
-            queueId: 'default',
-            revision: st.queueRevision,
-            total: st.queueTracks.length,
-            offset,
-            limit,
-            currentIndex: st.currentQueueIndex,
-            currentOccurrenceId: currentTrack
-              ? currentTrack.queueEntryId || `occ-${st.currentQueueIndex}-${currentTrack.id}`
-              : null,
-            items
-          }
-        })
-      }
-      if (name === 'search.songs') {
-        const q = String(payload.query ?? '').trim().toLowerCase()
-        const matched = q
-          ? st.libraryTracks.filter(
-              (t) =>
-                t.title.toLowerCase().includes(q) ||
-                t.artist.toLowerCase().includes(q) ||
-                t.album.toLowerCase().includes(q)
-            )
-          : [...st.libraryTracks]
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: {
-            query: String(payload.query ?? '').trim(),
-            total: matched.length,
-            items: matched
-          }
-        })
-      }
-      if (name === 'lyrics.current') {
-        const targetId = payload.trackId ? String(payload.trackId) : null
-        const targetTrack = targetId
-          ? st.libraryTracks.find((t) => t.id === targetId) || st.queueTracks.find((t) => t.id === targetId)
-          : st.queueTracks[st.currentQueueIndex]
-        const lyricsView = targetTrack
-          ? buildEmbeddedLyricsForTrack(targetTrack)
-          : { trackId: targetId || 'none', source: 'none', synced: false, lines: [] }
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: lyricsView
-        })
-      }
-      if (name === 'library.collections') {
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: aggregateLibraryCollections(st.libraryTracks)
-        })
-      }
-      if (name === 'playlists.list') {
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: structuredClone(st.playlists)
-        })
-      }
-      if (name === 'audio.getEq') {
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: structuredClone(st.eqConfig)
-        })
-      }
-      if (name === 'audioDevice.getRoute') {
-        const routeRes = invokeHostBridgePort('audioDevice', 'getActiveRoute', {})
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value:
-            routeRes && routeRes.ok && routeRes.value
-              ? routeRes.value
-              : {
-                  routeId: 'route-speaker-default',
-                  routeType: 'speaker',
-                  productName: 'Built-in Speaker',
-                  sampleRateHz: 48000,
-                  bitDepth: 16,
-                  channels: 2,
-                  isBitPerfectCapable: false
-                }
-        })
-      }
-      if (name === 'audioDevice.listDevices') {
-        const listRes = invokeHostBridgePort('audioDevice', 'listOutputDevices', {})
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: listRes && listRes.ok && Array.isArray(listRes.value) ? listRes.value : []
-        })
-      }
-      if (name === 'lyrics.fetchOnline') {
-        const targetId = payload.trackId ? String(payload.trackId) : null
-        const targetTrack = targetId
-          ? st.libraryTracks.find((t) => t.id === targetId) || st.queueTracks.find((t) => t.id === targetId)
-          : st.queueTracks[st.currentQueueIndex]
-        const resolvedTrackId = targetTrack?.id || targetId || 'unknown'
-        const fetched = fetchEmbeddedOnlineLyrics(
-          resolvedTrackId,
-          String(payload.title || targetTrack?.title || ''),
-          String(payload.artist || targetTrack?.artist || ''),
-          String(payload.album || targetTrack?.album || ''),
-          typeof payload.url === 'string' ? payload.url : undefined
-        )
-        const fallbackView = targetTrack
-          ? buildEmbeddedLyricsForTrack(targetTrack)
-          : { trackId: resolvedTrackId, source: 'none', synced: false, lines: [] }
-        return JSON.stringify({
-          requestId,
-          epoch: st.epoch,
-          ok: true,
-          value: fetched || fallbackView
-        })
-      }
-      return JSON.stringify({
-        requestId,
-        epoch: st.epoch,
-        ok: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: `Unsupported query: ${name}`,
-          retryable: false
-        }
-      })
-    }
-
-    // Optimistic concurrency check for queue-mutating commands
-    const requiresRevCheck =
-      name === 'playback.selectQueueIndex' ||
-      name === 'playback.replaceQueue' ||
-      name === 'queue.select' ||
-      name === 'queue.edit'
-    if (
-      requiresRevCheck &&
-      env.expectedRevision !== undefined &&
-      env.expectedRevision !== null &&
-      env.expectedRevision !== st.queueRevision
-    ) {
-      return JSON.stringify({
-        requestId,
-        epoch: st.epoch,
-        ok: false,
-        error: {
-          code: 'STALE_REVISION',
-          message: `Expected queue revision ${env.expectedRevision}, but authoritative revision is ${st.queueRevision}`,
-          retryable: true
-        }
-      })
-    }
-
-    // Handle commands
-    switch (name) {
-      case 'playback.play': {
-        const positionSec = typeof payload.position === 'number' ? payload.position : undefined
-        const activeTrack = st.queueTracks[st.currentQueueIndex]
-        if (activeTrack) {
-          const uriRes = invokeHostBridgePort('resourceAccess', 'resolveNativeUri', {
-            resourceId: activeTrack.source || activeTrack.id
-          })
-          if (uriRes && !uriRes.ok && uriRes.error?.code === 'PERMISSION_EXPIRED') {
-            return JSON.stringify({
-              requestId,
-              epoch: st.epoch,
-              ok: false,
-              error: {
-                code: 'PERMISSION_EXPIRED',
-                message: uriRes.error.message,
-                retryable: false
-              }
-            })
-          }
-        }
-        invokeHostBridgePort('audioEngine', 'play', positionSec !== undefined ? { position: positionSec } : {})
-        st.latestAudioSnapshot.state = 'playing'
-        if (positionSec !== undefined) {
-          st.latestAudioSnapshot.positionMs = Math.round(positionSec * 1000)
-        }
-        break
-      }
-      case 'playback.pause': {
-        invokeHostBridgePort('audioEngine', 'pause', {})
-        st.latestAudioSnapshot.state = 'paused'
-        break
-      }
-      case 'playback.stop': {
-        invokeHostBridgePort('audioEngine', 'stop', {})
-        st.latestAudioSnapshot.state = 'idle'
-        st.latestAudioSnapshot.positionMs = 0
-        break
-      }
-      case 'playback.seek': {
-        const posSec = Number(payload.position ?? 0)
-        const posMs = Math.max(0, Math.round(posSec * 1000))
-        invokeHostBridgePort('audioEngine', 'seek', { positionMs: posMs })
-        st.latestAudioSnapshot.positionMs = posMs
-        break
-      }
-      case 'playback.next': {
-        if (st.queueTracks.length > 0) {
-          st.currentQueueIndex = (st.currentQueueIndex + 1) % st.queueTracks.length
-          st.lyricsRevision += 1
-          invokeHostBridgePort('audioEngine', 'next', {})
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playback.previous': {
-        if (st.queueTracks.length > 0) {
-          st.currentQueueIndex =
-            st.currentQueueIndex - 1 < 0 ? st.queueTracks.length - 1 : st.currentQueueIndex - 1
-          st.lyricsRevision += 1
-          invokeHostBridgePort('audioEngine', 'previous', {})
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playback.setVolume':
-      case 'playback.volume': {
-        const vol = Math.max(0, Math.min(1, Number(payload.volume ?? 1)))
-        invokeHostBridgePort('audioEngine', 'setVolume', { volume: vol })
-        st.latestAudioSnapshot.volume = vol
-        break
-      }
-      case 'playback.setPlayMode':
-      case 'playback.mode': {
-        const mode = String(payload.mode || 'sequence')
-        st.currentPlayMode = mode
-        invokeHostBridgePort('audioEngine', 'setPlayMode', { mode })
-        persistEmbeddedSession()
-        break
-      }
-      case 'playback.selectQueueIndex':
-      case 'queue.select': {
-        const idx = Number(payload.index ?? 0)
-        if (idx >= 0 && idx < st.queueTracks.length) {
-          st.currentQueueIndex = idx
-          st.queueRevision += 1
-          st.lyricsRevision += 1
-          invokeHostBridgePort('audioEngine', 'selectQueueIndex', { index: idx })
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playback.replaceQueue': {
-        const incoming = Array.isArray(payload.tracks) ? (payload.tracks as EmbeddedTrackView[]) : []
-        const startIndex = Number(payload.startIndex ?? 0)
-        const playImmediately = payload.play !== false && payload.play !== 'false'
-        if (incoming.length > 0) {
-          st.queueTracks = structuredClone(incoming)
-          st.currentQueueIndex = Math.max(0, Math.min(st.queueTracks.length - 1, startIndex))
-          st.queueRevision += 1
-          st.lyricsRevision += 1
-          invokeHostBridgePort('audioEngine', 'loadQueue', {
-            tracks: st.queueTracks,
-            startIndex: st.currentQueueIndex
-          })
-          if (playImmediately) {
-            invokeHostBridgePort('audioEngine', 'play', { position: 0 })
-            st.latestAudioSnapshot.state = 'playing'
-            st.latestAudioSnapshot.positionMs = 0
-          }
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'library.syncTracks': {
-        const scanned = Array.isArray(payload.tracks) ? (payload.tracks as EmbeddedTrackView[]) : []
-        const merged = new Map<string, EmbeddedTrackView>()
-        for (const t of EMBEDDED_DEMO_TRACKS) merged.set(t.id, structuredClone(t))
-        for (const t of scanned) {
-          if (t && typeof t.id === 'string') merged.set(t.id, structuredClone(t))
-        }
-        st.libraryTracks = [...merged.values()]
-        st.libraryRevision += 1
-        if (scanned.length > 0) {
-          st.queueTracks = structuredClone(st.libraryTracks)
-          st.currentQueueIndex = Math.max(0, Math.min(st.queueTracks.length - 1, st.currentQueueIndex))
-          st.queueRevision += 1
-          st.lyricsRevision += 1
-          invokeHostBridgePort('audioEngine', 'loadQueue', {
-            tracks: st.queueTracks,
-            startIndex: st.currentQueueIndex
-          })
-        }
-        persistEmbeddedSession()
-        break
-      }
-      case 'playlists.toggleFavorite': {
-        const trackId = String(payload.trackId || '').trim()
-        if (trackId) {
-          const idx = st.favoriteTrackIds.indexOf(trackId)
-          if (idx >= 0) {
-            st.favoriteTrackIds.splice(idx, 1)
-          } else {
-            st.favoriteTrackIds.push(trackId)
-          }
-          st.playlistsRevision += 1
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playlists.create': {
-        st.idCounter += 1
-        const plName = String(payload.name || 'Untitled Playlist').trim() || 'Untitled Playlist'
-        const rawIds = Array.isArray(payload.trackIds) ? payload.trackIds : []
-        const trackIds = [...new Set(rawIds.map((id: unknown) => String(id || '').trim()).filter(Boolean))]
-        const created: CorePlaylistView = {
-          id: `pl-${nowEmbeddedUnixMs()}-${st.idCounter}`,
-          name: plName,
-          trackIds,
-          trackCount: trackIds.length,
-          updatedAtMs: nowEmbeddedUnixMs()
-        }
-        st.playlists.push(created)
-        st.playlistsRevision += 1
-        persistEmbeddedSession()
-        break
-      }
-      case 'playlists.delete': {
-        const playlistId = String(payload.playlistId || '').trim()
-        const idx = st.playlists.findIndex((p) => p.id === playlistId)
-        if (idx >= 0) {
-          st.playlists.splice(idx, 1)
-          st.playlistsRevision += 1
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playlists.rename': {
-        const playlistId = String(payload.playlistId || '').trim()
-        const newName = String(payload.name || '').trim()
-        const target = st.playlists.find((p) => p.id === playlistId)
-        if (target && newName) {
-          target.name = newName
-          target.updatedAtMs = nowEmbeddedUnixMs()
-          st.playlistsRevision += 1
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playlists.addTracks': {
-        const playlistId = String(payload.playlistId || '').trim()
-        const rawIds = Array.isArray(payload.trackIds) ? payload.trackIds : []
-        const target = st.playlists.find((p) => p.id === playlistId)
-        if (target) {
-          const merged = new Set(target.trackIds)
-          for (const r of rawIds) {
-            const id = String(r || '').trim()
-            if (id) merged.add(id)
-          }
-          target.trackIds = [...merged]
-          target.trackCount = target.trackIds.length
-          target.updatedAtMs = nowEmbeddedUnixMs()
-          st.playlistsRevision += 1
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'playlists.removeTrack': {
-        const playlistId = String(payload.playlistId || '').trim()
-        const trackId = String(payload.trackId || '').trim()
-        const target = st.playlists.find((p) => p.id === playlistId)
-        if (target && trackId) {
-          target.trackIds = target.trackIds.filter((id) => id !== trackId)
-          target.trackCount = target.trackIds.length
-          target.updatedAtMs = nowEmbeddedUnixMs()
-          st.playlistsRevision += 1
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'bookmarks.add': {
-        const activeTrack = st.queueTracks[st.currentQueueIndex]
-        const trackId = String(payload.trackId || activeTrack?.id || '').trim()
-        const positionSec =
-          typeof payload.positionSec === 'number'
-            ? payload.positionSec
-            : (st.latestAudioSnapshot.positionMs || 0) / 1000
-        const label = String(payload.label || `Bookmark @ ${Math.round(positionSec)}s`).trim()
-        if (trackId) {
-          st.idCounter += 1
-          st.bookmarks.push({
-            id: `bm-${nowEmbeddedUnixMs()}-${st.idCounter}`,
-            trackId,
-            positionSec,
-            label,
-            createdAtMs: nowEmbeddedUnixMs()
-          })
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'bookmarks.remove': {
-        const bmId = String(payload.bookmarkId || '').trim()
-        if (bmId) {
-          st.bookmarks = st.bookmarks.filter((b) => b.id !== bmId)
-          persistEmbeddedSession()
-        }
-        break
-      }
-      case 'audio.setEq': {
-        st.eqConfig = applyEqConfigPatch(st.eqConfig, payload as Partial<CoreEqConfigView>)
-        invokeHostBridgePort('audioEngine', 'setDspConfig', {
-          configJson: JSON.stringify(st.eqConfig)
-        })
-        persistEmbeddedSession()
-        break
-      }
-      case 'lyrics.fetchOnline': {
-        const targetId = payload.trackId ? String(payload.trackId) : null
-        const targetTrack = targetId
-          ? st.libraryTracks.find((t) => t.id === targetId) || st.queueTracks.find((t) => t.id === targetId)
-          : st.queueTracks[st.currentQueueIndex]
-        const resolvedTrackId = targetTrack?.id || targetId || 'unknown'
-        fetchEmbeddedOnlineLyrics(
-          resolvedTrackId,
-          String(payload.title || targetTrack?.title || ''),
-          String(payload.artist || targetTrack?.artist || ''),
-          String(payload.album || targetTrack?.album || ''),
-          typeof payload.url === 'string' ? payload.url : undefined
-        )
-        break
-      }
-      case 'lyrics.importLrc': {
-        const activeTrack = st.queueTracks[st.currentQueueIndex]
-        const trackId = String(payload.trackId || activeTrack?.id || '').trim()
-        const rawLrc = String(payload.lrcText || payload.content || '').trim()
-        if (trackId && rawLrc) {
-          const parsedLrc = parseEmbeddedLrcLines(rawLrc)
-          if (parsedLrc.lines.length > 0) {
-            st.customLyrics[trackId] = {
-              trackId,
-              source: 'imported',
-              synced: parsedLrc.synced,
-              lines: parsedLrc.lines
-            }
-            st.lyricsRevision += 1
-          }
-        }
-        break
-      }
-      case 'playback.platformInterruption': {
-        const shouldPause = payload.shouldPause !== false && payload.shouldPause !== 'false'
-        if (shouldPause) {
-          invokeHostBridgePort('audioEngine', 'pause', {})
-          st.latestAudioSnapshot.state = 'paused'
-        }
-        break
-      }
-      case 'settings.edit': {
-        persistEmbeddedSession()
-        break
-      }
-      default:
-        break
-    }
-
-    const snapRes = invokeHostBridgePort('audioEngine', 'getSnapshot', {})
-    if (snapRes && snapRes.ok && snapRes.value && typeof snapRes.value === 'object') {
-      st.latestAudioSnapshot = {
-        ...st.latestAudioSnapshot,
-        ...snapRes.value
-      }
-    }
-
-    const updatedSnapshot = publishEmbeddedEvent()
-    return JSON.stringify({
-      requestId,
-      epoch: st.epoch,
-      ok: true,
-      value: {
-        snapshot: updatedSnapshot
-      }
-    })
-  },
-  onAudioEngineEvent(rawEvent?: string | Record<string, any>) {
-    const evt =
-      typeof rawEvent === 'string' && rawEvent.trim().length > 0
-        ? (JSON.parse(rawEvent) as Record<string, any>)
-        : typeof rawEvent === 'object' && rawEvent !== null
-          ? rawEvent
-          : {}
-    const st = activeEmbeddedHostState
-    if (evt.type === 'track-ended' && st.queueTracks.length > 0) {
-      if (st.currentPlayMode === 'single') {
-        invokeHostBridgePort('audioEngine', 'seek', { positionMs: 0 })
-        invokeHostBridgePort('audioEngine', 'play', { position: 0 })
-      } else {
-        st.currentQueueIndex = (st.currentQueueIndex + 1) % st.queueTracks.length
-        st.lyricsRevision += 1
-        invokeHostBridgePort('audioEngine', 'selectQueueIndex', { index: st.currentQueueIndex })
-      }
-      const snapRes = invokeHostBridgePort('audioEngine', 'getSnapshot', {})
-      if (snapRes && snapRes.ok && snapRes.value && typeof snapRes.value === 'object') {
-        st.latestAudioSnapshot = {
-          ...st.latestAudioSnapshot,
-          ...snapRes.value
-        }
-      }
-    } else if (evt.snapshot && typeof evt.snapshot === 'object') {
-      st.latestAudioSnapshot = {
-        ...st.latestAudioSnapshot,
-        ...evt.snapshot
-      }
-      if (
-        typeof evt.snapshot.queueIndex === 'number' &&
-        evt.snapshot.queueIndex >= 0 &&
-        evt.snapshot.queueIndex < st.queueTracks.length
-      ) {
-        st.currentQueueIndex = evt.snapshot.queueIndex
-      }
-    }
-    const updatedSnapshot = publishEmbeddedEvent(typeof evt.message === 'string' ? evt.message : null)
-    return JSON.stringify({
-      ok: true,
-      epoch: st.epoch,
-      sequence: st.sequence,
-      snapshot: updatedSnapshot
-    })
-  },
-  cancelRequest(rawCancel?: string | { requestId?: string }) {
-    const cancel =
-      typeof rawCancel === 'string' && rawCancel.trim().length > 0
-        ? (JSON.parse(rawCancel) as { requestId?: string })
-        : typeof rawCancel === 'object' && rawCancel !== null
-          ? rawCancel
-          : {}
-    return JSON.stringify({
-      ok: true,
-      cancelledRequestId: cancel.requestId ?? null,
-      epoch: activeEmbeddedHostState.epoch
-    })
-  }
-}

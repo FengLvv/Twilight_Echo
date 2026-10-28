@@ -27,7 +27,11 @@ const props = defineProps<{
   duplicateEntry: (entryId: string, next: boolean, expected: QueueVersion) => Promise<void>
   refreshQueue: () => Promise<void>
 }>()
-const emit = defineEmits<{ addToPlaylist: [track: QueuePlaylistEntry]; savePlaylist: [] }>()
+const emit = defineEmits<{
+  addToPlaylist: [track: QueuePlaylistEntry]
+  savePlaylist: []
+  openSessions: []
+}>()
 const viewport = useLibraryQueueViewport({
   snapshot: toRef(props, 'snapshot'),
   contentRevision: toRef(props, 'contentRevision'),
@@ -224,6 +228,14 @@ function drop(event: DragEvent, row: LibraryQueueRow): void {
           @click="emit('savePlaylist')"
         >
           存为歌单
+        </button>
+        <button
+          class="playlist-tool-btn"
+          type="button"
+          title="保存、恢复会话与查看播放顺序"
+          @click="emit('openSessions')"
+        >
+          会话
         </button>
         <button class="playlist-tool-btn" type="button" :disabled="disabled" @click="retry">
           刷新

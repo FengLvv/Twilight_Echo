@@ -11,11 +11,14 @@ export type CoreLibraryReadDatabase = Pick<
 
 export async function executeLibraryRead(
   database: CoreLibraryReadDatabase,
-  request: Exclude<CoreLibraryReadRequest, { name: 'library.artwork' | 'library.recent.resolve' }>
+  request: Exclude<CoreLibraryReadRequest, { name: 'library.artwork' | 'library.recent.resolve' }>,
+  metadata?: import('../../shared/entityMetadata.ts').EntityMetadataReadOptions
 ) {
   switch (request.name) {
     case 'library.collections':
-      return database.queryCollections(request.payload.kind, request.payload.query)
+      return request.payload.kind === 'albums' && metadata
+        ? database.queryCollections(request.payload.kind, request.payload.query, metadata)
+        : database.queryCollections(request.payload.kind, request.payload.query)
     case 'library.byIds': {
       const page = await database.getTracksByIds(request.payload.ids, request.payload.revision)
       return { ...page, tracks: page.tracks.map((track) => projectCoreTrack(track)) }

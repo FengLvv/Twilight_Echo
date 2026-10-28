@@ -10,12 +10,14 @@
 #include "../dsp/DspTypes.h"
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <mutex>
 #include <numeric>
 #include <optional>
@@ -259,6 +261,8 @@ struct FFmpegDecoder::Impl {
     }
     ~IoBudget() { impl.ioDeadline = previous; }
   };
+  std::shared_ptr<const SeekableInputFactory> inputFactory;
+  std::shared_ptr<SeekableInput> customInput;
   AudioStreamInfo streamInfo;
   AudioFormat outputFormat;
   bool eof = false;
@@ -274,6 +278,33 @@ struct FFmpegDecoder::Impl {
 #if defined(TAE_HAS_FFMPEG)
   AVFormatContext* formatContext = nullptr;
   FFmpegFileInput fileInput;
+  AVIOContext* customIo = nullptr;
+  int64_t inputPosition = 0;
+
+  static int readInput(void* context, uint8_t* bytes, int count) {
+    auto& self = *static_cast<Impl*>(context);
+    if (interruptIo(&self)) return AVERROR_EXIT;
+    auto input = std::atomic_load(&self.customInput);
+    const int read = input ? input->readAt(self.inputPosition, bytes, count) : -1;
+    if (interruptIo(&self)) return AVERROR_EXIT;
+    if (read > 0 && read <= count) { self.inputPosition += read; return read; }
+    return read == 0 ? AVERROR_EOF : AVERROR(EIO);
+  }
+
+  static int64_t seekInput(void* context, int64_t offset, int whence) {
+    auto& self = *static_cast<Impl*>(context);
+    if (interruptIo(&self)) return AVERROR_EXIT;
+    auto input = std::atomic_load(&self.customInput);
+    if (!input) return AVERROR(EIO);
+    whence &= ~AVSEEK_FORCE;
+    if (whence == AVSEEK_SIZE) return input->size();
+    int64_t base = whence == SEEK_SET ? 0 : whence == SEEK_CUR ? self.inputPosition :
+        whence == SEEK_END ? input->size() : -1;
+    if (base < 0 || (offset > 0 && base > std::numeric_limits<int64_t>::max() - offset) ||
+        (offset < 0 && offset < -base)) return AVERROR(EINVAL);
+    self.inputPosition = base + offset;
+    return self.inputPosition;
+  }
   AVCodecContext* codecContext = nullptr;
   AVPacket* packet = nullptr;
   AVFrame* frame = nullptr;
@@ -366,6 +397,11 @@ struct FFmpegDecoder::Impl {
     if (formatContext) {
       avformat_close_input(&formatContext);
     }
+    if (customIo) {
+      av_freep(&customIo->buffer);
+      avio_context_free(&customIo);
+    }
+    std::atomic_store(&customInput, std::shared_ptr<SeekableInput>{});
     fileInput.close();
     audioStreamIndex = -1;
     inputEof = false;
@@ -660,6 +696,17 @@ void FFmpegDecoder::setInterrupt(int (*callback)(void*), void* context) {
   impl_->interruptContext = context;
 }
 
+void FFmpegDecoder::setInputFactory(std::shared_ptr<const SeekableInputFactory> factory) {
+  impl_->inputFactory = std::move(factory);
+}
+
+bool FFmpegDecoder::cancelInput() {
+  auto input = std::atomic_load(&impl_->customInput);
+  if (!input) return false;
+  input->cancel();
+  return true;
+}
+
 bool FFmpegDecoder::open(const std::string& source, std::string* error) {
   close();
   impl_->remoteIo = source.find("://") != std::string::npos && source.rfind("file://", 0) != 0;
@@ -730,7 +777,23 @@ bool FFmpegDecoder::open(const std::string& source, std::string* error) {
       inputFormat = av_find_input_format("wav");
     }
   }
-  if (!impl_->fileInput.open(source, &impl_->formatContext)) {
+  if (impl_->inputFactory) std::atomic_store(&impl_->customInput, (*impl_->inputFactory)(source));
+  if (std::atomic_load(&impl_->customInput)) {
+    auto* buffer = static_cast<unsigned char*>(av_malloc(32768));
+    if (!buffer) { av_dict_free(&openOptions); if (error) *error = "Cannot allocate input buffer"; return false; }
+    impl_->customIo = avio_alloc_context(buffer, 32768, 0, impl_.get(), Impl::readInput, nullptr, Impl::seekInput);
+    if (!impl_->customIo) { av_free(buffer); av_dict_free(&openOptions); return false; }
+    impl_->inputPosition = 0;
+    impl_->formatContext = avformat_alloc_context();
+    if (!impl_->formatContext) {
+      av_dict_free(&openOptions);
+      if (error) *error = "Cannot allocate input context";
+      close();
+      return false;
+    }
+    impl_->formatContext->pb = impl_->customIo;
+    impl_->formatContext->flags |= AVFMT_FLAG_CUSTOM_IO;
+  } else if (!impl_->fileInput.open(source, &impl_->formatContext)) {
     av_dict_free(&openOptions);
     if (error) *error = "无法打开本地音频文件";
     return false;
@@ -742,7 +805,7 @@ bool FFmpegDecoder::open(const std::string& source, std::string* error) {
     return false;
   }
   impl_->formatContext->interrupt_callback = {Impl::interruptIo, impl_.get()};
-  int ret = avformat_open_input(&impl_->formatContext, source.c_str(), inputFormat, &openOptions);
+  int ret = avformat_open_input(&impl_->formatContext, impl_->customIo ? nullptr : source.c_str(), inputFormat, &openOptions);
   av_dict_free(&openOptions);
   if (ret < 0) {
     if (error) *error = "打开音频失败，错误码：" + std::to_string(ret);

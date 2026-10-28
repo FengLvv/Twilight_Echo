@@ -21,6 +21,13 @@ export type TwilightPluginPermission =
   | 'plugins:manage'
   | 'dsp:native'
 
+export interface TwilightAndroidPluginRuntime {
+  apiVersion: 1
+  entry: string
+  permissions: ('network' | 'settings')[]
+  networkHosts: string[]
+}
+
 export interface TwilightPluginManifest {
   id: string
   name: string
@@ -42,6 +49,8 @@ export interface TwilightPluginManifest {
   repository?: string
   icon?: string
   signature?: unknown
+  /** Optional serial Android provider entry. Desktop continues to use main/binary. */
+  androidRuntime?: TwilightAndroidPluginRuntime
 }
 
 /** API v4: isolated, packaged full-window interface. No preload or Node access. */
@@ -343,6 +352,16 @@ export interface PlatformEntityMetadata {
     licenseUrl: string
     usage?: MetadataUsage
   }>
+  /** This platform release's calendar date, not the album work's first release. */
+  releaseDate?: {
+    value: string
+    url: string
+    revision: string
+    attribution: string
+    license: string
+    licenseUrl: string
+    usage?: MetadataUsage
+  }
   /** Private resource URLs; Core projects approved images to session handles. */
   artwork?: Array<{
     resource: string

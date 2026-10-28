@@ -112,6 +112,8 @@ export interface AudioEngineServiceNativeBinding extends NativeAudioBinding {
   // Present on the real service binding: the fatal-startup latch and its manual
   // release. Optional so lightweight test doubles need not implement them.
   restartAfterFatal?: () => boolean
+  /** Manual recovery joins the old process before maintenance and a fresh ready handshake. */
+  restart?: (maintenance?: () => Promise<void>) => Promise<void>
   readonly fatalStartupError?: string
   on: (
     event: 'crash' | 'error-log' | 'log' | 'ready' | 'rpc-timeout',

@@ -149,6 +149,12 @@ export interface LibraryCollectionSummary {
   cover: string | null
   coverSource?: string | null
   releaseDate?: string
+  /** Confirmed-release display fallback; never a replacement for the file's date. */
+  metadataReleaseDate?: {
+    value: string
+    attribution: import('./entityMetadata.ts').MetadataAttribution
+    usage?: import('./musicMetadata.ts').MetadataUsage
+  }
   genre?: string | null
   path?: string
   artist?: string
@@ -474,7 +480,8 @@ export interface LibraryDatabaseApi {
   queryTracks(query?: LibraryQuery): Promise<LibraryPage>
   queryCollections(
     kind: LibraryCollectionKind,
-    query?: LibraryQuery
+    query?: LibraryQuery,
+    metadata?: import('./entityMetadata.ts').EntityMetadataReadOptions
   ): Promise<LibraryCollectionPage>
   getTracksByIds(ids: string[], expectedRevision?: number): Promise<LibraryPage>
   patchTracks(patches: LibraryTrackPatch[]): Promise<LibraryPage>

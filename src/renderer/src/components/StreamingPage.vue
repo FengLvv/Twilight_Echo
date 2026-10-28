@@ -13,7 +13,7 @@ import {
 import type { ProviderHomeSectionPresentation } from '../../../shared/providerHome'
 import { useBackHandler } from '../app/useBackStack'
 import type { Track, TrackArtistRef } from '../types/music'
-import { copyTrackNames } from '../utils/copyTrackNames'
+import { copyTrackNames } from '../composables/copyTrackNames'
 import {
   useNcmStore,
   captureNcmSession,

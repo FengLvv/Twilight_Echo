@@ -121,3 +121,51 @@ test('both active and last-good heart sessions protect their base queue from ref
     else assert.throws(() => db.getLibraryQueue(base.id), /does not exist/)
   }
 })
+
+
+test('saved playback tracks without filePath load cleanly and retain their SQL queue reference', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'core-no-filepath-repository-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const db = new LibraryDatabase(':memory:')
+  t.after(() => db.close())
+  db.replaceDocument({
+    version: 2,
+    revision: 1,
+    folders: [],
+    exclusions: [],
+    tracks: [{ id: 'one', filePath: 'D:/one.flac' }]
+  })
+  const bundle = createPlaybackSessionStoreBundle(root)
+  const repository = createCorePlaybackRepository(bundle, {
+    syncLibraryQueueReferences: async (...args) => db.syncLibraryQueueReferences(...args)
+  })
+  const queue = db.createLibraryQueue({})
+  await bundle.sessionStore.save(
+    {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      mode: 'trackAndPosition',
+      position: 18,
+      track: {
+        id: 'ncm:42',
+        source: 'ncm',
+        title: 'Online Song',
+        artist: 'Artist',
+        album: 'Album',
+        duration: 180,
+        queueEntryId: queue.selectedEntryId!
+      } as any,
+      libraryQueue: {
+        id: queue.id,
+        revision: queue.revision,
+        index: queue.index,
+        entryId: queue.selectedEntryId!
+      }
+    },
+    0
+  )
+  const loaded = await repository.load()
+  assert.equal(loaded?.data?.track.id, 'ncm:42')
+  assert.equal(loaded?.data?.track.filePath, '')
+  assert.equal(loaded?.data?.libraryQueue?.id, queue.id)
+})

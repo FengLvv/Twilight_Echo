@@ -220,3 +220,22 @@ test('unreadable request errors are reported without updating settings', (t) => 
   assert.equal(result.settingsApplied, false)
   assert.equal(f.settings.getRevision(), 0)
 })
+
+test('explicit v2 repair enables history, new imports and NCM once without altering unrelated preferences', t => {
+  const f = fixture(t)
+  f.settings.update({ audioDevice: 'saved-device', musicIdentification: {
+    newImports: false, history: false, sources: ['musicbrainz'], language: 'zh-Hant'
+  } })
+  f.writeRequest({ version: 2, profileRoot: f.root, enableAll: true })
+  assert.deepEqual(applyDevelopmentMetadataSetup(f.requestFile, f.root, f.settings), { status: 'applied' })
+  const settings = f.settings.read()
+  assert.equal(settings.audioDevice, 'saved-device')
+  assert.equal(settings.musicIdentification.newImports, true)
+  assert.equal(settings.musicIdentification.history, true)
+  assert.equal(settings.musicIdentification.ncmLocalFallback, true)
+  assert.equal(settings.musicIdentification.language, 'zh-Hant')
+  assert.ok(settings.musicIdentification.sources.includes('platform.ncm'))
+  f.settings.update({ musicIdentification: { ...settings.musicIdentification, history: false } })
+  assert.equal(applyDevelopmentMetadataSetup(f.requestFile, f.root, f.settings).status, 'missing')
+  assert.equal(f.settings.read().musicIdentification.history, false)
+})

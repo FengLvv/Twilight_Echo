@@ -381,6 +381,18 @@ export interface SettingsSearchEntry {
 /** 设置项级细粒度搜索索引：每个设置项一条，保证任意设置项都能被搜到 */
 export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
+    id: 'audio-restart',
+    section: 'playback',
+    title: '重启音频引擎',
+    terms: '音频 故障排除 没声音 无声 卡住 恢复 引擎 重启 audio troubleshooting restart engine'
+  },
+  {
+    id: 'windows-audio-restart',
+    section: 'playback',
+    title: '重启 Windows 音频服务',
+    terms: '系统 Windows 音频 服务 故障排除 管理员 没声音 恢复 restart audio services'
+  },
+  {
     id: 'appearance-workspace',
     section: 'appearance',
     title: '外观工作区',

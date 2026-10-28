@@ -8,6 +8,7 @@ import ts from 'typescript'
 import { IdentificationResponseCache } from '../library/identificationResponseCache.ts'
 import { PlatformIdentificationProvider } from '../library/musicIdentificationProvider.ts'
 import type { IdentificationInput } from '../../shared/musicIdentification.ts'
+import type { RemoteProviderSession } from '../../shared/remoteCoreBridge.ts'
 import {
   normalizeProviderUi,
   normalizeProviderHealth,
@@ -237,4 +238,80 @@ test('production manager context changes prevent reuse of the previous account s
   resultId = '8'
   assert.equal((await adapter().recall(input, signal)).proposals[0].references[0].value, '8')
   assert.equal(calls, 2)
+})
+
+function sessionFixture() {
+  const id = 'com.twilightecho.provider.ncm'
+  const source = readFileSync(new URL('./manager.ts', import.meta.url), 'utf8')
+  const ast = ts.createSourceFile('manager.ts', source, ts.ScriptTarget.Latest, true)
+  const declaration = ast.statements.find((n): n is ts.ClassDeclaration =>
+    ts.isClassDeclaration(n) && n.name?.text === 'TwilightPluginManager')!
+  const method = declaration.members.find(n => ts.isMethodDeclaration(n) && n.name.getText(ast) === 'readNcmSession')!
+  const code = ts.transpileModule(`class Manager {${method.getText(ast)}}`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 }
+  }).outputText
+  const Manager = runInNewContext(`${code}\nManager`, { INTERNAL_NCM_PLUGIN_ID: id }) as new () => {
+    readNcmSession(): Promise<RemoteProviderSession>
+  }
+  const owner = { descriptor: { id, paths: { dataDir: 'ncm-private-settings' } }, providers: [{ id: 'ncm' }] }
+  const plugins = [owner]
+  const state = { [id]: { enabled: true } }
+  let revision = 0, loginCalls = 0
+  let loggedIn = true
+  let readCookie = async (): Promise<unknown> => 'MUSIC_U=account; __csrf=csrf'
+  const reads: unknown[] = []
+  const manager = Object.assign(new Manager(), {
+    state,
+    shuttingDown: false,
+    contributingPlugins: () => plugins,
+    providerIdentityContext: () => String(revision),
+    callProvider: async (...args: unknown[]) => {
+      loginCalls++
+      assert.deepEqual(JSON.parse(JSON.stringify(args)), ['ncm', 'checkLogin', []])
+      return { loggedIn }
+    },
+    settings: { get: async (...args: unknown[]) => { reads.push(args); return readCookie() } }
+  })
+  return {
+    read: async () => JSON.parse(JSON.stringify(await manager.readNcmSession())) as RemoteProviderSession,
+    reads, state, plugins, owner, manager,
+    login: (value: boolean) => { loggedIn = value },
+    loginCalls: () => loginCalls,
+    cookie: (read: typeof readCookie) => { readCookie = read },
+    accountChanged: () => { revision++ }
+  }
+}
+
+test('remote session reads only the enabled official NCM account through the settings repository', async () => {
+  const f = sessionFixture()
+  assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: true, cookie: 'MUSIC_U=account; __csrf=csrf' })
+  assert.deepEqual(f.reads, [['ncm-private-settings', 'cookie']])
+  f.login(false)
+  assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: false })
+  assert.equal(f.reads.length, 1)
+})
+
+test('disabled, absent, or nonofficial providers never read account credentials', async () => {
+  for (const condition of ['disabled', 'absent', 'other-plugin', 'shutdown']) {
+    const f = sessionFixture()
+    if (condition === 'disabled') Object.values(f.state)[0].enabled = false
+    if (condition === 'absent') f.plugins.length = 0
+    if (condition === 'other-plugin') f.owner.descriptor.id = 'other.provider'
+    if (condition === 'shutdown') f.manager.shuttingDown = true
+    assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: false })
+    assert.equal(f.loginCalls(), 0)
+    assert.equal(f.reads.length, 0)
+  }
+})
+
+test('remote sessions omit malformed cookies and discard concurrent account or enablement changes', async () => {
+  const f = sessionFixture()
+  for (const cookie of [undefined, 3, '', 'MUSIC_U=', 'other=MUSIC_U=spoof', 'MUSIC_U=account\r\nInjected: header', 'MUSIC_U=' + 'x'.repeat(16000)]) {
+    f.cookie(async () => cookie)
+    assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: false })
+  }
+  f.cookie(async () => { f.accountChanged(); return 'MUSIC_U=old-account' })
+  assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: false })
+  f.cookie(async () => { Object.values(f.state)[0].enabled = false; return 'MUSIC_U=old-account' })
+  assert.deepEqual(await f.read(), { providerId: 'ncm', loggedIn: false })
 })

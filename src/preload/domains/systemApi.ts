@@ -73,6 +73,8 @@ export const systemApi = {
   },
   window: {
     ...equalizerClipboardApi,
+    copyTrackNames: (text: string): Promise<void> =>
+      ipcRenderer.invoke('window:copy-track-names', text),
     getState: (): Promise<WindowChromeState> => ipcRenderer.invoke('window:getState'),
     onStateChanged: (callback: (state: WindowChromeState) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, state: WindowChromeState): void => {

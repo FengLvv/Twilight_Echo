@@ -3,6 +3,7 @@ import { assertTrustedIpcSender, shouldAcceptIpcEvent } from '../security/electr
 import { nativeMenuTemplate, registerNativeContextMenuIpc } from './nativeContextMenuIpc.ts'
 import { dspEditorInteractionWindow } from '../app/dspEditorWindow.ts'
 import { registerEqualizerClipboardIpc } from './equalizerClipboardIpc.ts'
+import { registerTrackNamesClipboardIpc } from './trackNamesClipboardIpc.ts'
 import { readWindowChromeState } from '../app/windowChrome.ts'
 
 export function registerWindowIpc(ipcMain: IpcMain): void {
@@ -16,6 +17,10 @@ export function registerWindowIpc(ipcMain: IpcMain): void {
   registerEqualizerClipboardIpc(ipcMain, {
     assertTrusted: assertTrustedIpcSender,
     readText: () => clipboard.readText(),
+    writeText: (text) => clipboard.writeText(text)
+  })
+  registerTrackNamesClipboardIpc(ipcMain, {
+    assertTrusted: assertTrustedIpcSender,
     writeText: (text) => clipboard.writeText(text)
   })
   const menus = new Map<number, { requestId: string; close: () => void }>()

@@ -13,6 +13,7 @@ export type GridItem = {
   cover?: string | null
   coverSource?: string | null
   releaseDate?: string
+  metadataReleaseDate?: import('../../../../shared/libraryDatabase.ts').LibraryCollectionSummary['metadataReleaseDate']
   duration?: number
   genre?: string | null
   compilation?: boolean

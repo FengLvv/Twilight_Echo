@@ -200,11 +200,12 @@ window.albumCore={state:shallowRef({phase:'ready',epoch:'album-fixture',libraryR
  throw Error('Unexpected query '+name)
 }}
 const filter=ref(null)
+const albumInstance=ref(0)
 const menuOpen=ref(innerWidth>=1000)
 const app=createApp({setup:()=>()=>h('div',{class:'app-shell'},[
  h('div',{class:'app-shell-title'},h(TitleBar,{preview:true,menuOpen:menuOpen.value})),
  h('div',{class:'app-shell-navigation'},h(SideMenu,{preview:true,open:menuOpen.value,activeKey:'albums'})),
- h('div',{class:'app-shell-content'},h('main',{class:['main-content',{'menu-open':menuOpen.value}]},h(SongList,{category:'albums',filter:filter.value,hasPlayer:true,transitionName:filter.value?'page-down':'page-up',onSelectView:(_category,next)=>filter.value=next,returnFromDetail:()=>{filter.value=null}}))),
+ h('div',{class:'app-shell-content'},h('main',{class:['main-content',{'menu-open':menuOpen.value}]},h(SongList,{key:albumInstance.value,category:'albums',filter:filter.value,hasPlayer:true,transitionName:filter.value?'page-down':'page-up',onSelectView:(_category,next)=>filter.value=next,returnFromDetail:()=>{filter.value=null}}))),
  h('div',{class:'app-shell-player'},h(PlayerBar,{preview:true,previewTrack:tracks[0],previewState:'idle',glass:false}))
 ])})
 app.use(createPinia());app.config.errorHandler=e=>errors.push(String(e));app.mount('#app')
@@ -345,6 +346,9 @@ window.albumTest=async()=>{
  const failedArtwork=document.querySelector('.album-artwork img')
  expect(failedArtwork?.complete&&failedArtwork.naturalWidth===1254,'failed album artwork must display the packaged music cover')
  filter.value=null;await pause(650)
+ filter.value='album:id:album-0';albumInstance.value++;await nextTick();await pause(650)
+ expect(document.querySelector('#local-album-title')?.textContent==='A 晨光与远方','initial album-detail mount failed')
+ expect(document.querySelector('.album-detail-release')?.textContent==='2020年5月12日','initial album-detail mount lost its date')
  expect(errors.length===0,errors.join(';'))
  return 'ALBUM_UI_OK'
 }

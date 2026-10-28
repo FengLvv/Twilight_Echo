@@ -264,3 +264,49 @@ test('explicit profile choice restores one source without confirming the other s
   assert.equal(view.state.value.detail,null)
   view.dispose()
 })
+
+test('background reads keep unresolved choices usable and coalesce progress instead of restarting reads', async t => {
+  const f = fixture([entity('a'), entity('b')])
+  f.setIdentities(new Map([['a', identity('a')], ['b', identity('b', 'homonym')]]))
+  let hold = false, reads = 0, release!: () => void
+  const view = createArtistDetailView({ ...f.api, catalog: async query => {
+    reads++
+    if (hold) await new Promise<void>(resolve => { release = resolve })
+    return f.api.catalog(query)
+  } })
+  t.after(view.dispose)
+  await view.setContext('Alice', 'en')
+  const painted = view.state.value.page
+  hold = true
+  const first = view.refresh()
+  const next = view.refresh()
+  assert.equal(view.state.value.loading, false)
+  assert.equal(view.state.value.refreshing, true)
+  assert.equal(view.state.value.page, painted)
+  assert.equal(view.state.value.selected, null)
+  assert.equal(reads, 2, 'one in-flight read, no abort/restart for each progress event')
+  hold = false; release()
+  await Promise.all([first, next])
+  assert.equal(reads, 3)
+  assert.equal(view.state.value.refreshing, false)
+})
+
+test('failed background reads retain the selected source and draft host; permission changes withdraw it', async t => {
+  const f = fixture()
+  let failure = false
+  const view = createArtistDetailView({ ...f.api, catalog: async query => {
+    if (failure) throw new Error('temporary read failure')
+    return f.api.catalog(query)
+  } })
+  t.after(view.dispose)
+  await view.setContext('Alice', 'en')
+  const painted = view.state.value.detail
+  failure = true
+  await view.refresh()
+  assert.equal(view.state.value.detail, painted)
+  assert.equal(view.state.value.selected?.id, 'a')
+  assert.match(view.state.value.error, /temporary/)
+  await view.refresh(true)
+  assert.equal(view.state.value.detail, null)
+  assert.equal(view.state.value.selected, null)
+})

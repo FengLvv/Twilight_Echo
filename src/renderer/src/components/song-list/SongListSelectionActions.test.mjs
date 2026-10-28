@@ -5,7 +5,8 @@ import { effectScope, ref, shallowRef } from 'vue'
 import { createSongListActionSource } from './songListActionSource.ts'
 import { useTrackMultiSelect } from './useTrackMultiSelect.ts'
 import { coreQueueTrackInput } from '../../stores/player/corePlayerQueue.ts'
-import { copyTrackNamePages } from '../../utils/copyTrackNames.ts'
+import { copyTrackNames, copyTrackNamePages } from '../../composables/copyTrackNames.ts'
+import { useAppNoticeStore } from '../../stores/useAppNoticeStore.ts'
 
 const source = readFileSync(new URL('../SongList.vue', import.meta.url), 'utf8')
 const track = (id, patch = {}) => ({
@@ -31,6 +32,21 @@ function fixture(count = 605) {
   }
   const request = { query: { sort: 'insertion', contentRevision: 7 }, total: count, ranges: [[0, count]] }
   return { api, request, rows, calls, snapshot }
+}
+
+function clipboardFixture(t, copyTrackNames) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const notices = useAppNoticeStore()
+  notices.clearNotices()
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true, value: { api: { window: { copyTrackNames } } }
+  })
+  t.after(() => {
+    notices.clearNotices()
+    if (previous) Object.defineProperty(globalThis, 'window', previous)
+    else Reflect.deleteProperty(globalThis, 'window')
+  })
+  return notices
 }
 
 test('query selection keeps absolute ranges across unloaded windows without caching selected tracks', t => {
@@ -155,15 +171,8 @@ test('a retained dialog intent is fenced before publication when its selection c
 })
 
 test('copy text consumes all Core pages and checks the final intent before using the clipboard', async t => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const copied = []
-  Object.defineProperty(globalThis, 'navigator', {
-    configurable: true, value: { clipboard: { writeText: async text => { copied.push(text) } } }
-  })
-  t.after(() => {
-    if (previous) Object.defineProperty(globalThis, 'navigator', previous)
-    else Reflect.deleteProperty(globalThis, 'navigator')
-  })
+  clipboardFixture(t, async text => { copied.push(text) })
   const f = fixture()
   const lease = await createSongListActionSource({ api: f.api, request: f.request }).open()
   try { await copyTrackNamePages(lease.tracks) } finally { await lease.close() }
@@ -174,6 +183,38 @@ test('copy text consumes all Core pages and checks the final intent before using
     return () => { throw new Error('dialog closed') }
   }), /dialog closed/)
   assert.equal(copied.length, 1)
+})
+
+test('single and multi-track copies retain their format and ignore empty selections', async t => {
+  const copied = []
+  const notices = clipboardFixture(t, async text => { copied.push(text) })
+  await copyTrackNames([])
+  assert.deepEqual(copied, [])
+  assert.equal(notices.notices.value.length, 0)
+  await copyTrackNames([{ title: '  夜曲  ', artist: '  周杰伦  ' }])
+  assert.deepEqual(copied, ['夜曲 - 周杰伦'])
+  assert.equal(notices.notices.value.at(-1).message, '已复制歌曲名和作者')
+  await copyTrackNames([
+    { title: ' No artist ', artist: ' ' },
+    { title: ' ', artist: ' Artist only ' },
+    { title: 'Duet', artist: 'A / B' }
+  ])
+  assert.equal(copied.at(-1), 'No artist\nArtist only\nDuet - A / B')
+  assert.equal(notices.notices.value.at(-1).message, '已复制 3 首歌曲名和作者')
+})
+
+test('copy feedback waits for the native write and reports a rejected write as failure', async t => {
+  let rejectWrite
+  const notices = clipboardFixture(t, () => new Promise((_resolve, reject) => { rejectWrite = reject }))
+  const copying = copyTrackNames([{ title: 'Song', artist: 'Artist' }])
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(typeof rejectWrite, 'function', 'copy did not use the native clipboard bridge')
+  assert.equal(notices.notices.value.length, 0)
+  rejectWrite(new Error('Clipboard unavailable'))
+  await copying
+  assert.equal(notices.notices.value.length, 1)
+  assert.equal(notices.notices.value[0].kind, 'error')
+  assert.equal(notices.notices.value[0].message, '复制歌曲名和作者失败，请重试')
 })
 
 test('SongList binds Core selection and identity-only commands, not private media records', () => {

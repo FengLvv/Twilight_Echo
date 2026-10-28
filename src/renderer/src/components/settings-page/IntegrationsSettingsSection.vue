@@ -30,6 +30,7 @@ const discordStatus = ref<{
 const notice = ref('')
 
 let discordStatusTimer: number | null = null
+let remoteStatusTimer: number | null = null
 
 async function refreshDiscordStatus(): Promise<void> {
   try {
@@ -135,6 +136,22 @@ async function rotateRemotePin(): Promise<void> {
   }
 }
 
+async function decideRemotePairing(requestId: string, allow: boolean): Promise<void> {
+  remoteBusy.value = true
+  remoteStatusError.value = ''
+  try { remoteStatus.value = await core.command('remote.decidePairing', { requestId, allow }) as RemoteControlStatus }
+  catch (err) { remoteStatusError.value = err instanceof Error ? err.message : String(err) }
+  finally { remoteBusy.value = false }
+}
+
+async function revokeRemoteDevice(id: string): Promise<void> {
+  remoteBusy.value = true
+  remoteStatusError.value = ''
+  try { remoteStatus.value = await core.command('remote.revokeDevice', { id }) as RemoteControlStatus }
+  catch (err) { remoteStatusError.value = err instanceof Error ? err.message : String(err) }
+  finally { remoteBusy.value = false }
+}
+
 async function copyRemoteUrl(url: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(url)
@@ -150,9 +167,13 @@ onMounted(() => {
   discordStatusTimer = window.setInterval(() => {
     if (props.discordEnabled) void refreshDiscordStatus()
   }, 8_000)
+  remoteStatusTimer = window.setInterval(() => {
+    if (props.remoteEnabled && !remoteBusy.value) void refreshRemoteStatus()
+  }, 3_000)
 })
 
 onBeforeUnmount(() => {
+  if (remoteStatusTimer !== null) window.clearInterval(remoteStatusTimer)
   if (discordStatusTimer !== null) {
     window.clearInterval(discordStatusTimer)
     discordStatusTimer = null
@@ -203,7 +224,7 @@ onBeforeUnmount(() => {
           <div class="setting-copy">
             <strong>局域网远程控制</strong>
             <span>
-              默认关闭。开启后在局域网提供 Web 遥控页（PIN 配对 + Token），并支持 DLNA 投送。
+              开启后，Android 可自动发现这台电脑。首次连接在电脑确认，之后直接重连。
             </span>
           </div>
           <button
@@ -228,7 +249,7 @@ onBeforeUnmount(() => {
           class="setting-item top-align remote-control-panel"
         >
           <div class="setting-copy">
-            <strong>配对 PIN / 访问地址</strong>
+            <strong>{{ remoteStatus?.serverName || '这台电脑' }}</strong>
             <span>
               状态：
               {{ remoteStatus?.running ? `运行中 · 端口 ${remoteStatus.port ?? '—'}` : '未运行' }}
@@ -237,6 +258,22 @@ onBeforeUnmount(() => {
                 · {{ remoteStatus?.clientCount }} 客户端
               </template>
             </span>
+            <span class="setting-substatus" role="status">
+              {{ remoteStatus?.discovery === 'advertising' ? '手机可在同一局域网自动发现' : remoteStatus?.discoveryError || '局域网发现未启动' }}
+            </span>
+            <div v-for="request in remoteStatus?.pairingRequests ?? []" :key="request.id" class="remote-device-row">
+              <div><strong>{{ request.deviceName }}</strong><span>请求连接 · {{ request.address }}</span></div>
+              <button type="button" class="soft-button" :disabled="remoteBusy" @click="decideRemotePairing(request.id, true)">允许连接</button>
+              <button type="button" class="soft-button" :disabled="remoteBusy" @click="decideRemotePairing(request.id, false)">拒绝</button>
+            </div>
+            <div v-if="(remoteStatus?.trustedDevices?.length ?? 0) > 0" class="remote-devices">
+              <strong>已授权设备</strong>
+              <div v-for="device in remoteStatus?.trustedDevices ?? []" :key="device.id" class="remote-device-row">
+                <span>{{ device.name }}</span>
+                <button type="button" class="soft-button" :disabled="remoteBusy" @click="revokeRemoteDevice(device.id)">撤销授权</button>
+              </div>
+            </div>
+            <details class="remote-manual-access"><summary>浏览器遥控与手动连接</summary>
             <div v-if="remoteStatus?.pin" class="remote-pin-row">
               <code class="remote-pin">{{ remoteStatus.pin }}</code>
               <button
@@ -245,7 +282,7 @@ onBeforeUnmount(() => {
                 :disabled="remoteBusy"
                 @click="rotateRemotePin"
               >
-                更换 PIN
+                更换 PIN 并撤销全部授权
               </button>
               <button
                 type="button"
@@ -278,6 +315,7 @@ onBeforeUnmount(() => {
                 </li>
               </ul>
             </div>
+            </details>
             <span v-if="remoteStatus?.lastError" class="remote-error">
               {{ remoteStatus.lastError }}
             </span>
@@ -289,3 +327,11 @@ onBeforeUnmount(() => {
     </div>
   </SettingsGroup>
 </template>
+
+<style scoped>
+.remote-device-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; }
+.remote-device-row > :first-child { flex: 1; min-width: 160px; }
+.remote-device-row > div { display: flex; flex-direction: column; gap: 4px; }
+.remote-devices, .remote-manual-access { margin-top: 16px; }
+.remote-manual-access summary { cursor: pointer; padding: 8px 0; }
+</style>

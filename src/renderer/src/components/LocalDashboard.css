@@ -17,12 +17,16 @@
   --home-accent: var(--te-primary-500);
   --home-tint: color-mix(in srgb, var(--te-primary-500) 12%, transparent);
   --home-cyan-tint: color-mix(in srgb, var(--te-accent-cyan) 12%, transparent);
-  --home-radius-lg: 22px;
-  --home-radius-md: 14px;
+  --home-radius-lg: 24px;
+  --home-radius-md: 16px;
+  /* One content inset for every card, so the page reads on two left edges:
+     the card edges and the copy inside them. */
+  --home-pad: clamp(20px, 2.8cqi, 36px);
   --home-shadow-color: rgba(15, 23, 42, 0.09);
   --home-shadow-strong: rgba(15, 23, 42, 0.16);
-  --home-shadow: 0 18px 44px var(--home-shadow-color);
-  --home-shadow-lift: 0 24px 56px var(--home-shadow-strong);
+  /* Cards stay flat like the streaming home; only artwork casts shadows. */
+  --home-shadow: none;
+  --home-shadow-lift: 0 16px 36px var(--home-shadow-color);
   --home-display: var(--te-font-display, var(--te-font-rounded, var(--te-font-sans)));
 
   position: relative;
@@ -205,52 +209,10 @@
 .masthead-title {
   margin: 0;
   font-family: var(--home-display);
-  font-size: calc(var(--te-font-size-body, 14px) * 28 / 14);
+  font-size: calc(var(--te-font-size-body, 14px) * 26 / 14);
   line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--home-ink);
-}
-
-.masthead-shuffle {
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 8px 16px;
-  border: 1px solid var(--home-line);
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-  box-shadow: none;
-  transition:
-    transform var(--te-motion-hover) var(--te-ease-soft),
-    border-color var(--te-motion-hover);
-}
-
-.masthead-shuffle:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--home-ink) 18%, transparent);
-}
-
-.masthead-shuffle:active {
-  transform: scale(var(--te-motion-press-scale));
-}
-
-.masthead-shuffle-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: max(20px, 1em);
-  height: max(20px, 1em);
-  font-size: calc(var(--te-font-size-body, 14px) * 18 / 14);
-  color: inherit;
-}
-
-.masthead-shuffle-label {
-  font-size: calc(var(--te-font-size-body, 14px) * 14 / 14);
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.04em;
   color: var(--home-ink);
 }
 
@@ -419,11 +381,27 @@
   box-shadow: var(--home-shadow);
 }
 
+/* The streaming home's surface: a faint accent drift over the card colour. It is
+   an image layer so material modes that repaint background-color still apply, and
+   the `.home` prefix outranks the shared dark-theme card paint in base.css. */
+.home .feature-card {
+  background-color: var(--home-card);
+  background-image: linear-gradient(
+    115deg,
+    transparent,
+    color-mix(in srgb, var(--home-accent) 9%, transparent)
+  );
+  box-shadow: var(--home-shadow);
+}
+
 .feature-backdrop {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  /* The cover tints the art side only; the copy keeps the plain card behind it. */
+  -webkit-mask-image: linear-gradient(100deg, transparent 36%, #000 86%);
+  mask-image: linear-gradient(100deg, transparent 36%, #000 86%);
 }
 
 .feature-backdrop img {
@@ -433,9 +411,9 @@
   height: 136%;
   object-fit: cover;
   filter: blur(64px) saturate(1.35);
-  /* Tokenised so the liquid glass surface can thin the bloom: stacked on top of a
-     blurred backdrop, a 0.5 cover wash turns the hero into mud. */
-  opacity: var(--home-hero-art-alpha, 0.5);
+  /* Tokenised so a surface can thin the tint further. The sleeve already shows the
+     cover, so this stays a wash rather than a second copy of the artwork. */
+  opacity: var(--home-hero-art-alpha, 0.32);
   transform: translateZ(0);
 }
 
@@ -443,29 +421,16 @@
   filter: blur(64px) saturate(1.3) brightness(0.6);
 }
 
-.feature-backdrop::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(
-      100deg,
-      var(--home-card) 0%,
-      color-mix(in srgb, var(--home-card) 84%, transparent) 46%,
-      color-mix(in srgb, var(--home-card) 32%, transparent) 100%
-    ),
-    linear-gradient(180deg, color-mix(in srgb, var(--home-card) 28%, transparent), transparent 42%);
-}
-
 .hero-inner {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.85fr);
   align-items: center;
-  gap: clamp(32px, 4cqi, 48px);
-  min-height: 344px;
-  padding: clamp(28px, 3.6cqi, 44px);
+  gap: clamp(24px, 3cqi, 40px);
+  min-height: 310px;
+  box-sizing: border-box;
+  padding: clamp(28px, 3.6cqi, 44px) var(--home-pad);
 }
 
 .hero-copy {
@@ -479,18 +444,19 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
+  font-size: calc(var(--te-font-size-body, 14px) * 10.5 / 14);
   line-height: 1.5;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--home-accent) 82%, var(--home-ink));
+  font-weight: 650;
+  letter-spacing: 0.17em;
+  color: var(--home-muted);
 }
 
 .eq {
   display: inline-flex;
   align-items: flex-end;
   gap: 2.5px;
-  height: 12px;
+  height: 11px;
+  color: var(--home-accent);
 }
 
 .eq i {
@@ -527,7 +493,7 @@
 .hero-track-info {
   width: 100%;
   min-width: 0;
-  margin-top: 20px;
+  margin-top: 12px;
 }
 
 .hero-title {
@@ -535,14 +501,14 @@
   margin: 0;
   font-family: var(--home-display);
   font-size: clamp(
-    calc(var(--te-font-size-body, 14px) * 32 / 14),
-    4.5cqi,
-    calc(var(--te-font-size-body, 14px) * 48 / 14)
+    calc(var(--te-font-size-body, 14px) * 26 / 14),
+    3.2cqi,
+    calc(var(--te-font-size-body, 14px) * 36 / 14)
   );
-  line-height: 1.15;
+  line-height: 1.25;
   overflow-wrap: anywhere;
   font-weight: 650;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
   text-wrap: pretty;
   color: var(--home-ink);
   overflow: hidden;
@@ -554,8 +520,8 @@
 }
 
 .hero-artist {
-  margin: 12px 0 0;
-  font-size: calc(var(--te-font-size-body, 14px) * 18 / 14);
+  margin: 10px 0 0;
+  font-size: var(--te-font-size-body, 14px);
   line-height: 1.5;
   font-weight: 500;
   color: color-mix(in srgb, var(--home-ink) 76%, transparent);
@@ -569,25 +535,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  margin: 16px 0 0;
+  gap: 6px 10px;
+  margin: 4px 0 0;
   font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
   line-height: 1.5;
   font-weight: 400;
   color: var(--home-muted);
   max-width: 100%;
-}
-
-.hero-release {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.hero-release > i {
-  flex-shrink: 0;
 }
 
 .hero-album {
@@ -599,8 +553,12 @@
 }
 
 .hero-audio-meta {
-  padding-left: 12px;
-  border-left: 1px solid var(--home-line);
+  padding: 1px 8px;
+  border: 1px solid var(--home-line);
+  border-radius: 999px;
+  font-size: calc(var(--te-font-size-body, 14px) * 10.5 / 14);
+  font-weight: 600;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -609,10 +567,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 26px;
   max-width: 100%;
 }
 
+/* Only while the player bar is off screen: the hero then carries the session. */
 .hero-actions.is-current {
   width: min(100%, 460px);
   flex-wrap: nowrap;
@@ -653,30 +612,21 @@
   transform: scale(var(--te-motion-press-scale));
 }
 
-/* Align transport with the seek bar; use the accent to give play a clear focus. */
+/* The streaming home's primary action: an opaque ink pill. The home-action pair is
+   resolved before wallpaper text tones, so the pill stays legible over any photo. */
 .home .transport-button.transport-play {
-  width: 58px;
+  width: 50px;
   height: 50px;
   border: none;
-  border-radius: 18px;
+  border-radius: 999px;
   font-size: calc(var(--te-font-size-body, 14px) * 20 / 14);
-  color: var(--te-player-bar-play-text, var(--home-card));
+  color: var(--te-player-bar-play-text, var(--te-home-action-ink, var(--home-card)));
   -webkit-text-fill-color: currentColor;
-  background: var(
-    --te-player-bar-play-surface,
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--home-accent) 82%, var(--home-card)),
-      color-mix(in srgb, var(--home-accent) 90%, var(--home-ink))
-    )
-  );
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--home-card) 40%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--home-ink) 8%, transparent),
-    0 5px 14px color-mix(in srgb, var(--home-accent) 18%, transparent);
+  background: var(--te-player-bar-play-surface, var(--te-home-action-surface, var(--home-ink)));
+  box-shadow: none;
 }
 
-.home .transport-button.transport-play.is-idle {
+.home .transport-button.transport-play.is-labelled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -684,23 +634,12 @@
   width: auto;
   max-width: 100%;
   height: auto;
-  min-height: 48px;
+  min-height: 44px;
   box-sizing: border-box;
-  padding: 12px 22px;
-  border: 1px solid color-mix(in srgb, var(--home-accent) 18%, var(--home-card));
-  border-radius: 999px;
-  font-size: var(--te-font-size-body, 14px);
+  padding: 10px 20px;
+  font-size: calc(var(--te-font-size-body, 14px) * 13 / 14);
   font-weight: 600;
   line-height: 1.5;
-  color: var(
-    --te-player-bar-play-text,
-    color-mix(in srgb, var(--home-accent) 72%, var(--home-ink))
-  );
-  background: var(
-    --te-player-bar-play-surface,
-    color-mix(in srgb, var(--home-accent) 10%, var(--home-card))
-  );
-  box-shadow: none;
 }
 
 .home .transport-button.transport-play:focus-visible {
@@ -713,14 +652,39 @@
   height: 22px;
 }
 
-.home .transport-button.transport-play.is-idle .playback-icon {
-  width: 18px;
-  height: 18px;
+.home .transport-button.transport-play.is-labelled .playback-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .transport-play-label {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 18px;
+  border: 1px solid var(--home-line);
+  border-radius: 999px;
+  background: transparent;
+  font-size: calc(var(--te-font-size-body, 14px) * 13 / 14);
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background var(--te-motion-hover),
+    border-color var(--te-motion-hover);
+}
+
+.hero-secondary i {
+  font-size: calc(var(--te-font-size-body, 14px) * 16 / 14);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -730,15 +694,18 @@
   }
 
   .home .transport-button.transport-play:hover {
-    color: var(--te-player-bar-play-hover-text, var(--te-player-bar-play-text, var(--home-card)));
+    color: var(
+      --te-player-bar-play-hover-text,
+      var(--te-player-bar-play-text, var(--te-home-action-ink, var(--home-card)))
+    );
     background: var(
       --te-player-bar-play-hover-surface,
       var(
         --te-player-bar-play-surface,
-        linear-gradient(
-          145deg,
-          color-mix(in srgb, var(--home-accent) 90%, var(--home-card)),
-          color-mix(in srgb, var(--home-accent) 84%, var(--home-ink))
+        color-mix(
+          in srgb,
+          var(--te-home-action-surface, var(--home-ink)) 86%,
+          var(--te-home-action-ink, var(--home-card))
         )
       )
     );
@@ -752,51 +719,70 @@
     color: var(--home-ink);
   }
 
-  .home .transport-button.transport-play.is-idle:hover {
-    color: var(
-      --te-player-bar-play-hover-text,
-      var(--te-player-bar-play-text, color-mix(in srgb, var(--home-accent) 72%, var(--home-ink)))
-    );
-    background: var(
-      --te-player-bar-play-hover-surface,
-      var(
-        --te-player-bar-play-surface,
-        color-mix(in srgb, var(--home-accent) 16%, var(--home-card))
-      )
-    );
-    border-color: color-mix(in srgb, var(--home-accent) 30%, var(--home-card));
+  .hero-secondary:hover {
+    border-color: color-mix(in srgb, var(--home-ink) 18%, transparent);
+    background: var(--home-hover);
   }
 }
 
-/* Hero art: offset echo + big cover */
+/* Hero art: the streaming home's record and sleeve, with the cover as the sleeve. */
 
 .hero-art {
+  --hero-sleeve: clamp(168px, 19cqi, 224px);
   position: relative;
   justify-self: center;
-  width: min(100%, clamp(200px, 26cqi, 288px));
-  aspect-ratio: 1;
+  width: calc(var(--hero-sleeve) * 1.5);
+  max-width: 100%;
+  height: calc(var(--hero-sleeve) * 1.16);
 }
 
 .hero-art-echo {
   position: absolute;
-  inset: 0;
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--home-tint), var(--home-cyan-tint));
-  transform: rotate(6deg) translate(10px, 6px);
-  transition: transform 0.4s var(--te-ease-soft);
+  inset: 0 0 0 auto;
+  width: calc(var(--hero-sleeve) * 1.06);
+  height: calc(var(--hero-sleeve) * 1.06);
+  margin-block: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: repeating-radial-gradient(
+    circle,
+    var(--home-ink) 0 2px,
+    color-mix(in srgb, var(--home-ink) 86%, var(--home-card)) 3px 4px
+  );
+  box-shadow: 12px 12px 26px var(--home-shadow-color);
+  transition: translate 0.5s var(--te-ease-soft);
+}
+
+/* A two-tone label is what makes the spin readable while the track plays. */
+.hero-art-echo::after {
+  content: '';
+  position: absolute;
+  inset: 33%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--home-card) 0 9%, transparent 10%),
+    conic-gradient(
+      from 40deg,
+      var(--home-accent) 0 50%,
+      color-mix(in srgb, var(--home-accent) 62%, var(--home-card)) 50% 100%
+    );
 }
 
 .hero-art-frame {
   position: absolute;
-  inset: 0;
+  inset: 0 auto 0 0;
   display: block;
-  border-radius: 20px;
+  width: var(--hero-sleeve);
+  height: var(--hero-sleeve);
+  margin-block: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+  box-sizing: border-box;
   overflow: hidden;
-  box-shadow:
-    0 26px 54px color-mix(in srgb, var(--te-neutral-900) 26%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--home-card) 42%, transparent);
-  transform: rotate(-2deg);
-  transition: transform 0.4s var(--te-ease-soft);
+  background: var(--home-soft);
+  box-shadow: 0 14px 35px var(--home-shadow-strong);
+  transform: rotate(-8deg);
 }
 
 .hero-art-frame img {
@@ -806,128 +792,127 @@
   object-fit: cover;
 }
 
-.hero-art-frame.is-live {
-  animation: art-breathe 5.5s ease-in-out infinite;
+.hero-art.is-live .hero-art-echo {
+  translate: calc(var(--hero-sleeve) * 0.05) 0;
+  animation: record-spin 8s linear infinite;
 }
 
-@keyframes art-breathe {
-  0%,
-  100% {
-    transform: rotate(-2deg) translateY(0);
-  }
-  50% {
-    transform: rotate(-1.2deg) translateY(-7px);
+@keyframes record-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-.feature-card:hover .hero-art-echo {
-  transform: rotate(8deg) translate(13px, 8px);
+@media (hover: hover) and (pointer: fine) {
+  .feature-card:hover .hero-art-echo {
+    translate: calc(var(--hero-sleeve) * 0.09) 0;
+  }
 }
 
-/* ── Figures row ────────────────────────────────────────────────────── */
+/* ── Library shortcuts ──────────────────────────────────────────────── */
 
 .figures {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  padding: 4px 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .figure {
-  min-width: 0;
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px clamp(16px, 2.4cqi, 28px);
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px var(--home-pad);
+  border: 1px solid var(--home-line);
+  border-radius: var(--home-radius-md);
+  background: var(--home-card);
   text-align: left;
   cursor: pointer;
-  transition: background var(--te-motion-hover);
+  transition:
+    background var(--te-motion-hover),
+    border-color var(--te-motion-hover);
 }
 
-.figure + .figure {
-  border-left: 1px solid var(--home-line);
+.figure-icon {
+  flex-shrink: 0;
+  font-size: calc(var(--te-font-size-body, 14px) * 22 / 14);
+  color: var(--home-accent);
 }
 
-.figure:not(.is-static):hover {
-  background: var(--home-hover);
-}
-
-.figure.is-static {
-  cursor: default;
+.figure-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .figure strong {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
   overflow-wrap: anywhere;
   font-family: var(--home-display);
-  font-size: calc(var(--te-font-size-body, 14px) * 28 / 14);
+  font-size: calc(var(--te-font-size-body, 14px) * 22 / 14);
   line-height: 1.25;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 650;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--home-ink);
 }
 
-.figure-unit {
-  font-family: var(--te-font-sans, sans-serif);
-  font-size: calc(var(--te-font-size-body, 14px) * 14 / 14);
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--home-muted);
-}
-
-.figure span {
+.figure-copy span {
   font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
   line-height: 1.5;
   font-weight: 400;
   color: var(--home-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.figure i {
-  position: absolute;
-  right: 14px;
-  top: 14px;
-  font-size: calc(var(--te-font-size-body, 14px) * 13 / 14);
+.figure-arrow {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
   color: var(--home-muted);
-  opacity: 0;
   transition:
-    opacity var(--te-motion-hover),
+    color var(--te-motion-hover),
     transform var(--te-motion-hover) var(--te-ease-soft);
 }
 
-.figure:not(.is-static):hover i {
-  opacity: 1;
-  transform: translate(2px, -2px);
+@media (hover: hover) and (pointer: fine) {
+  /* Layer the hover wash over the card so a translucent hover token stays opaque. */
+  .figure:hover {
+    border-color: color-mix(in srgb, var(--home-ink) 16%, transparent);
+    background:
+      linear-gradient(var(--home-hover), var(--home-hover)),
+      var(--home-card);
+  }
+
+  .figure:hover .figure-arrow {
+    color: var(--home-ink);
+    transform: translate(2px, -2px);
+  }
 }
 
-/* ── Signal path card ───────────────────────────────────────────────── */
+/* ── Signal path strip ──────────────────────────────────────────────── */
 
 .signal-card {
   position: relative;
-  padding: 22px clamp(20px, 2.4vw, 30px) 18px;
+  padding: 16px var(--home-pad);
   border: 1px solid var(--home-line);
-  border-radius: var(--home-radius-lg);
+  border-radius: var(--home-radius-md);
   background: var(--home-card);
   box-shadow: var(--home-shadow);
   cursor: pointer;
   transition:
-    transform var(--te-motion-hover) var(--te-ease-soft),
-    border-color var(--te-motion-hover),
-    box-shadow var(--te-motion-hover);
+    background var(--te-motion-hover),
+    border-color var(--te-motion-hover);
 }
 
 .signal-card:hover {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--home-ink) 16%, transparent);
-  box-shadow: var(--home-shadow-lift);
+  background:
+    linear-gradient(var(--home-hover), var(--home-hover)),
+    var(--home-card);
 }
 
 .signal-card:focus-visible {
@@ -935,72 +920,59 @@
   outline-offset: 2px;
 }
 
+/* Title and live state share the first line; the stages that touch the signal take
+   the full width below and wrap instead of scrolling out of sight. */
 .signal-head {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px 20px;
 }
 
-.signal-kicker {
-  display: block;
-  font-size: calc(var(--te-font-size-body, 14px) * 10.5 / 14);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  color: var(--home-muted);
+.signal-title {
+  display: flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  gap: 10px;
+  min-width: 0;
 }
 
 .signal-title h2 {
-  margin-top: 6px;
+  margin: 0;
   font-family: var(--home-display);
-  font-size: calc(var(--te-font-size-body, 14px) * 20 / 14);
-  line-height: 1.3;
-  font-weight: 600;
+  font-size: var(--te-font-size-body, 14px);
+  line-height: 1.5;
+  font-weight: 650;
+  white-space: nowrap;
   color: var(--home-ink);
 }
 
 .signal-title small {
-  display: block;
-  margin-top: 3px;
   font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
   font-weight: 500;
+  white-space: nowrap;
   color: var(--home-muted);
 }
 
 .signal-head-state {
   display: flex;
   align-items: center;
-  gap: 14px;
-}
-
-.signal-summary {
-  display: inline-flex;
-  gap: 14px;
-  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
-  font-weight: 600;
-  color: var(--home-muted);
-}
-
-.signal-summary span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.signal-summary i {
-  font-size: calc(var(--te-font-size-body, 14px) * 13 / 14);
+  flex-shrink: 0;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .dsp-state {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--home-line);
   background: var(--home-soft);
   font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--home-muted);
   white-space: nowrap;
 }
@@ -1041,7 +1013,7 @@
 }
 
 .signal-caret {
-  font-size: calc(var(--te-font-size-body, 14px) * 15 / 14);
+  font-size: var(--te-font-size-body, 14px);
   color: var(--home-muted);
   transition: transform var(--te-motion-hover) var(--te-ease-soft);
 }
@@ -1049,24 +1021,6 @@
 .signal-card:hover .signal-caret {
   transform: translateX(3px);
   color: var(--home-ink);
-}
-
-.signal-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 14px;
-  font-size: calc(var(--te-font-size-body, 14px) * 11.5 / 14);
-  font-weight: 600;
-  color: var(--home-muted);
-}
-
-.signal-foot strong {
-  font-size: calc(var(--te-font-size-body, 14px) * 11 / 14);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: color-mix(in srgb, var(--home-accent) 84%, var(--home-ink));
 }
 
 /* ── DSP route strip (compact + dialog shared) ──────────────────────── */
@@ -1084,9 +1038,53 @@
   display: none;
 }
 
+/* The home strip names stages only; icons, details and state live in the dialog. */
 .dsp-route-strip.is-compact {
-  margin-top: 18px;
-  padding: 2px;
+  order: 3;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+  min-width: 0;
+  margin: 0;
+  overflow: visible;
+}
+
+.dsp-route-strip.is-compact .route-stage {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
+  line-height: 1.5;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--home-ink);
+}
+
+.dsp-route-strip.is-compact .route-stage.is-active {
+  color: color-mix(in srgb, var(--home-accent) 84%, var(--home-ink));
+}
+
+.dsp-route-strip.is-compact .route-endpoint-stage {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
+  line-height: 1.5;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--home-muted);
+}
+
+.dsp-route-strip.is-compact .route-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dsp-route-strip.is-compact .route-connector {
+  width: 14px;
 }
 
 .route-stage {
@@ -1213,10 +1211,10 @@
 
 .block-copy h3 {
   font-family: var(--home-display);
-  font-size: calc(var(--te-font-size-body, 14px) * 20 / 14);
+  font-size: calc(var(--te-font-size-body, 14px) * 21 / 14);
   line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-weight: 650;
+  letter-spacing: -0.035em;
   color: var(--home-ink);
 }
 
@@ -1277,14 +1275,12 @@
   border-radius: var(--te-library-cover-radius);
   overflow: hidden;
   background: var(--home-soft);
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--te-neutral-900) 12%, transparent);
+  /* Artwork shadows read the dark-aware shadow tokens: an ink-mixed shadow turns
+     into a pale glow once the dark theme makes ink light. */
+  box-shadow: 0 14px 30px var(--home-shadow-color);
   transition:
     transform var(--te-motion-hover) var(--te-ease-soft),
     box-shadow var(--te-motion-hover);
-}
-
-:global(html[data-theme='dark'] .home .fresh-cover) {
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
 }
 
 .fresh-cover img {
@@ -1298,7 +1294,7 @@
 @media (hover: hover) and (pointer: fine) {
   .fresh-tile:hover .fresh-cover {
     transform: translateY(-2px);
-    box-shadow: 0 20px 42px color-mix(in srgb, var(--te-neutral-900) 20%, transparent);
+    box-shadow: 0 20px 42px var(--home-shadow-strong);
   }
 
   .fresh-tile:hover .fresh-cover img {
@@ -1315,7 +1311,8 @@
   font-size: calc(var(--te-font-size-body, 14px) * 10 / 14);
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--te-neutral-900);
+  /* The badge is always white, so its text stays dark in both themes. */
+  color: #111827;
   background: color-mix(in srgb, #ffffff 88%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1333,7 +1330,7 @@
   font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
   color: #111827;
   background: color-mix(in srgb, #ffffff 92%, transparent);
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--te-neutral-900) 30%, transparent);
+  box-shadow: 0 10px 22px var(--home-shadow-strong);
   opacity: 0;
   transform: translateY(6px) scale(0.9);
   transition:
@@ -1383,7 +1380,7 @@
 .cal-panel {
   display: flex;
   flex-direction: column;
-  padding: 22px clamp(18px, 2vw, 26px);
+  padding: 22px var(--home-pad);
   border: 1px solid var(--home-line);
   border-radius: var(--home-radius-lg);
   background: var(--home-card);
@@ -1400,8 +1397,8 @@
 
 .panel-kicker {
   font-size: calc(var(--te-font-size-body, 14px) * 10.5 / 14);
-  font-weight: 800;
-  letter-spacing: 0.26em;
+  font-weight: 650;
+  letter-spacing: 0.17em;
   color: var(--home-muted);
 }
 
@@ -1464,7 +1461,7 @@
   border-radius: 10px;
   overflow: hidden;
   background: var(--home-soft);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--te-neutral-900) 12%, transparent);
+  box-shadow: 0 8px 18px var(--home-shadow-color);
 }
 
 .chart-cover img {
@@ -1712,14 +1709,10 @@
   border-radius: var(--te-library-cover-radius);
   overflow: hidden;
   background: var(--home-soft);
-  box-shadow: 0 16px 34px color-mix(in srgb, var(--te-neutral-900) 13%, transparent);
+  box-shadow: 0 16px 34px var(--home-shadow-color);
   transition:
     transform var(--te-motion-hover) var(--te-ease-soft),
     box-shadow var(--te-motion-hover);
-}
-
-:global(html[data-theme='dark'] .home .gallery-cover) {
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
 }
 
 .gallery-cover img {
@@ -1733,7 +1726,7 @@
 @media (hover: hover) and (pointer: fine) {
   .gallery-tile:hover .gallery-cover {
     transform: translateY(-2px);
-    box-shadow: 0 22px 46px color-mix(in srgb, var(--te-neutral-900) 22%, transparent);
+    box-shadow: 0 22px 46px var(--home-shadow-strong);
   }
 
   .gallery-tile:hover .gallery-cover img {
@@ -1744,11 +1737,8 @@
 .gallery-scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    transparent 46%,
-    color-mix(in srgb, var(--te-neutral-900) 62%, transparent)
-  );
+  /* A scrim over artwork darkens it in both themes; ink would lighten it in dark. */
+  background: linear-gradient(180deg, transparent 46%, rgb(0 0 0 / 0.55));
   opacity: 0;
   transition: opacity var(--te-motion-hover);
 }
@@ -1766,7 +1756,7 @@
   font-size: calc(var(--te-font-size-body, 14px) * 11 / 14);
   font-weight: 700;
   color: #ffffff;
-  background: color-mix(in srgb, var(--te-neutral-900) 46%, transparent);
+  background: rgb(0 0 0 / 0.46);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   opacity: 0;
@@ -1793,7 +1783,7 @@
   font-size: calc(var(--te-font-size-body, 14px) * 14 / 14);
   color: #111827;
   background: color-mix(in srgb, #ffffff 92%, transparent);
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--te-neutral-900) 30%, transparent);
+  box-shadow: 0 10px 22px var(--home-shadow-strong);
   opacity: 0;
   transform: translateY(6px) scale(0.9);
   transition:
@@ -2373,26 +2363,13 @@
 
 @container dashboard (max-width: 720px) {
   .hero-inner {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.65fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 24px;
     min-height: 0;
-    padding: 28px;
   }
 
   .hero-art {
-    width: min(100%, 200px);
-  }
-
-  .hero-title {
-    font-size: calc(var(--te-font-size-body, 14px) * 32 / 14);
-  }
-
-  .signal-head {
-    flex-direction: column;
-  }
-
-  .signal-summary {
-    display: none;
+    --hero-sleeve: 136px;
   }
 
   .fresh-grid,
@@ -2408,24 +2385,8 @@
 /* Font-relative breakpoint also gives enlarged text enough room beside the sidebar. */
 @container dashboard (max-width: 44em) {
   .figures {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 0;
-  }
-
-  .figure:nth-child(3) {
-    border-left: none;
-  }
-
-  .hero-inner {
     grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
-  }
-
-  .hero-art {
-    grid-row: 1;
-    justify-self: start;
-    width: clamp(144px, 40cqi, 200px);
-    margin: 4px 0 4px 4px;
+    gap: 8px;
   }
 }
 
@@ -2474,11 +2435,7 @@
   }
 
   .hero-title {
-    font-size: calc(var(--te-font-size-body, 14px) * 28 / 14);
-  }
-
-  .hero-artist {
-    font-size: calc(var(--te-font-size-body, 14px) * 14 / 14);
+    font-size: calc(var(--te-font-size-body, 14px) * 24 / 14);
   }
 
   .hero-meta {
@@ -2486,24 +2443,24 @@
   }
 
   .figure strong {
-    font-size: calc(var(--te-font-size-body, 14px) * 24 / 14);
+    font-size: calc(var(--te-font-size-body, 14px) * 20 / 14);
   }
 
-  .figure span {
+  .figure-copy span {
     font-size: calc(var(--te-font-size-body, 14px) * 11.5 / 14);
-  }
-
-  .signal-title h2 {
-    font-size: calc(var(--te-font-size-body, 14px) * 18 / 14);
   }
 
   .block-copy h3 {
     font-size: calc(var(--te-font-size-body, 14px) * 18 / 14);
   }
 
+  /* Like the streaming home on narrow widths: the copy keeps the whole card. */
   .hero-inner {
-    gap: 24px;
-    padding: 24px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-art {
+    display: none;
   }
 
   .hero-copy {
@@ -2533,11 +2490,14 @@
 }
 
 .fresh-tile:focus-visible .fresh-play,
-.gallery-tile:focus-visible .gallery-play,
-.figure:focus-visible i {
+.gallery-tile:focus-visible .gallery-play {
   opacity: 1;
   transform: none;
   transition: none;
+}
+
+.figure:focus-visible .figure-arrow {
+  color: var(--home-ink);
 }
 
 .block-more:active:not(:focus-visible) {
@@ -2563,7 +2523,7 @@
   .home-inner > *,
   .blob,
   .empty-orb,
-  .hero-art-frame.is-live,
+  .hero-art.is-live .hero-art-echo,
   .eq i,
   .dsp-state.live .dsp-state-dot,
   .dialog-live-state.live i {
@@ -2572,7 +2532,8 @@
 
   .home button,
   .home button *,
-  .hero-art-echo {
+  .hero-art-echo,
+  .signal-caret {
     transition: none;
   }
 

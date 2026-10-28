@@ -99,6 +99,7 @@ import {
 } from '../../shared/pluginPlaylistImport.ts'
 import type { DynamicIslandConfig } from '../../shared/dynamicIsland.ts'
 import type { PlaylistImportApplyResult } from '../../shared/playlists.ts'
+import type { RemoteProviderSession } from '../../shared/remoteCoreBridge.ts'
 
 export interface TwilightPluginManagerOptions {
   appVersion: string
@@ -733,6 +734,25 @@ export class TwilightPluginManager extends EventEmitter {
       ...provider,
       health: this.getProviderHealth(provider.id)
     }))
+  }
+
+  /** Host-only credential export for the authenticated, encrypted remote bridge. */
+  async readNcmSession(): Promise<RemoteProviderSession> {
+    const signedOut: RemoteProviderSession = { providerId: 'ncm', loggedIn: false }
+    const owner = this.contributingPlugins().find(plugin =>
+      plugin.descriptor.id === INTERNAL_NCM_PLUGIN_ID && plugin.providers.some(p => p.id === 'ncm'))
+    if (!owner || !this.state[INTERNAL_NCM_PLUGIN_ID]?.enabled || this.shuttingDown) return signedOut
+    const login = await this.callProvider('ncm', 'checkLogin', [])
+    if (!login || typeof login !== 'object' || (login as { loggedIn?: unknown }).loggedIn !== true)
+      return signedOut
+    const context = this.providerIdentityContext('ncm')
+    const cookie = await this.settings.get(owner.descriptor.paths.dataDir, 'cookie')
+    if (this.shuttingDown || !this.state[INTERNAL_NCM_PLUGIN_ID]?.enabled ||
+      this.providerIdentityContext('ncm') !== context) return signedOut
+    // eslint-disable-next-line no-control-regex -- Exported cookies must not carry control characters.
+    if (typeof cookie !== 'string' || cookie.length > 16_000 || /[\x00-\x1f\x7f-\x9f]/.test(cookie) ||
+      !/(?:^|;\s*)MUSIC_U=[^;\s]+/.test(cookie)) return signedOut
+    return { providerId: 'ncm', loggedIn: true, cookie }
   }
 
   /** Opaque session context; never derives a key from cookies or other credentials. */

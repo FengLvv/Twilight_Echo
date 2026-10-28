@@ -822,6 +822,7 @@ struct AudioPipeline::DecodeStream {
   // Decode-thread reconnects publish one coherent observation for status readers.
   std::atomic<uint32_t> resamplerObservation{0};
   std::unique_ptr<FFmpegDecoder> decoder;
+  std::shared_ptr<const SeekableInputFactory> inputFactory;
   std::unique_ptr<DsdReader> dsdReader;
   // DSD-preserving DST decoder provider, injected into dsdReader so SACD ISO
   // DST-compressed tracks are playable through the DoP / native-DSD pipeline.
@@ -879,6 +880,7 @@ struct AudioPipeline::DecodeStream {
     routingSourceToken.store(nextRoutingSourceToken(), std::memory_order_release);
     mode = Mode::Pcm;
     decoder = std::make_unique<FFmpegDecoder>();
+    decoder->setInputFactory(inputFactory);
     ta_am_source_stamp before{}, after{};
     const bool hadBefore = ta_am_source_snapshot(item.source.c_str(), &before) != 0;
     decoder->setInterrupt([](void* p) -> int {
@@ -1198,7 +1200,10 @@ struct AudioPipeline::DecodeStream {
 
   void stop() {
     requestStop();
+    // This path is control/reaper-only. No host/JNI call runs on the render thread.
+    const bool cancelledInput = decoder && decoder->cancelInput();
     if (decodeThread.joinable()) decodeThread.join();
+    if (cancelledInput) decoderNeedsReopen = true;
   }
 
   bool seek(double seconds, std::string* error) {
@@ -1910,7 +1915,7 @@ struct AudioPipeline::AutoMixGeneration {
       const ta_am_cancel* cancel, char* reason, size_t n) {
     auto& g = *static_cast<AutoMixGeneration*>(context);
     try {
-      auto stream = makeDecodeStream();
+      auto stream = makeDecodeStream(g.fallback->inputFactory);
       std::string error;
       if (!stream->openSource(g.fallback->item, &error, cancel)) {
         std::snprintf(reason, n, "continuation_open_failed"); return 0;
@@ -1921,9 +1926,11 @@ struct AudioPipeline::AutoMixGeneration {
           spec->binding.sample_rate, &error)) {
         std::snprintf(reason, n, "continuation_seek_failed"); return 0;
       }
-      // The bounded preparation token must never be retained by the live
-      // continuation decoder after the job is joined and freed.
-      stream->decoder->setInterrupt(nullptr, nullptr);
+      // Only opening/seeking borrows the preparation token. Detach it before
+      // the worker starts: the job frees it while this stream is still live,
+      // and decodeLoop checks cancellation again when it reaches EOF.
+      // Keep the decoder's stream-owned stopRequested interrupt installed.
+      stream->externalCancel = nullptr;
       stream->prepareFloatReadScratch(g.renderFrames);
       stream->crossfadeConsumedFrames.store(spec->next_end, std::memory_order_release);
       // The prepared incoming lane and its decoder continuation are one deck.
@@ -2404,12 +2411,14 @@ AudioPipeline::~AudioPipeline() {
   stop();
 }
 
-std::shared_ptr<AudioPipeline::DecodeStream> AudioPipeline::makeDecodeStream() {
-  return std::shared_ptr<DecodeStream>(
+std::shared_ptr<AudioPipeline::DecodeStream> AudioPipeline::makeDecodeStream(std::shared_ptr<const SeekableInputFactory> factory) {
+  auto stream = std::shared_ptr<DecodeStream>(
       new DecodeStream(),
       [](DecodeStream* stream) {
         decodeStreamReaper().retire(std::unique_ptr<DecodeStream>(stream));
       });
+  stream->inputFactory = std::move(factory);
+  return stream;
 }
 
 AudioPipeline::DecodeStreamReaper& AudioPipeline::decodeStreamReaper() {
@@ -2769,7 +2778,7 @@ TAE_Result AudioPipeline::playInternal(
 
   const auto tryNativeDsdRoute = [&](const std::string& routeBackendId, const std::string& routeDeviceId,
                                      int targetRate) {
-    auto nativeActive = makeDecodeStream();
+    auto nativeActive = makeDecodeStream(std::atomic_load(&inputFactory_));
     nativeActive->setTargetDsdRate(targetRate);
     if (nativeActive->openNativeDsdSource(item, &nativeAttemptError)) {
       output = backendFactoryOverride() ? backendFactoryOverride()(routeBackendId)
@@ -2819,7 +2828,7 @@ TAE_Result AudioPipeline::playInternal(
 
   const auto tryDopRoute = [&](const std::string& routeBackendId, const std::string& routeDeviceId,
                                int targetRate) {
-    auto dopActive = makeDecodeStream();
+    auto dopActive = makeDecodeStream(std::atomic_load(&inputFactory_));
     dopActive->setTargetDsdRate(targetRate);
     if (dopActive->openDsdSource(item, &dopAttemptError)) {
       output = backendFactoryOverride() ? backendFactoryOverride()(routeBackendId)
@@ -2922,7 +2931,7 @@ TAE_Result AudioPipeline::playInternal(
 
   bool pcmToDsdPath = false;
   if (!active) {
-    active = makeDecodeStream();
+    active = makeDecodeStream(std::atomic_load(&inputFactory_));
     if (!active->openSource(item, error)) {
       return TAE_RESULT_BACKEND_UNAVAILABLE;
     }
@@ -4766,7 +4775,7 @@ bool AudioPipeline::preloadNext(const std::optional<QueueItem>& item, std::strin
 
   preloadNext(std::nullopt, nullptr);
 
-  auto stream = makeDecodeStream();
+  auto stream = makeDecodeStream(std::atomic_load(&inputFactory_));
   if (!stream->openSource(*item, error)) {
     std::lock_guard lock(mutex_);
     lastPreloadFormatMismatch_ = true;

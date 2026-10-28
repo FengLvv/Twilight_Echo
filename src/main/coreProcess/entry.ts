@@ -1,6 +1,10 @@
 import '../../adapters-node/index.ts'
 import { CoreMusicExplorationService } from '../../core/library/explorationService.ts'
-import { networkInterfaces } from 'node:os'
+import { networkInterfaces, hostname } from 'node:os'
+import { CoreDiscoveryAdvertisement } from '../remote/coreDiscovery.ts'
+import { createPersistentDevicePairing } from '../remote/deviceTrust.ts'
+import { persistentLibraryId } from '../remote/libraryIdentity.ts'
+import { RemoteMediaResolver } from '../../core/remote/media.ts'
 import { CoreCastService } from '../../core/cast/service.ts'
 import { CoreNcmCloudTransferService } from '../../core/ncm/cloudTransferService.ts'
 import { RemoteHttpServer } from '../../core/cast/httpServer.ts'
@@ -146,6 +150,7 @@ import { CoreMetadataService } from '../../core/library/metadataService.ts'
 import { MusicBrainzWikiProvider, MusicBrainzDetailsProvider } from '../../core/library/entityMetadataProvider.ts'
 import { PublicMusicSource } from '../../core/library/publicMusicSources.ts'
 import { metadataConfiguration } from './metadataConfiguration.ts'
+import { NCM_PUBLIC_METADATA_CONFIGURATION } from '../../shared/metadataCacheContext.ts'
 import { publicMetadataSources } from '../../shared/metadataProviders.ts'
 import { MusicBrainzIdentificationProvider, PlatformIdentificationProvider } from '../../core/library/musicIdentificationProvider.ts'
 import { resolveLocale } from '../../shared/i18n/locale.ts'
@@ -163,6 +168,7 @@ import { randomUUID } from 'node:crypto'
 import { createSourceResolver } from '../../core/playback/sourceResolver.ts'
 import { AudioEngineManager } from '../audioEngineManager.ts'
 import { AudioEngineServiceBinding } from '../audioEngineServiceClient.ts'
+import { CoreAudioRecoveryService } from '../../core/audio/recoveryService.ts'
 import { LibraryDatabaseServiceClient } from '../library/libraryDatabaseServiceClient.ts'
 import { createPlaybackSessionStoreBundle } from '../persistence/playbackSessionRepository.ts'
 import { createCorePlaybackRepository } from '../persistence/corePlaybackRepository.ts'
@@ -325,6 +331,8 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       publishSettings()
       if (Object.hasOwn(patch, 'musicIdentification') || Object.hasOwn(patch, 'language')) metadata?.entities?.refreshIdentification(true)
       if (Object.hasOwn(patch, 'genreSeparators')) genres?.invalidate()
+      if (Object.hasOwn(patch, 'playbackResumeMode'))
+        void playback?.flush().catch((error) => console.error('[core.playback]', error))
     }
   })
   function publishSettings(): void {
@@ -815,6 +823,9 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   })
   const sourceResources = new SourceResources()
   const mediaServer = new RemoteHttpServer({
+      serverName: hostname(), devicePairing: createPersistentDevicePairing(config.root),
+      discovery: new CoreDiscoveryAdvertisement(),
+      confirmDevice: ({ deviceName, address }, signal) => platform!.call('remote.confirmDevice', { deviceName, address }, signal),
       staticRoot: config.remoteStaticRoot ?? '',
       addresses: () =>
         Object.values(networkInterfaces()).flatMap((entries) =>
@@ -1577,7 +1588,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       enrichmentProviders: () => [new MusicBrainzDetailsProvider(() => entityMetadataPolicy), new PublicArtworkProvider(() => publicArtworkPolicy), ...publicMusicProviders, ...identificationPlatforms().map(provider => new PlatformMetadataProvider(provider.id, {
         inventory: identificationPlatforms,
         configuration: () => provider.id === 'ncm'
-          ? JSON.stringify(['public-metadata-v2', plugins!.providerMetadataContext(provider.id)])
+          ? NCM_PUBLIC_METADATA_CONFIGURATION
           : plugins!.providerMetadataContext(provider.id),
         usage: id => platformTextUsage(settings.read().musicIdentification.ncmLocalFallback !== false)[id] ?? null,
         ...(provider.id === 'ncm' || platformArtworkUsage()[provider.id] ? {
@@ -1641,7 +1652,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   if (metadataSetupFile) {
     if (entityMetadataPolicy.enabled && entityMetadataPolicy.publicServiceApproved) {
       const result = applyDevelopmentMetadataSetup(metadataSetupFile, config.root, settings)
-      if (result.status === 'applied') console.info('[dev.metadata] New-import metadata enabled; history remains off.')
+      if (result.status === 'applied') console.info('[dev.metadata] Requested music metadata preferences applied.')
       else if (result.status !== 'missing' && result.status !== 'not-requested')
         console.warn('[dev.metadata] One-time setup needs attention:', result)
     } else console.warn('[dev.metadata] One-time setup deferred: deployment metadata policy is disabled.')
@@ -1684,6 +1695,14 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   }
   const remote = new CoreRemoteService({
     server: mediaServer, settings, playback,
+    providerSession: () => plugins?.readNcmSession() ?? Promise.resolve({ providerId: 'ncm', loggedIn: false }),
+    media: new RemoteMediaResolver({ libraryId: persistentLibraryId(config.root),
+      resolve: async (sourceId) => {
+        const status = await database!.catalogStatus()
+        return database!.catalogResolve(sourceId, status.revision)
+      },
+      authorizeFile: (path) => platform!.call('paths.authorizeAudioFile', { path }),
+      grants: mediaServer.getMediaGrants() }),
     playlistRecords: (query, signal) => playlists.records(query, signal),
     castActive: () => cast.active(),
     resolveCover: (cover) => platform!.call('artwork.remotePreview', { cover }),
@@ -1907,6 +1926,15 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     dsp,
     output,
     search,
+    audioRecovery: new CoreAudioRecoveryService({
+      engine: audio,
+      playback,
+      configuration: output,
+      windows: process.platform === 'win32',
+      confirmWindowsRestart: (signal) => platform!.call('audio.confirmWindowsRestart', {}, signal),
+      restartWindowsServices: () => platform!.callJoined('audio.restartWindowsServices', {}),
+      changed: () => application?.changed()
+    }),
     epoch: config.epoch,
     playback,
     cast,

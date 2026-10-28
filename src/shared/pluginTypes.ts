@@ -22,6 +22,13 @@ export const PLUGIN_PERMISSIONS = [
 ] as const
 export type TwilightPluginPermission = (typeof PLUGIN_PERMISSIONS)[number]
 
+export interface TwilightAndroidPluginRuntime {
+  apiVersion: 1
+  entry: string
+  permissions: ('network' | 'settings')[]
+  networkHosts: string[]
+}
+
 export interface TwilightPluginManifest {
   id: string
   name: string
@@ -43,6 +50,8 @@ export interface TwilightPluginManifest {
   repository?: string
   icon?: string
   signature?: unknown
+  /** Optional mobile entry. Desktop continues to use main/binary. */
+  androidRuntime?: TwilightAndroidPluginRuntime
 }
 
 export type TwilightPluginStatus = 'installed' | 'enabled' | 'disabled' | 'invalid' | 'failed'
@@ -89,6 +98,7 @@ export interface TwilightPluginDescriptor {
   repository?: string
   icon?: string
   signature?: unknown
+  androidRuntime?: TwilightAndroidPluginRuntime
   status: TwilightPluginStatus
   enabled: boolean
   /** Persisted user intent, independent of activation success. */

@@ -1,6 +1,7 @@
 #include "twilight_audio_engine.h"
 
 #include <jni.h>
+#include <algorithm>
 
 #include <cstdint>
 #include <memory>
@@ -128,6 +129,87 @@ struct JniListenerContext {
 std::mutex g_contextsMutex;
 std::unordered_map<TAE_EngineHandle, std::shared_ptr<JniListenerContext>> g_contexts;
 
+struct JniInputStream {
+  jobject input = nullptr;
+  jbyteArray buffer = nullptr;
+  jmethodID size = nullptr, read = nullptr, close = nullptr;
+};
+struct JniInputProvider {
+  jobject provider = nullptr;
+  jmethodID open = nullptr;
+  ~JniInputProvider() {
+    ScopedJniEnv scope(getJavaVm());
+    if (scope.get() && provider) scope.get()->DeleteGlobalRef(provider);
+  }
+};
+std::unordered_map<TAE_EngineHandle, std::shared_ptr<JniInputProvider>> g_inputs;
+
+bool clearInputException(JNIEnv* env) {
+  if (!env->ExceptionCheck()) return false;
+  env->ExceptionClear();
+  return true;
+}
+
+void* openInput(const char* source, void* context) {
+  auto* provider = static_cast<JniInputProvider*>(context);
+  ScopedJniEnv scope(getJavaVm());
+  auto* env = scope.get();
+  if (!env || !provider) return nullptr;
+  jstring name = env->NewStringUTF(source);
+  jobject input = env->CallObjectMethod(provider->provider, provider->open, name);
+  env->DeleteLocalRef(name);
+  if (clearInputException(env) || !input) return nullptr;
+  auto stream = std::make_unique<JniInputStream>();
+  jclass cls = env->GetObjectClass(input);
+  stream->size = env->GetMethodID(cls, "size", "()J");
+  stream->read = env->GetMethodID(cls, "readAt", "(J[BII)I");
+  stream->close = env->GetMethodID(cls, "close", "()V");
+  stream->input = env->NewGlobalRef(input);
+  jbyteArray bytes = env->NewByteArray(32768);
+  stream->buffer = static_cast<jbyteArray>(env->NewGlobalRef(bytes));
+  env->DeleteLocalRef(bytes);
+  env->DeleteLocalRef(cls);
+  env->DeleteLocalRef(input);
+  if (clearInputException(env) || !stream->size || !stream->read || !stream->close || !stream->input || !stream->buffer) {
+    if (stream->input) env->DeleteGlobalRef(stream->input);
+    if (stream->buffer) env->DeleteGlobalRef(stream->buffer);
+    return nullptr;
+  }
+  return stream.release();
+}
+int64_t inputSize(void* context) {
+  auto& stream = *static_cast<JniInputStream*>(context);
+  ScopedJniEnv scope(getJavaVm());
+  auto* env = scope.get();
+  if (!env) return -1;
+  const jlong result = env->CallLongMethod(stream.input, stream.size);
+  return clearInputException(env) ? -1 : result;
+}
+int readInput(void* context, int64_t position, uint8_t* bytes, int count) {
+  auto& stream = *static_cast<JniInputStream*>(context);
+  ScopedJniEnv scope(getJavaVm());
+  auto* env = scope.get();
+  if (!env) return -1;
+  const int bounded = std::min(count, 32768);
+  const jint result = env->CallIntMethod(stream.input, stream.read, static_cast<jlong>(position), stream.buffer, 0, bounded);
+  if (clearInputException(env) || result < -1 || result > bounded) return -1;
+  if (result == -1) return 0; // MediaDataSource EOF -> engine EOF.
+  if (result <= 0) return -1;
+  env->GetByteArrayRegion(stream.buffer, 0, result, reinterpret_cast<jbyte*>(bytes));
+  return clearInputException(env) ? -1 : result;
+}
+void cancelInput(void* context) {
+  auto& stream = *static_cast<JniInputStream*>(context);
+  ScopedJniEnv scope(getJavaVm());
+  if (auto* env = scope.get()) { env->CallVoidMethod(stream.input, stream.close); clearInputException(env); }
+}
+void closeInput(void* context) {
+  auto stream = std::unique_ptr<JniInputStream>(static_cast<JniInputStream*>(context));
+  cancelInput(context);
+  ScopedJniEnv scope(getJavaVm());
+  if (auto* env = scope.get()) { env->DeleteGlobalRef(stream->input); env->DeleteGlobalRef(stream->buffer); }
+}
+
 TAE_EngineHandle toEngineHandle(jlong handle) {
   return reinterpret_cast<TAE_EngineHandle>(static_cast<uintptr_t>(handle));
 }
@@ -149,13 +231,14 @@ std::string jstringToUtf8(JNIEnv* env, jstring value) {
   return result;
 }
 
+template <typename Getter>
 jstring readEngineJson(
     JNIEnv* env,
     TAE_EngineHandle engine,
-    TAE_Result (*getter)(TAE_EngineHandle, char*, size_t, size_t*),
+    Getter getter,
     const char* fallbackJson = "{}") {
   if (!env) return nullptr;
-  if (!engine || !getter) {
+  if (!engine) {
     return env->NewStringUTF(fallbackJson);
   }
 
@@ -260,6 +343,31 @@ Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeDes
   }
 
   TAE_DestroyEngine(engine);
+  {
+    std::lock_guard lock(g_contextsMutex);
+    g_inputs.erase(engine);
+  }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeSetInputProvider(
+    JNIEnv* env, jobject, jlong handle, jobject provider) {
+  auto engine = toEngineHandle(handle);
+  if (!engine || !provider) return TAE_RESULT_INVALID_ARGUMENT;
+  {
+    std::lock_guard lock(g_contextsMutex);
+    if (g_inputs.count(engine)) return TAE_RESULT_INVALID_ARGUMENT;
+  }
+  auto context = std::make_shared<JniInputProvider>();
+  context->provider = env->NewGlobalRef(provider);
+  auto cls = env->GetObjectClass(provider);
+  context->open = env->GetMethodID(cls, "open", "(Ljava/lang/String;)Lcom/twilightecho/android/nativeintegration/NativeAudioInput;");
+  env->DeleteLocalRef(cls);
+  if (clearInputException(env) || !context->open) return TAE_RESULT_INVALID_ARGUMENT;
+  const TAE_InputCallbacks callbacks{openInput, inputSize, readInput, cancelInput, closeInput};
+  const auto result = TAE_SetInputProvider(engine, &callbacks, context.get());
+  if (result == TAE_RESULT_OK) { std::lock_guard lock(g_contextsMutex); g_inputs[engine] = std::move(context); }
+  return result;
 }
 
 JNIEXPORT void JNICALL
@@ -338,12 +446,25 @@ Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativePla
 }
 
 JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeLoad(
+    JNIEnv* env, jobject, jlong handle, jstring source, jdouble startTimeSeconds) {
+  const std::string name = jstringToUtf8(env, source);
+  return static_cast<jint>(TAE_Load(toEngineHandle(handle), name.c_str(), startTimeSeconds));
+}
+
+JNIEXPORT jint JNICALL
 Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativePause(
     JNIEnv* /*env*/,
     jobject /*thiz*/,
     jlong handle) {
   TAE_EngineHandle engine = toEngineHandle(handle);
   return static_cast<jint>(TAE_Pause(engine));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeSetPaused(
+    JNIEnv*, jobject, jlong handle, jboolean paused) {
+  return static_cast<jint>(TAE_SetPaused(toEngineHandle(handle), paused == JNI_TRUE));
 }
 
 JNIEXPORT jint JNICALL
@@ -456,6 +577,47 @@ Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeSet
   TAE_EngineHandle engine = toEngineHandle(handle);
   const std::string jsonUtf8 = jstringToUtf8(env, dspConfigJson);
   return static_cast<jint>(TAE_SetDspConfig(engine, jsonUtf8.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeApplyDspState(
+    JNIEnv* env, jobject, jlong handle, jlong revision, jstring stateJson) {
+  const std::string state = jstringToUtf8(env, stateJson);
+  return static_cast<jint>(TAE_ApplyDspState(toEngineHandle(handle), static_cast<uint64_t>(revision), state.c_str()));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeGetDspGraphStatusJson(
+    JNIEnv* env, jobject, jlong handle) {
+  return readEngineJson(env, toEngineHandle(handle), &TAE_GetDspGraphStatus, "{}");
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeGetDspConfigJson(
+    JNIEnv* env, jobject, jlong handle) {
+  return readEngineJson(env, toEngineHandle(handle), &TAE_GetDspConfig, "{}");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeSetLoopRange(
+    JNIEnv*, jobject, jlong handle, jdouble start, jdouble end) {
+  return static_cast<jint>(TAE_SetLoopRange(toEngineHandle(handle), start, end));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeSetVisualizationDemand(
+    JNIEnv*, jobject, jlong handle, jboolean enabled) {
+  return static_cast<jint>(TAE_SetVisualizationDemand(toEngineHandle(handle), enabled == JNI_TRUE));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_twilightecho_android_nativeintegration_TwilightAudioEngineJni_nativeGetVisualizationDataJson(
+    JNIEnv* env, jobject, jlong handle, jstring optionsJson) {
+  const std::string options = jstringToUtf8(env, optionsJson);
+  const auto getter = [&options](TAE_EngineHandle engine, char* buffer, size_t size, size_t* required) {
+    return TAE_GetVisualizationData(engine, options.c_str(), buffer, size, required);
+  };
+  return readEngineJson(env, toEngineHandle(handle), getter, "{}");
 }
 
 JNIEXPORT jint JNICALL

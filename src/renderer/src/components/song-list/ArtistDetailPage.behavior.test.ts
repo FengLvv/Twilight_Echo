@@ -143,8 +143,8 @@ const detail=id=>({entityId:id,targetId:'person',name:artist.value,revision,
 const token={revision:1,libraryRevision:1,catalogRevision:1,entityMetadataRevision:1,expiresAt:null}
 const explorationArtist={id:'person',kind:'artist',title:'周末乐队',artist:'',inLibrary:true,sourceCount:850}
 const work={id:'work',kind:'work',title:'风中的回声',artist:'周末乐队',inLibrary:true,sourceCount:2}
-const state=shallowRef({phase:'ready',epoch:'artist-fixture',libraryRevision:1,catalogRevision:1,entityMetadataRevision:1,settingsRevision:1,playlistsRevision:1,versionsRevision:1,statisticsRevision:1,bookmarksRevision:1,pluginsRevision:1,preferencesRevision:1,tagsRevision:1})
-const bump=()=>{revision++;state.value={...state.value,entityMetadataRevision:revision}}
+const state=shallowRef({phase:'ready',epoch:'artist-fixture',libraryRevision:1,catalogRevision:1,entityMetadataRevision:1,entityMetadataContentRevision:1,settingsRevision:1,playlistsRevision:1,versionsRevision:1,statisticsRevision:1,bookmarksRevision:1,pluginsRevision:1,preferencesRevision:1,tagsRevision:1})
+const bump=()=>{revision++;state.value={...state.value,entityMetadataRevision:state.value.entityMetadataRevision+1,entityMetadataContentRevision:revision}}
 window.api={window:{popupContextMenu:async request=>{menus.push(request);return null},closeContextMenu:async()=>{}}}
 window.artistSettings={settings:shallowRef({musicIdentification:{language:'zh-Hans'},libraryFolders:[],genreSeparators:';',trackActivationMode:'doubleClick'})}
 window.artistCore={state,attach:async()=>{},subscribe:()=>()=>{},query:async(name,q={},signal)=>{
@@ -262,6 +262,48 @@ window.artistTest=async()=>{
  expect(errors.length===0,errors.join(';'))
  return {queries:reads.length,writes:writes.length,plays:plays.length}
 }
+window.artistBackgroundTest=async()=>{
+ // Reproduce the recording: unresolved same-name sources and a missing portrait.
+ homonym=true;missing=true;denied=false;fail=false;delay=0;override=null;bump()
+ await wait(()=>document.querySelector('.artist-reference-choices button')&&!document.querySelector('.artist-biography-text')&&!document.querySelector('.artist-portrait-placeholder')?.textContent.includes('正在读取'),'unresolved artist not ready')
+ const choice=document.querySelector('.artist-overview .artist-reference-choices button')
+ choice.focus()
+ const photo=document.querySelector('.artist-portrait'),references=document.querySelector('.artist-overview .artist-reference-choices')
+ const photoText=photo.textContent,choicesText=references.textContent,photoHeight=photo.getBoundingClientRect().height
+ const catalogReads=()=>reads.filter(r=>r.name==='catalog.query').length
+ const before=catalogReads()
+ for(let i=0;i<12;i++){
+  state.value={...state.value,entityMetadataRevision:state.value.entityMetadataRevision+1,sequence:i}
+  await nextTick()
+  expect(photo.textContent===photoText&&references.textContent===choicesText,'task progress changed unresolved content')
+  expect(!choice.disabled&&document.activeElement===choice,'task progress interrupted source selection')
+ }
+ const taskOnlyCatalogReads=catalogReads()-before
+ expect(taskOnlyCatalogReads===0,'task progress unnecessarily reloaded artist content')
+ delay=80;bump();await nextTick()
+ expect(photo.textContent===photoText&&!choice.disabled,'background content read flashed loading state')
+ expect(photo.getBoundingClientRect().height===photoHeight,'background read shifted portrait frame')
+ await pause(650);delay=0
+ expect(photo.textContent===photoText&&document.activeElement===choice,'background read replaced focused choices')
+ homonym=false;missing=false;bump();await window.artistReady()
+ await click('展开全文')
+ const bio=document.querySelector('.artist-biography-text')
+ delay=80;bump();await nextTick();await pause(650);delay=0
+ expect(document.querySelector('.artist-biography-text')===bio&&!bio.classList.contains('collapsed'),'background refresh collapsed the biography')
+ const disclosure=document.querySelector('.artist-manage-disclosure');disclosure.open=true
+ await wait(()=>button('编辑介绍')&&!button('编辑介绍').disabled,'editor unavailable')
+ await click('编辑介绍')
+ const textarea=document.querySelector('textarea'),draft='正在输入的介绍，不应被后台补全打断。'
+ input(textarea,draft);textarea.focus();textarea.setSelectionRange(4,9)
+ const scroll=document.querySelector('.song-list'),scrollTop=scroll.scrollTop
+ delay=80;bump();await nextTick();await pause(650);delay=0
+ expect(document.querySelector('textarea')===textarea&&textarea.value===draft,'background metadata replaced the draft host or value')
+ expect(document.activeElement===textarea&&textarea.selectionStart===4&&textarea.selectionEnd===9,'background metadata stole focus or text selection')
+ expect(scroll.scrollTop===scrollTop,'background metadata moved the reader scroll position')
+ await click('取消');disclosure.open=false
+ expect(errors.length===0,errors.join(';'))
+ return {taskOnlyCatalogReads,focusPreserved:true,draftPreserved:true}
+}
 window.artistCase=async(tone,variant='normal')=>{
  document.documentElement.dataset.theme=tone;missing=variant==='missing';broken=variant==='broken';homonym=false;denied=false
  portrait=variant==='logo'?squareLogo:defaultPortrait
@@ -345,6 +387,7 @@ app.whenReady().then(async()=>{
  try{
   await win.loadFile(path.join(directory,'index.html'))
   console.log('ARTIST_PAGE_OK',JSON.stringify(await win.webContents.executeJavaScript('window.artistTest()')))
+  console.log('ARTIST_BACKGROUND_OK',JSON.stringify(await win.webContents.executeJavaScript('window.artistBackgroundTest()')))
   for(const tone of ['pureWhite','dark'])for(const width of [1280,900,520])for(const variant of ['normal','logo','long','missing','broken']){
    win.setContentSize(width,1000);await win.webContents.executeJavaScript('window.artistCase('+JSON.stringify(tone)+','+JSON.stringify(variant)+')')
    if(process.env.TWILIGHT_ARTIST_EVIDENCE_DIR){

@@ -22,6 +22,9 @@ import { LibraryDatabaseIdentification } from './libraryDatabaseIdentification.t
 import type { IdentificationEnqueue } from '../../shared/musicIdentification.ts'
 import { validIdentificationPayload } from '../../shared/musicIdentification.ts'
 import { metadataLanguageFamily } from '../../shared/musicMetadata.ts'
+import { metadataCacheContextMatches } from '../../shared/metadataCacheContext.ts'
+import { normalizeReleaseDate } from '../../shared/releaseDate.ts'
+import type { LibraryCollectionPage } from '../../shared/libraryDatabase.ts'
 import type { MusicCredit, MusicCreditsQuery, MusicCreditsPage } from '../../shared/musicCredits.ts'
 import type { MetadataArtworkRecord } from '../../shared/musicArtwork.ts'
 import type { LegacyMusicDetail } from '../../shared/legacyMusicMetadata.ts'
@@ -137,6 +140,50 @@ export class LibraryDatabaseEntityMetadata {
     if (!active) throw stale()
     return JSON.stringify([subject.title, subject.artist, subject.revision ?? 0])
   }
+  private visibleFact(fact: EntityMetadataFact, options: EntityMetadataReadOptions, sourceProvider: string) {
+    if (fact.usage && (!fact.usage.display || !fact.usage.cache ||
+      (fact.usage.expiresAt !== undefined && fact.usage.expiresAt <= (options.now ?? Date.now())))) return false
+    return !fact.sourceProvider || metadataCacheContextMatches(fact.sourceProvider,
+      fact.providerContext, options.platformContexts?.[fact.sourceProvider]) &&
+      (fact.usage?.crossSource || sourceProvider === fact.sourceProvider)
+  }
+  /** Page-only fallback. File dates, playback bindings and saved tags are unchanged. */
+  collectionDates(page: LibraryCollectionPage, options: EntityMetadataReadOptions): LibraryCollectionPage {
+    const candidates = page.items.filter(item => !normalizeReleaseDate(item.releaseDate) && item.catalog &&
+      item.catalog.total === item.catalog.items.length && item.catalog.items.some(ref => ref.kind === 'release'))
+    const ids = [...new Set(candidates.flatMap(item => item.catalog!.items.filter(ref => ref.kind === 'release').map(ref => ref.id)))]
+    if (!ids.length) return page
+    const targets = new Map<string, string>(), facts = new Map<string, EntityMetadataFact[]>()
+    for (const row of this.sql.prepare(`SELECT l.entity_id,l.target_id,f.payload FROM metadata_identity_links l
+      LEFT JOIN metadata_facts f ON f.target_id=l.target_id AND f.field='releaseDate'
+      WHERE l.kind='release' AND l.state='confirmed' AND l.target_id IS NOT NULL
+        AND l.entity_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(ids))) {
+      const target = String(row.target_id)
+      targets.set(String(row.entity_id), target)
+      if (row.payload) {
+        const fact = decode<EntityMetadataFact>(row)!
+        if (normalizeReleaseDate(fact.value) && this.visibleFact(fact, options, 'local')) {
+          const values = facts.get(target) ?? []
+          values.push(fact)
+          facts.set(target, values)
+        }
+      }
+    }
+    const eligible = new Set(candidates)
+    return { ...page, items: page.items.map(item => {
+      if (!eligible.has(item)) return item
+      const releases = item.catalog!.items.filter(ref => ref.kind === 'release')
+      const target = targets.get(releases[0].id)
+      // A collection with unresolved or different releases cannot borrow the first one's date.
+      if (!target || releases.some(ref => targets.get(ref.id) !== target)) return item
+      const values = facts.get(target) ?? []
+      const priority = (fact: EntityMetadataFact) => fact.attribution.provider === 'musicbrainz' ? 0 : fact.sourceProvider ? 2 : 1
+      values.sort((a, b) => priority(a) - priority(b) || a.attribution.provider.localeCompare(b.attribution.provider))
+      const fact = values[0]
+      return fact ? { ...item, metadataReleaseDate: { value: normalizeReleaseDate(fact.value)!,
+        attribution: fact.attribution, ...(fact.usage ? { usage: fact.usage } : {}) } } : item
+    }) }
+  }
   detail(id: string, language: EntityMetadataLanguage, options: EntityMetadataReadOptions = {}): EntityMetadataDetail {
     const subject = this.subject(id)
     const targetId = subject.state === 'confirmed' ? String(subject.target_id) : null
@@ -155,13 +202,7 @@ export class LibraryDatabaseEntityMetadata {
             )
             .all(targetId) as Row[]
         ).map((row) => decode<EntityMetadataFact>(row)!)
-      : []).filter(f => {
-        if (f.usage && (!f.usage.display || !f.usage.cache ||
-          (f.usage.expiresAt !== undefined && f.usage.expiresAt <= (options.now ?? Date.now())))) return false
-        if (!f.sourceProvider) return true
-        return options.platformContexts?.[f.sourceProvider] === f.providerContext &&
-          (f.usage?.crossSource || sourceProvider === f.sourceProvider)
-      })
+      : []).filter(f => this.visibleFact(f, options, sourceProvider))
     const override = decode<EntityMetadataDetail['override']>(
       this.sql.prepare('SELECT payload FROM metadata_overrides WHERE entity_id=?').get(id) as
         | Row
@@ -268,7 +309,7 @@ export class LibraryDatabaseEntityMetadata {
       ORDER BY CASE provider WHEN 'public-artwork' THEN 0 WHEN 'platform.ncm' THEN 2 ELSE 1 END,provider,CASE language WHEN 'release' THEN 0 ELSE 1 END LIMIT 16`)
       .all(String(subject.target_id)).flatMap(row => {
         const image = decode<MetadataArtworkRecord>(row)!
-        return contexts[String(row.provider)] && image.providerContext === contexts[String(row.provider)] &&
+        return metadataCacheContextMatches(String(row.provider), image.providerContext, contexts[String(row.provider)]) &&
           image.usage.display && image.usage.cache && image.usage.crossSource &&
           (image.usage.expiresAt === undefined || image.usage.expiresAt > (options.now ?? Date.now())) ? [image] : []
       }).slice(0, 1)

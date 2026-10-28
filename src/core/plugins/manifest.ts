@@ -253,7 +253,8 @@ export function validatePluginManifest(raw: unknown): TwilightPluginManifest {
     homepage: typeof raw.homepage === 'string' ? raw.homepage.trim() : undefined,
     repository: typeof raw.repository === 'string' ? raw.repository.trim() : undefined,
     icon: canonicalPaths.icon as string | undefined,
-    signature: raw.signature
+    signature: raw.signature,
+    ...(raw.androidRuntime ? { androidRuntime: raw.androidRuntime as TwilightPluginManifest['androidRuntime'] } : {})
   }
 }
 
@@ -276,7 +277,8 @@ export function toManifest(descriptor: TwilightPluginDescriptor): TwilightPlugin
     homepage: descriptor.homepage,
     repository: descriptor.repository,
     icon: descriptor.icon,
-    signature: descriptor.signature
+    signature: descriptor.signature,
+    ...(descriptor.androidRuntime ? { androidRuntime: descriptor.androidRuntime } : {})
   }
 }
 

@@ -176,7 +176,9 @@ else()
   )
 endif()
 
-find_package(FFMPEG QUIET)
+if(NOT FFMPEG_FOUND)
+  find_package(FFMPEG QUIET)
+endif()
 if(NOT FFMPEG_FOUND)
   find_path(FFMPEG_INCLUDE_DIR libavformat/avformat.h)
   find_library(FFMPEG_AVFORMAT_LIBRARY avformat)
@@ -299,7 +301,7 @@ if(TAE_OBOE_AVAILABLE)
   )
   target_compile_definitions(twilight_audio_engine PRIVATE TAE_ENABLE_OBOE=1)
   if(ANDROID)
-    target_link_libraries(twilight_audio_engine PRIVATE aaudio log)
+    target_link_libraries(twilight_audio_engine PRIVATE aaudio log dl)
   endif()
   find_package(oboe QUIET)
   if(oboe_FOUND)
@@ -1004,6 +1006,9 @@ if(TAE_BUILD_TESTS)
   add_test(NAME twilight_audio_flac_tail_continuation
     COMMAND twilight_audio_performance_gate --verify-flac-tail)
   set_tests_properties(twilight_audio_flac_tail_continuation PROPERTIES TIMEOUT 20 SKIP_RETURN_CODE 77)
+  add_test(NAME twilight_audio_automix_continuation
+    COMMAND twilight_audio_performance_gate --verify-automix-transport)
+  set_tests_properties(twilight_audio_automix_continuation PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
 
   add_executable(twilight_dst_decoder_tests
     tests/dst_decoder_tests.cpp

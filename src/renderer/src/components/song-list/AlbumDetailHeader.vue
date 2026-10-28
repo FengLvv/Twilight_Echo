@@ -6,6 +6,8 @@ import AlbumArtwork from './AlbumArtwork.vue'
 import { formatReleaseDate } from '../../../../shared/releaseDate.ts'
 import { resolveCover } from '../../utils/coverLoader.ts'
 import { extractAverageColor, normalizeAccentColor } from '../../utils/colorExtractor.ts'
+import { useAlbumReleaseDate } from './albumReleaseDate.ts'
+import MetadataAttribution from '../music-metadata/MetadataAttribution.vue'
 
 const props = defineProps<{
   album: GridItem
@@ -28,6 +30,7 @@ const emit = defineEmits<{
   openArtist: [artist: string]
 }>()
 const tint = ref<string | null>(null)
+const releaseDate = useAlbumReleaseDate(() => props.album)
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
 const menuTrigger = ref<HTMLButtonElement | null>(null)
@@ -47,7 +50,7 @@ const displayGenres = computed(() => {
 })
 const conciseIntroText = computed(() => {
   const artist = props.album.artist || '未知歌手'
-  const release = formatReleaseDate(props.album.releaseDate)
+  const release = formatReleaseDate(releaseDate.value)
   const releaseClause = release && release !== '发行时间未知' ? `，发行于 ${release}` : ''
   const trackCount = props.album.trackCount ?? props.album.tracks?.length ?? 0
   const durationClause = props.durationText ? `，总时长 ${props.durationText}` : ''
@@ -117,7 +120,9 @@ onBeforeUnmount(() => {
         <div class="album-kicker-row">
           <span class="album-type-label">{{ displayTypeText }}</span>
           <span class="album-kicker-dot" aria-hidden="true">·</span>
-          <p class="album-detail-release">{{ formatReleaseDate(album.releaseDate) }}</p>
+          <p class="album-detail-release">{{ formatReleaseDate(releaseDate) }}<template
+            v-if="!album.releaseDate && releaseDate && album.metadataReleaseDate"
+          > · <MetadataAttribution :attribution="album.metadataReleaseDate.attribution" /></template></p>
         </div>
         <h2 id="local-album-title" class="album-detail-title" :title="album.name">
           {{ album.name }}

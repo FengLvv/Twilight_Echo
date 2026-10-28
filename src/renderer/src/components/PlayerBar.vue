@@ -708,7 +708,8 @@ const {
   toggleMore
 } = useFloatingPanels(playerBarShellRef, {
   // The picker is teleported to `body`, so its clicks read as "outside the bar".
-  isDismissBlocked: () => queueAddToPlaylist.open.value || queueSavePlaylistOpen.value
+  isDismissBlocked: () =>
+    queueAddToPlaylist.open.value || queueSavePlaylistOpen.value || queueSessions.open.value
 })
 
 /*
@@ -1552,6 +1553,7 @@ onBeforeUnmount(() => {
         :refresh-queue="refreshLibraryQueue"
         @add-to-playlist="queueAddToPlaylist.openForTrack"
         @save-playlist="queueSavePlaylistOpen = true"
+        @open-sessions="queueSessions.show()"
       />
       <div v-else-if="playlistOpen" class="playlist-panel" :class="{ 'panel-glass': glass }">
         <div class="playlist-header">

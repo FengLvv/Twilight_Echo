@@ -208,6 +208,7 @@ export function observeEntityMetadataView(
       | 'catalogRevision'
       | 'libraryRevision'
       | 'entityMetadataRevision'
+      | 'entityMetadataContentRevision'
       | 'settingsRevision'
     > | null
   }
@@ -228,7 +229,11 @@ export function observeEntityMetadataView(
     { immediate: true }
   )
   const stopDetail = watch(
-    [() => input.snapshot()?.entityMetadataRevision, () => input.snapshot()?.settingsRevision],
+    [
+      () =>
+        input.snapshot()?.entityMetadataContentRevision ?? input.snapshot()?.entityMetadataRevision,
+      () => input.snapshot()?.settingsRevision
+    ],
     (value, previous) => {
       // A settings change may revoke a source's display permission. Unlike
       // background task progress, it must withdraw the old content immediately.

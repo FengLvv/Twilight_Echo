@@ -209,6 +209,28 @@ test('native album details contain platform release text, not playback tracks or
   } finally { ncmProvider.deactivate() }
 })
 
+test('native release dates survive without prose or artwork and use the upstream Shanghai calendar', async () => {
+  let publishTime = Date.parse('2020-05-11T16:00:00Z')
+  const provider = await activateProvider(async () => ({ code: 200, album: { id: 42, name: 'Album', publishTime } }), new Map())
+  try {
+    for (const value of [publishTime, String(publishTime)]) {
+      publishTime = value
+      const result = await provider.fetchAlbumMetadata('42')
+      assert.equal(result.status, 'ok')
+      assert.equal(result.metadata.releaseDate.value, '2020-05-12')
+      assert.equal(result.metadata.releaseDate.url, 'https://music.163.com/#/album?id=42')
+      assert.deepEqual(result.metadata.texts, [])
+      assert.equal(result.metadata.artwork, undefined)
+    }
+    publishTime = Date.parse('1965-01-01T00:00:00+08:00')
+    assert.equal((await provider.fetchAlbumMetadata('42')).metadata.releaseDate.value, '1965-01-01')
+    for (const value of [0, '', null, undefined, NaN, 1.5, 'invalid', 9e15]) {
+      publishTime = value
+      assert.deepEqual(await provider.fetchAlbumMetadata('42'), { status: 'not_provided' })
+    }
+  } finally { ncmProvider.deactivate() }
+})
+
 test('native metadata distinguishes absent text, missing identities, errors and mismatched response IDs', async () => {
   let data = { code: 200, album: { id: 42, name: 'Album' } }
   const provider = await activateProvider(async () => data, new Map())

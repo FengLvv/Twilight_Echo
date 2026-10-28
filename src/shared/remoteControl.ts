@@ -1,6 +1,6 @@
 /**
  * LAN web remote + DLNA cast shared types / validators.
- * Default OFF; PIN pairing + bearer token; rate-limited.
+ * Default OFF; desktop-approved devices or legacy PIN pairing; rate-limited bearer access.
  */
 
 export const REMOTE_CONTROL_SCHEMA_VERSION = 1 as const
@@ -96,6 +96,12 @@ export interface RemotePlaybackSnapshot {
 }
 
 export interface RemoteControlStatus {
+  serverId?: string
+  serverName?: string
+  discovery?: 'advertising' | 'unavailable' | 'off'
+  discoveryError?: string | null
+  pairingRequests?: RemotePairingRequest[]
+  trustedDevices?: RemoteTrustedDevice[]
   enabled: boolean
   running: boolean
   port: number | null
@@ -112,6 +118,9 @@ export interface RemoteControlStatus {
 }
 
 export type CastProtocol = 'dlna' | 'chromecast'
+
+export interface RemotePairingRequest { id: string; deviceName: string; address: string; expiresAt: number }
+export interface RemoteTrustedDevice { id: string; name: string; createdAt: number }
 
 export interface DlnaDeviceInfo {
   usn: string

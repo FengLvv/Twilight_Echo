@@ -399,11 +399,13 @@ test('Core restarts queued/running work without UI, persists Retry-After, blocks
   service.activate()
   await until(() => entered)
   assert.equal(sawRunningNotification, true, 'claim publishes a task revision before the provider completes')
+  assert.equal(service.getContentRevision(), 0, 'claiming a task changes progress, not painted content')
   await service.cancel(job.id, 'a')
   release([intro])
   await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'cancelled')
   await service.shutdown()
   assert.equal(db.metadataDetail(a, 'zh-Hans').facts.length, 0)
+  assert.equal(service.getContentRevision(), 0, 'cancelled late results do not invalidate content')
   const retry = new CoreEntityMetadataService({
     database: asyncDb(db),
     provider: provider({
@@ -422,6 +424,7 @@ test('Core restarts queued/running work without UI, persists Retry-After, blocks
   await retry.enrich(demand)
   await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'retry_wait')
   assert.equal(db.metadataJobs({ jobId: job.id }).items[0].nextAttemptAt, now + 900000)
+  assert.equal(retry.getContentRevision(), 0, 'Retry-After does not invalidate content')
   await retry.shutdown()
   now += 900001
   activePolicy = { ...policy, enabled: false }
@@ -442,6 +445,7 @@ test('Core restarts queued/running work without UI, persists Retry-After, blocks
   disabled.activate()
   await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'blocked')
   assert.equal(db.metadataJobs({ jobId: job.id }).items[0].reason, 'metadata_disabled')
+  assert.equal(disabled.getContentRevision(), 0, 'blocked tasks do not invalidate content')
   await disabled.shutdown()
 })
 
@@ -586,6 +590,7 @@ test('a process-style reopen resumes an unfinished disk job and shutdown joins w
     service.activate()
     await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'completed')
     assert.equal(db.metadataDetail(a, 'zh-Hans').introduction!.value, intro.value)
+    assert.equal(service.getContentRevision(), 1, 'a committed biography invalidates content once')
     assert.equal(db.metadataJobs({ jobId: job.id }).items[0].generation, job.generation + 2)
   } finally {
     await service?.shutdown()
@@ -624,6 +629,10 @@ test('changing deployment permission while a request runs fences publication, wi
     const job = await service.enrich({ entityId: a, language: 'zh-Hans', batchId: 'a' })
     await until(() => !!release)
     currentPolicy = { ...policy, enabled: false }
+    const contentBeforePermissionChange = service.getContentRevision()
+    service.refreshIdentification()
+    assert.ok(service.getContentRevision() > contentBeforePermissionChange,
+      'provider and permission invalidation still reaches content consumers immediately')
     release([intro])
     await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'blocked')
     assert.equal(db.metadataDetail(a, 'zh-Hans').introduction!.value, 'Manual')

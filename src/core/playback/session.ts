@@ -164,6 +164,7 @@ export class CorePlaybackSession {
   private scheduledSave: Promise<void> | null = null
   private stopped = false
   private committing = false
+  private recoveringAudio = false
   private sourceBarrier: Promise<void> | null = null
   private castBoundaryRevision: number | null = null
   private sleepReset: Promise<void> = Promise.resolve()
@@ -858,6 +859,7 @@ export class CorePlaybackSession {
     return this.intent
   }
   private beginPreparation(play = true): number {
+    this.assertAudioAvailable()
     const intent = this.revoke()
     this.loadingIntent = intent
     this.requestedState = play ? 'playing' : 'paused'
@@ -889,6 +891,7 @@ export class CorePlaybackSession {
       throw Object.assign(new Error('Playback request superseded'), { code: 'CANCELLED' })
   }
   private transport<T>(action: () => Promise<T>): Promise<T> {
+    if (this.recoveringAudio) return Promise.reject(audioRecoveryInProgress())
     return this.commit(() =>
       this.options.runTransport ? this.options.runTransport(action) : action()
     )
@@ -1922,6 +1925,46 @@ export class CorePlaybackSession {
       this.finishPreparation(intent)
     }
   }
+  private assertAudioAvailable(): void {
+    if (this.recoveringAudio) throw audioRecoveryInProgress()
+  }
+
+  /** Revoke prepared sources; preserve the logical cursor and resume position without autoplay. */
+  async recoverAudio(restart: () => Promise<void>): Promise<void> {
+    this.assertAudioAvailable()
+    if (this.options.cast?.active())
+      throw new Error('Stop casting before restarting the local audio engine')
+    this.recoveringAudio = true
+    const intent = this.revoke()
+    this.resetAbLoopState()
+    this.restored = true
+    try {
+      await this.commit(() => {
+        const recover = async () => {
+          try {
+            await restart()
+            this.uncertain = false
+            this.error = null
+          } catch (error) {
+            this.uncertain = true
+            this.error = errorText(error)
+            throw error
+          } finally {
+            // The engine's ready/poll events describe an empty stopped native
+            // pipeline. They must not replace the logical track's saved position.
+            this.observed = null
+            if (this.info) this.info = { ...this.info, state: 'stopped', nativePlaybackActive: false }
+            this.publish()
+          }
+        }
+        return this.options.runTransport ? this.options.runTransport(recover) : recover()
+      })
+    } finally {
+      this.recoveringAudio = false
+      this.finishPreparation(intent)
+      await this.flush()
+    }
+  }
   private async stopTransport(current = () => true): Promise<void> {
     await this.transport(async () => {
       if (!current()) return
@@ -2874,7 +2917,7 @@ export class CorePlaybackSession {
   }
   flush(): Promise<void> {
     const capture = this.commit(async () => {
-      if (!this.initialized || !this.info || this.uncertain) return undefined
+      if (!this.initialized || this.stopped || !this.info || this.uncertain) return undefined
       if (this.options.resumeMode() === 'off' || !this.currentTrack) return null
       const reference = this.controller.reference()
       if (!reference) return null
@@ -2900,6 +2943,7 @@ export class CorePlaybackSession {
       if (session === undefined) return
       if (session === null) {
         const saved = await this.options.repository.clear(this.revision)
+        this.lastSavedAt = this.options.now()
         this.revision = saved.revision
         return
       }
@@ -2914,6 +2958,9 @@ export class CorePlaybackSession {
   async shutdown(): Promise<void> {
     if (this.stopped) return
     await this.personalized?.shutdown()
+    this.options.engine.off('playback-info', this.listen)
+    this.options.engine.off('playback-sample', this.listen)
+    this.options.engine.off('audio-service-crash', this.crash)
     await this.heart?.shutdown()
     this.revoke()
     await this.mutation
@@ -2925,16 +2972,17 @@ export class CorePlaybackSession {
     this.publish()
     await this.flush()
     await this.clearAbLoop()
+    this.stopped = true
     await this.options.cast?.shutdown()
     await this.options.engine.stop()
     this.resetStreamBuffering()
-    this.stopped = true
-    this.options.engine.off('playback-info', this.listen)
-    this.options.engine.off('playback-sample', this.listen)
-    this.options.engine.off('audio-service-crash', this.crash)
     this.controller.dispose()
     this.heartBase?.dispose()
   }
+}
+
+function audioRecoveryInProgress(): Error {
+  return Object.assign(new Error('Audio recovery is in progress; wait before playing'), { code: 'BUSY' })
 }
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

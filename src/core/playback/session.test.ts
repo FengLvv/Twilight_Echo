@@ -4085,3 +4085,29 @@ test('unified playback waits for explicit source maintenance before acquiring it
   await Promise.all([maintenance, playback])
   assert.equal(f.session.snapshot().track?.id, 'ncm:1')
 })
+
+
+test('shutdown preserves the persisted libraryQueue when engine.stop emits playback-info or flush runs after shutdown', async (t) => {
+  const f = await fixture(t)
+  await f.session.fromQuery({}, 'a')
+  const queueId = f.session.snapshot().queue!.id
+  f.engine.info.position = 37
+  const originalStop = f.engine.stop.bind(f.engine)
+  f.engine.stop = async () => {
+    await originalStop()
+    f.engine.info = { ...f.engine.info, state: 'stopped', position: 0 }
+    f.engine.emit('playback-info', f.engine.info)
+  }
+  await f.session.shutdown()
+  await f.session.flush()
+  assert.equal(f.saved?.data?.libraryQueue?.id, queueId)
+  assert.equal(f.saved?.data?.position, 37)
+
+  const cold = f.create()
+  await cold.initialize()
+  assert.equal(cold.snapshot().queue?.id, queueId)
+  assert.equal(cold.snapshot().queue?.total, 2)
+  assert.equal(cold.snapshot().track?.id, 'a')
+  assert.equal(cold.snapshot().playback?.position, 37)
+  await cold.shutdown()
+})

@@ -18,8 +18,15 @@ import type { CoreSettingsPaths } from './coreSettings.ts'
 import type { CoreAutoMixWorkerRequest } from './coreAutoMix.ts'
 import type { CorePlayerPresentation } from './coreSystemPlayer.ts'
 import type { CorePlatformId } from './audioEngineTypes.ts'
+import { PERSONAL_MUSIC_ARTWORK_MAX_BYTES } from './personalMusicArtwork.ts'
 /** Platform capabilities, not a generic main-process method invocation surface. */
 export interface CorePlatformOperations extends CoreModelPackPlatformOperations {
+  'audio.confirmWindowsRestart': { input: Record<string, never>; output: boolean }
+  'audio.restartWindowsServices': { input: Record<string, never>; output: void }
+  'remote.confirmDevice': {
+    input: { deviceName: string; address: string }
+    output: boolean
+  }
   'themes.importArchive': { input: Record<string, never>; output: ThemeProfileV2 | null }
   'themes.exportArchive': { input: { profile: ThemeProfileV2 }; output: string | null }
   'themes.deleteAssets': { input: { id: string }; output: void }
@@ -157,13 +164,20 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
   const themeId = (value: unknown) =>
     typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value)
   switch (request.name) {
+    case 'remote.confirmDevice': {
+      const value = payload as CorePlatformOperations['remote.confirmDevice']['input']
+      return Object.keys(payload).length === 2 && typeof value.deviceName === 'string' &&
+        // eslint-disable-next-line no-control-regex -- Native approval prompts only accept printable device labels.
+        value.deviceName.length > 0 && value.deviceName.length <= 80 && !/[\x00-\x1f\x7f]/.test(value.deviceName) &&
+        typeof value.address === 'string' && value.address.length <= 64 && /^[a-fA-F0-9:.]*$/.test(value.address)
+    }
     case 'artwork.remotePreview': {
       const { cover } = payload as CorePlatformOperations['artwork.remotePreview']['input']
       return (
         Object.keys(payload).length === 1 &&
         (cover === null ||
           (typeof cover === 'string' &&
-            cover.length <= 2 * 1024 * 1024 &&
+            cover.length <= Math.ceil(PERSONAL_MUSIC_ARTWORK_MAX_BYTES / 3) * 4 + 32 &&
             (/^cover:\/\/[a-zA-Z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(cover) ||
               cover.startsWith('twilight-media://image/') ||
               /^data:image\/(?:png|jpe?g|webp);base64,/i.test(cover))))
@@ -334,6 +348,8 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
         (payload as { deviceId: string }).deviceId.length > 0 &&
         (payload as { deviceId: string }).deviceId.length <= 512
       )
+    case 'audio.confirmWindowsRestart':
+    case 'audio.restartWindowsServices':
     case 'dsp.environment':
     case 'dsp.chooseExportFile':
     case 'dsp.chooseVst3Directory':

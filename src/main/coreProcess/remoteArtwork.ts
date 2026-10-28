@@ -5,6 +5,7 @@ import {
   resizeCoverImageBytes
 } from '../library/coverCache.ts'
 import { createRemoteMediaRequestHandler } from '../security/remoteMediaGrants.ts'
+import { parsePersonalMusicArtwork } from '../../shared/personalMusicArtwork.ts'
 
 const MAX_BYTES = 180_000
 const MAX_DATA_URL = 250_000
@@ -16,9 +17,14 @@ export async function resolveRemoteArtwork(
   signal: AbortSignal
 ): Promise<string | null> {
   if (!cover) return null
-  if (SAFE_DATA_URL.test(cover)) return cover.length <= MAX_DATA_URL ? cover : null
   let bytes: Uint8Array, mime: string
-  if (cover.startsWith('cover://')) {
+  if (SAFE_DATA_URL.test(cover)) {
+    if (cover.length <= MAX_DATA_URL) return cover
+    const artwork = parsePersonalMusicArtwork(cover)
+    if (!artwork) return null
+    bytes = Buffer.from(cover.slice(cover.indexOf(',') + 1), 'base64')
+    mime = artwork.mime
+  } else if (cover.startsWith('cover://')) {
     const fileName = cover.slice('cover://'.length)
     if (!isCoverCacheFileName(fileName)) return null
     const cached = await readCoverCacheFileBytes(fileName)

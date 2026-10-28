@@ -31,6 +31,21 @@ Automatic network work waits for that choice. An upgraded profile with music alr
 gets the same one-time prompt. Existing saved scope/source choices are preserved rather than
 overwritten or re-prompted. The prompt waits until the welcome wizard and active scan finish.
 
+### Public NetEase caches survive a plugin upgrade
+
+Anonymous NetEase metadata uses its own stable data-contract context. Upgrading the bundled
+plugin, logging in, or changing unrelated playback capabilities no longer hides saved public
+introductions and portraits. The reader also accepts official `public-metadata-v2` caches
+under the same metadata methods, text/image permissions and exact-identity contract. Disabling
+the provider, revoking permissions or reaching an expiry still withdraws the cached material;
+job publication retains its exact context fence.
+
+NetEase album metadata includes `publishTime` as a Shanghai calendar release date. Core stores
+it as an attributed release fact. Album cards, headers and the overview use it only when the
+file has no date and every displayed release reference confirms the same identity. Incomplete
+or conflicting references cannot borrow another edition's date. The fallback does not alter
+audio tags or the Track's `releaseDate`; expiry removes it from an open page too.
+
 Development, preview and installed builds share the shipped public-service defaults in
 `src/main/coreProcess/metadataConfiguration.ts`: MusicBrainz identity/structured metadata,
 Wikipedia introductions, Commons licensed artist portraits and non-exportable local NCM
@@ -48,6 +63,21 @@ completed lookups just because the application reopened or a day elapsed. New im
 changed identification evidence and explicit online requery can create new work.
 Task totals include per-source lookups and retained history, not song counts or missing
 field counts. Use **资料覆盖明细** for actual missing fields.
+
+### Keep Listening And Editing During Completion
+
+Automatic completion stays in Core's durable background queue. Task progress updates the
+task center, not the artist's portrait placeholder, biography or open identity review.
+Artist pages keep their current content and source-choice buttons usable during a background
+read; expanded biographies, editor drafts, text selection and keyboard focus stay in place.
+Temporary read failures keep the last displayed source and its editors, with an explicit retry.
+Changed identities and revoked display permissions still withdraw the old content immediately.
+
+`entityMetadataRevision` retains its task-and-content meaning for existing clients.
+`entityMetadataContentRevision` separately signals committed identities, candidates, facts,
+manual edits and display-permission changes. Display consumers use the content revision when
+available and the original revision with older Core versions. Neither opening a page nor
+polling progress creates new work.
 
 ### Existing Libraries Recover Their Original Identification Tags
 

@@ -25,7 +25,7 @@ export function createServicePort<Incoming, Outgoing>(
     node?: {
       send(message: unknown): void
       on(event: 'message', listener: (message: unknown) => void): void
-      on?(event: 'disconnect', listener: () => void): void
+      on(event: 'disconnect', listener: () => void): void
     }
     supervise?: (message: unknown, reply: (message: unknown) => void) => void
     onClose?: (source: 'peer' | 'parent') => void
@@ -51,7 +51,7 @@ export function createServicePort<Incoming, Outgoing>(
     for (const listener of listeners) listener(message as Incoming)
   }
   const listenClose = (port: ServiceMessagePort, source: 'peer' | 'parent') => {
-    ;(port as { on?: (event: 'close', listener: () => void) => unknown }).on?.('close', () => {
+    ;(port as unknown as { on?: (event: 'close', listener: () => void) => unknown }).on?.('close', () => {
       options.onClose?.(source)
     })
   }

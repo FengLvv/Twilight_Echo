@@ -470,6 +470,12 @@ std::string playbackInfoToJson(const PlaybackInfo& info) {
        << "\"actualSampleRate\":" << out.actualSampleRate << ","
        << "\"actualBitDepth\":" << out.actualBitDepth << ","
        << "\"actualChannels\":" << out.actualChannels << ","
+       << "\"requestedSampleRate\":" << out.requestedSampleRate << ","
+       << "\"requestedSampleFormat\":\"" << json_utils::escape(out.requestedSampleFormat) << "\","
+       << "\"hardwareSampleRate\":" << out.hardwareSampleRate << ","
+       << "\"hardwareBitDepth\":" << out.hardwareBitDepth << ","
+       << "\"hardwareChannels\":" << out.hardwareChannels << ","
+       << "\"hardwareSampleFormat\":\"" << json_utils::escape(out.hardwareSampleFormat) << "\","
        << "\"perfectReasonCode\":\"" << json_utils::escape(out.perfectReasonCode) << "\","
        << "\"capabilityReason\":\"" << json_utils::escape(out.capabilityReason) << "\","
        << "\"driverDopCapable\":" << (out.driverDopCapable ? "true" : "false") << ","
@@ -785,6 +791,10 @@ void TwilightAudioEngine::setStateEventsEnabled(bool enabled) {
   stateEventsEnabled_.store(enabled, std::memory_order_relaxed);
 }
 
+void TwilightAudioEngine::setInputFactory(std::shared_ptr<const SeekableInputFactory> factory) {
+  pipeline_->setInputFactory(std::move(factory));
+}
+
 TAE_Result TwilightAudioEngine::play(const std::string& source, double startTimeSeconds, bool initiallyPaused) {
   std::lock_guard transportLock(transportMutex_);
   const ClockWake wake(*this);
@@ -924,6 +934,16 @@ TAE_Result TwilightAudioEngine::playQueueItem(const QueueItem& item, double star
   lastTick_ = std::chrono::steady_clock::now();
   publishStateLocked();
   return TAE_RESULT_OK;
+}
+
+TAE_Result TwilightAudioEngine::setPaused(bool paused) {
+  std::lock_guard transportLock(transportMutex_);
+  {
+    std::lock_guard lock(mutex_);
+    if (info_.state == PlaybackState::Stopped ||
+        (info_.state == PlaybackState::Paused) == paused) return TAE_RESULT_OK;
+  }
+  return pause();
 }
 
 TAE_Result TwilightAudioEngine::pause() {
@@ -2491,10 +2511,17 @@ void TwilightAudioEngine::clockLoop() {
         }
       }
       if (recover) {
+#if defined(__ANDROID__)
+        // A lost Android route can fall back to the loudspeaker. Reopen silently;
+        // the user chooses when playback continues on the new route.
+        const TAE_Result result = play(source, position, true);
+        if (result != TAE_RESULT_OK) {
+#else
         const TAE_Result result = play(source, position);
         if (result == TAE_RESULT_OK && previousState == PlaybackState::Paused) {
           pause();
         } else if (result != TAE_RESULT_OK) {
+#endif
           emitError(
               deviceInvalidatedMessage.empty() ? "输出设备已失效，自动恢复失败" : deviceInvalidatedMessage,
               TAE_RESULT_BACKEND_UNAVAILABLE,
@@ -3111,14 +3138,45 @@ TAE_Result TAE_SetStateEventsEnabled(TAE_EngineHandle engine, int enabled) {
   return TAE_RESULT_OK;
 }
 
+TAE_Result TAE_SetInputProvider(TAE_EngineHandle engine, const TAE_InputCallbacks* callbacks, void* user_data) {
+  if (!engine || !callbacks || !callbacks->open || !callbacks->size || !callbacks->read_at ||
+      !callbacks->cancel || !callbacks->close) return TAE_RESULT_INVALID_ARGUMENT;
+  struct CallbackInput final : twilight::audio::SeekableInput {
+    TAE_InputCallbacks callbacks;
+    void* stream;
+    CallbackInput(TAE_InputCallbacks cb, void* s) : callbacks(cb), stream(s) {}
+    ~CallbackInput() override { callbacks.close(stream); }
+    int64_t size() override { return callbacks.size(stream); }
+    int readAt(int64_t position, uint8_t* bytes, int count) override { return callbacks.read_at(stream, position, bytes, count); }
+    void cancel() override { callbacks.cancel(stream); }
+  };
+  auto factory = std::make_shared<const twilight::audio::SeekableInputFactory>(
+      [cb = *callbacks, user_data](const std::string& source) -> std::shared_ptr<twilight::audio::SeekableInput> {
+        void* stream = cb.open(source.c_str(), user_data);
+        return stream ? std::make_shared<CallbackInput>(cb, stream) : nullptr;
+      });
+  fromHandle(engine)->setInputFactory(std::move(factory));
+  return TAE_RESULT_OK;
+}
+
 TAE_Result TAE_Play(TAE_EngineHandle engine, const char* source, double start_time_seconds) {
   if (!engine || !source) return TAE_RESULT_INVALID_ARGUMENT;
   return fromHandle(engine)->play(source, start_time_seconds);
 }
 
+TAE_Result TAE_Load(TAE_EngineHandle engine, const char* source, double start_time_seconds) {
+  if (!engine || !source) return TAE_RESULT_INVALID_ARGUMENT;
+  return fromHandle(engine)->play(source, start_time_seconds, true);
+}
+
 TAE_Result TAE_Pause(TAE_EngineHandle engine) {
   if (!engine) return TAE_RESULT_NOT_INITIALIZED;
   return fromHandle(engine)->pause();
+}
+
+TAE_Result TAE_SetPaused(TAE_EngineHandle engine, int paused) {
+  if (!engine) return TAE_RESULT_NOT_INITIALIZED;
+  return fromHandle(engine)->setPaused(paused != 0);
 }
 
 TAE_Result TAE_Stop(TAE_EngineHandle engine) {

@@ -25,6 +25,9 @@ import {
 import { PlatformMetadataProvider, platformMetadataApprovals, ncmLocalFallbackApprovals } from './platformMetadataProvider.ts'
 import { CoreEntityMetadataService } from './entityMetadataService.ts'
 import { MusicBrainzWikiProvider } from './entityMetadataProvider.ts'
+import { NCM_PUBLIC_METADATA_CONFIGURATION } from '../../shared/metadataCacheContext.ts'
+import { collectionReleaseDate } from '../../shared/releaseDate.ts'
+import { LibraryDatabaseEntityMetadata } from '../../main/library/libraryDatabaseEntityMetadata.ts'
 
 const usage: MetadataUsage = { display: true, cache: true, crossSource: true, export: false }
 const policy = { enabled: true, publicServiceApproved: false, wikipediaText: false, contact: '' }
@@ -837,4 +840,127 @@ test('new optional metadata methods are routed only to declared handlers and hos
   assert.deepEqual(platformMetadataApprovals(undefined), {})
   assert.deepEqual(platformMetadataApprovals(JSON.stringify({ ncm: usage })), { ncm: usage })
   assert.throws(() => platformMetadataApprovals('{"ncm":true}'), /reviewed field permissions/)
+})
+
+test('release dates are validated, permission-capped facts and project to cards without changing file dates', async t => {
+  const db = new LibraryDatabase(':memory:')
+  const { local } = seed(db, 'release'), { state, provider } = fixture()
+  const raw = response('release', []) as Extract<PlatformMetadataResult, { status: 'ok' }>
+  raw.metadata.releaseDate = { value: '2020-05-12', url: 'https://music.163.com/#/album?id=42',
+    revision: '', attribution: '网易云音乐', license: '', licenseUrl: '' }
+  state.raw = raw
+  assert.equal(validPlatformMetadataResult(raw), true)
+  for (const value of ['', '2020-02-30', '2020/05/12', '1589212800000'])
+    assert.equal(validPlatformMetadataResult({ ...raw, metadata: { ...raw.metadata,
+      releaseDate: { ...raw.metadata.releaseDate, value } } }), false)
+  assert.equal(validPlatformMetadataResult({ ...raw, metadata: { ...raw.metadata, kind: 'artist' } }), false)
+  const core = service(db, provider)
+  t.after(async () => { await core.shutdown(); db.close() })
+  const job = await core.enrich({ entityId: local, language: 'zh-Hans', provider: 'platform.ncm', batchId: 'date' })
+  core.activate()
+  await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'completed')
+  const detail = await core.detail(local, 'zh-Hans')
+  assert.equal(detail.facts.find(f => f.field === 'releaseDate')?.value, '2020-05-12')
+  const options = { platformContexts: core.platformContexts(), now: 2000 }
+  const item = db.queryCollections('albums', {}, options).items[0]
+  assert.equal(item.releaseDate, undefined)
+  assert.equal(item.metadataReleaseDate?.value, '2020-05-12')
+  assert.equal(item.metadataReleaseDate?.attribution.provider, 'platform.ncm')
+  assert.equal(collectionReleaseDate(item, 2000), '2020-05-12')
+  assert.equal(db.getTracksByIds(['one']).tracks[0].releaseDate, undefined)
+  assert.equal(db.queryCollections('albums').items[0].metadataReleaseDate, undefined, 'old callers retain file-only meaning')
+  assert.equal(db.queryCollections('albums', {}, { now: 2000 }).items[0].metadataReleaseDate, undefined)
+  db.patchTracks([{ id: 'one', expectedVersion: db.getTracksByIds(['one']).versions.one, patch: { releaseDate: '2019' } }])
+  while (db.catalogStatus().localPending) db.catalogAdvance()
+  const file = db.queryCollections('albums', {}, options).items[0]
+  assert.equal(file.releaseDate, '2019')
+  assert.equal(file.metadataReleaseDate, undefined)
+  assert.equal(collectionReleaseDate(file, 2000), '2019')
+  raw.metadata.releaseDate.usage = { ...usage, cache: false }
+  assert.equal((await provider.enrich({ kind: 'release', externalId: '42', language: 'en' }, controller().signal)).facts.length, 0)
+})
+
+test('old anonymous NCM introductions and portraits remain visible after plugin upgrade but not revoked usage', async t => {
+  const db = new LibraryDatabase(':memory:')
+  const { local } = seed(db), { state } = fixture(true)
+  let version = '1.1.0'
+  const provider = new PlatformMetadataProvider('ncm', {
+    inventory: () => [{ id: 'ncm', enabled: state.enabled, configuration: version, supportedMethods: state.methods }],
+    configuration: () => NCM_PUBLIC_METADATA_CONFIGURATION,
+    usage: () => state.usage, artworkUsage: () => state.artworkUsage,
+    identity: { context: () => 'ncm-exact-link-v1', resolve: async (_kind, id) => id },
+    call: async () => state.raw, now: () => 2000
+  })
+  const raw = response() as Extract<PlatformMetadataResult, { status: 'ok' }>
+  raw.metadata.artwork = [{ resource: 'https://p4.music.126.net/avatar/42.jpg',
+    url: raw.metadata.texts[0].url, revision: '', attribution: '网易云音乐', license: '', licenseUrl: '' }]
+  state.raw = raw
+  const core = service(db, provider, async () => 'twilight-media://image/restored')
+  t.after(async () => { await core.shutdown(); db.close() })
+  const job = await core.enrich({ entityId: local, language: 'en', provider: provider.id, batchId: 'old' })
+  core.activate()
+  await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'completed')
+  const context = provider.context()
+  const old = JSON.stringify([JSON.stringify(['public-metadata-v2', JSON.stringify([
+    'com.twilightecho.provider.ncm', '1.0.0', 'old-account-filesystem-epoch'
+  ])]), true, [...state.methods, 'getPlaybackUrl', 'searchSongs', 'fetchArtistIntro'], usage, usage, 'ncm-exact-link-v1'])
+  db.sql.prepare("UPDATE metadata_facts SET payload=json_set(payload,'$.providerContext',?) WHERE provider='platform.ncm'").run(old)
+  version = '1.1.1'; state.methods = [...state.methods, 'unrelatedPlaybackMethod']
+  assert.equal(provider.context(), context, 'anonymous cache identity excludes plugin build and unrelated methods')
+  let detail = await core.detail(local, 'zh-Hans')
+  assert.equal(detail.introduction?.value, '平台人物介绍')
+  assert.equal(detail.artwork?.[0].handle, 'twilight-media://image/restored')
+  state.usage = { ...usage, crossSource: false }
+  detail = await core.detail(local, 'zh-Hans')
+  assert.equal(detail.introduction, null)
+  assert.equal(detail.artwork, undefined)
+  state.usage = usage
+  state.enabled = false
+  detail = await core.detail(local, 'zh-Hans')
+  assert.equal(detail.introduction, null)
+  assert.equal(detail.artwork, undefined)
+})
+
+test('album date fallbacks require a complete unambiguous release identity and expire at their deadline', async t => {
+  const db = new LibraryDatabase(':memory:')
+  const { local, online } = seed(db, 'release'), { state, provider } = fixture()
+  const raw = response('release', []) as Extract<PlatformMetadataResult, { status: 'ok' }>
+  raw.metadata.releaseDate = { value: '2020-05', url: 'https://music.163.com/#/album?id=42',
+    revision: '', attribution: '网易云音乐', license: '', licenseUrl: '', usage: { ...usage, expiresAt: 3000 } }
+  state.raw = raw
+  const core = service(db, provider)
+  t.after(async () => { await core.shutdown(); db.close() })
+  const job = await core.enrich({ entityId: local, language: 'en', provider: provider.id, batchId: 'expiry' })
+  core.activate()
+  await until(() => db.metadataJobs({ jobId: job.id }).items[0].state === 'completed')
+  const options = { platformContexts: core.platformContexts(), now: 2000 }
+  const saved = db.queryCollections('albums', {}, options).items[0]
+  assert.equal(collectionReleaseDate(saved, 2999), '2020-05')
+  assert.equal(collectionReleaseDate(saved, 3000), undefined)
+  assert.equal(db.queryCollections('albums', {}, { ...options, now: 3000 }).items[0].metadataReleaseDate, undefined)
+  const projection = new LibraryDatabaseEntityMetadata({ sql: db.sql, transaction: action => action(),
+    contentRevision: () => 0, albumAliases: () => [], music: () => { throw new Error('Not used by date projection') } })
+  const page = db.queryCollections('albums')
+  const item = page.items[0], catalog = item.catalog!
+  const release = catalog.items.find(ref => ref.kind === 'release')!
+  const project = (references: typeof catalog) => projection.collectionDates({ ...page,
+    items: [{ ...item, catalog: references }] }, options).items[0].metadataReleaseDate?.value
+  assert.equal(project({ ...catalog, total: catalog.total + 1 }), undefined, 'truncated references cannot select a date')
+  const onlineReference = { ...release, id: online }
+  const both = { ...catalog, total: catalog.total + 1, items: [...catalog.items, onlineReference] }
+  assert.equal(project(both), '2020-05', 'multiple local references may share one confirmed target')
+  const other = db.identificationDetail(online).link!
+  db.identificationDetach(other.id, other.revision, 2001)
+  assert.equal(project(both), undefined, 'an unresolved second release cannot borrow the first date')
+  const [candidate] = db.identificationPublish(db.identificationInput(online), [{ provider: 'ncm',
+    name: 'Different release', summary: 'Verified separate edition', matcherVersion: 'fixture-v1',
+    references: [{ provider: 'ncm', kind: 'release', idType: 'native', value: '99' }],
+    evidence: { origin: 'search', matches: [], missing: ['manual'], conflicts: [], incomplete: true, provenance: 'fixture' }
+  }], 2002)
+  db.identificationDecide({ candidateId: candidate.id, revision: candidate.revision,
+    linkRevision: candidate.linkRevision, decision: 'confirm' }, 2003)
+  assert.equal(project(both), undefined, 'different confirmed releases do not share a date')
+  const link = db.identificationDetail(local).link!
+  db.identificationDetach(link.id, link.revision, 2001)
+  assert.equal(db.queryCollections('albums', {}, options).items[0].metadataReleaseDate, undefined)
 })

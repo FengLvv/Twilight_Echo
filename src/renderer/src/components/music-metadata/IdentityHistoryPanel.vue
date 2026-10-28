@@ -31,7 +31,7 @@ watch([() => props.entityId, () => props.scope], ([id, scope]) => view.setContex
 })
 watch(
   [
-    () => core.state.value?.entityMetadataRevision,
+    () => core.state.value?.entityMetadataContentRevision ?? core.state.value?.entityMetadataRevision,
     () => core.state.value?.ratingsRevision,
     () => core.state.value?.catalogRevision,
     () => core.state.value?.libraryRevision,

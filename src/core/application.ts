@@ -16,6 +16,7 @@ import type { CoreRemoteService } from './remote/service.ts'
 import type { CorePlaylistSourceEdits } from './playlists/sourceEdits.ts'
 import type { CoreQueueTrackInput } from '../shared/coreQueueSubmission.ts'
 import type { CoreAudioDiagnosticsService } from './audio/diagnosticsService.ts'
+import type { CoreAudioRecoveryService } from './audio/recoveryService.ts'
 import type { CorePlayerPresentationService } from './playback/presentationService.ts'
 import type { OutputInfo } from '../shared/audioEngineTypes.ts'
 import { projectCoreOutput } from './audio/outputProjection.ts'
@@ -88,7 +89,7 @@ export interface CoreApplicationDependencies {
   opra?: Pick<OpraCatalog, 'search' | 'getProfile' | 'getStatus' | 'refresh'>
   playlistSources?: CorePlaylistSourceEdits
   revealAudioFile?(path: string): Promise<void>
-  remote?: Pick<CoreRemoteService, 'status' | 'setEnabled' | 'rotatePin' | 'shutdown'>
+  remote?: Pick<CoreRemoteService, 'status' | 'setEnabled' | 'rotatePin' | 'decidePairing' | 'revokeDevice' | 'shutdown'>
   recordingCatalog?: CoreRecordingCatalog
   catalog?: CoreCatalogService
   genres?: CoreGenresService
@@ -102,6 +103,7 @@ export interface CoreApplicationDependencies {
   resolvePlaylistInputs?: (inputs: readonly CoreQueueTrackInput[], signal: AbortSignal) => Promise<import('../shared/track.ts').TrackData[]>
   libraryRevision?(): number | null
   diagnostics?: CoreAudioDiagnosticsService
+  audioRecovery?: CoreAudioRecoveryService
   artwork?: Parameters<typeof executeLibraryArtwork>[2]
   playlistSubmission?: CorePlaylistSubmission
   presentation?: CorePlayerPresentationService
@@ -301,6 +303,8 @@ export class CoreApplication {
         ? this.dependencies.tags?.getLinkRevision() ?? null : null,
       entityMetadataRevision: !identity || identity.permissions.includes('library:read')
         ? this.dependencies.metadata?.entities?.getRevision() ?? null : null,
+      entityMetadataContentRevision: !identity || identity.permissions.includes('library:read')
+        ? this.dependencies.metadata?.entities?.getContentRevision() ?? null : null,
       pluginsRevision:
         !identity || identity.permissions.includes('plugins:read') ? this.pluginsRevision : null,
       presentationRevision:
@@ -1228,12 +1232,25 @@ export class CoreApplication {
       }
       case 'remote.status':
       case 'remote.setEnabled':
+      case 'remote.decidePairing':
+      case 'remote.revokeDevice':
       case 'remote.rotatePin': {
         const remote = this.dependencies.remote
         if (!remote) throw failure('NOT_READY', 'Remote control is unavailable')
         if (request.name === 'remote.status') return remote.status()
         if (request.name === 'remote.setEnabled') return remote.setEnabled(request.payload.enabled)
+        if (request.name === 'remote.decidePairing') return remote.decidePairing(request.payload.requestId, request.payload.allow)
+        if (request.name === 'remote.revokeDevice') return remote.revokeDevice(request.payload.id)
         return remote.rotatePin()
+      }
+      case 'audio.recovery':
+      case 'audio.recovery.start': {
+        const recovery = this.dependencies.audioRecovery
+        if (!recovery) throw failure('NOT_READY', 'Audio recovery is unavailable')
+        if (request.name === 'audio.recovery') return recovery.state()
+        if (identity.role !== 'desktop' || !identity.permissions.includes('playback:write'))
+          throw failure('FORBIDDEN', 'Audio recovery requires the desktop playback controller')
+        return recovery.start(request.payload.kind)
       }
       case 'audio.outputTest':
       case 'audio.outputTest.play':
@@ -1904,7 +1921,14 @@ export class CoreApplication {
       case 'library.artwork':
         if (!this.dependencies.artwork) throw failure('NOT_READY', 'Artwork is unavailable')
         return executeLibraryArtwork(this.dependencies.library, request.payload, this.dependencies.artwork, signal)
-      case 'library.collections':
+      case 'library.collections': {
+        const entities = this.dependencies.metadata?.entities
+        const platformContexts = entities?.platformContexts() ?? {}
+        const page = await executeLibraryRead(this.dependencies.library, request, { platformContexts, now: Date.now() })
+        if (JSON.stringify(platformContexts) !== JSON.stringify(entities?.platformContexts() ?? {}))
+          throw failure('STALE_REVISION', '资料授权已变化，请重新读取')
+        return page
+      }
       case 'library.byIds':
       case 'library.paths.lookup':
         return executeLibraryRead(this.dependencies.library, request)
@@ -2063,6 +2087,7 @@ export class CoreApplication {
       for (const controller of client.requests.values())
         controller.abort(new Error('Core shutting down'))
     try {
+      await this.dependencies.audioRecovery?.shutdown()
       await this.dependencies.audition?.shutdown()
       await this.dependencies.visualization?.shutdown()
       await this.dependencies.outputTest?.stop()

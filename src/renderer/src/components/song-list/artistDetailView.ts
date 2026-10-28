@@ -21,7 +21,9 @@ interface ArtistDetailState {
   detail: EntityMetadataDetail | null
   shared: boolean
   exact: boolean
+  /** Only a foreground read may replace controls with their loading state. */
   loading: boolean
+  refreshing: boolean
   error: string
 }
 const empty = (): ArtistDetailState => ({
@@ -33,6 +35,7 @@ const empty = (): ArtistDetailState => ({
   shared: false,
   exact: true,
   loading: false,
+  refreshing: false,
   error: ''
 })
 
@@ -63,7 +66,7 @@ export function createArtistDetailView(
     if (withdraw) {
       request?.abort()
       request = null
-      state.value = { ...state.value, detail: null, selected: null }
+      state.value = empty()
     }
     if (request) {
       pending = true
@@ -74,7 +77,8 @@ export function createArtistDetailView(
       expected = context
     request = controller
     const current = () => !disposed && request === controller && !controller.signal.aborted
-    state.value = { ...state.value, loading: true, error: '' }
+    const painted = !!state.value.page
+    state.value = { ...state.value, loading: !painted, refreshing: painted, error: '' }
     try {
       const base: CatalogQuery = {
         kind: 'artist',
@@ -177,10 +181,12 @@ export function createArtistDetailView(
           (saved.targetId && detail?.link?.state !== 'confirmed'))
       ) {
         choice = null
-        throw new Error('已保存的人物身份已变化，请重新选择资料条目')
+        throw Object.assign(new Error('已保存的人物身份已变化，请重新选择资料条目'), {
+          code: 'STALE_IDENTITY'
+        })
       }
       if (shared && (detail?.link?.state !== 'confirmed' || detail.targetId !== commonTarget))
-        throw new Error('人物身份已变化，请重新读取')
+        throw Object.assign(new Error('人物身份已变化，请重新读取'), { code: 'STALE_IDENTITY' })
       state.value = {
         page: choices,
         samples,
@@ -190,11 +196,21 @@ export function createArtistDetailView(
         shared,
         exact,
         loading: false,
+        refreshing: false,
         error: ''
       }
     } catch (error) {
-      if (current())
-        state.value = { ...empty(), error: error instanceof Error ? error.message : String(error) }
+      if (current()) {
+        // A temporary read failure must not unmount the source's open editors.
+        // Changed identity and permission scopes still withdraw old content.
+        const retain = painted && (error as { code?: string })?.code !== 'STALE_IDENTITY'
+        state.value = {
+          ...(retain ? state.value : empty()),
+          loading: false,
+          refreshing: false,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      }
     } finally {
       if (request === controller) {
         request = null
