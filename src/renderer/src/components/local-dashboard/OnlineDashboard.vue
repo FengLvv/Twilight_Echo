@@ -48,7 +48,7 @@ const {
 } = home
 const hero = computed(() => recent.value.find((track) => track.id === player.currentTrack.value?.id)
   ?? tracks.value.find((track) => track.id === player.currentTrack.value?.id)
-  ?? recent.value[0] ?? tracks.value[0] ?? null)
+  ?? recent.value[0] ?? tracks.value[0] ?? player.currentTrack.value ?? null)
 const actionError = ref('')
 const pendingPlaylist = ref<string | null>(null)
 let actionRevision = 0

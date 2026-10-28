@@ -802,7 +802,7 @@ export class PlaybackController {
         throw nativeAudioError('audio.stop_failed', 'native stop failed', this.lastNativeError)
       }
     } else {
-      this.tryNative('停止', (native) => native.Stop())
+      await this.callNativeMaybeAsync('停止', 'Stop')
     }
     this.nativePlaybackActive = false
     this.pendingNativeSource = null

@@ -2874,7 +2874,7 @@ export class CorePlaybackSession {
   }
   flush(): Promise<void> {
     const capture = this.commit(async () => {
-      if (!this.initialized || !this.info || this.uncertain) return undefined
+      if (!this.initialized || this.stopped || !this.info || this.uncertain) return undefined
       if (this.options.resumeMode() === 'off' || !this.currentTrack) return null
       const reference = this.controller.reference()
       if (!reference) return null
@@ -2900,6 +2900,7 @@ export class CorePlaybackSession {
       if (session === undefined) return
       if (session === null) {
         const saved = await this.options.repository.clear(this.revision)
+        this.lastSavedAt = this.options.now()
         this.revision = saved.revision
         return
       }
@@ -2914,6 +2915,9 @@ export class CorePlaybackSession {
   async shutdown(): Promise<void> {
     if (this.stopped) return
     await this.personalized?.shutdown()
+    this.options.engine.off('playback-info', this.listen)
+    this.options.engine.off('playback-sample', this.listen)
+    this.options.engine.off('audio-service-crash', this.crash)
     await this.heart?.shutdown()
     this.revoke()
     await this.mutation
@@ -2925,13 +2929,10 @@ export class CorePlaybackSession {
     this.publish()
     await this.flush()
     await this.clearAbLoop()
+    this.stopped = true
     await this.options.cast?.shutdown()
     await this.options.engine.stop()
     this.resetStreamBuffering()
-    this.stopped = true
-    this.options.engine.off('playback-info', this.listen)
-    this.options.engine.off('playback-sample', this.listen)
-    this.options.engine.off('audio-service-crash', this.crash)
     this.controller.dispose()
     this.heartBase?.dispose()
   }

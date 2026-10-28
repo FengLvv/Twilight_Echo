@@ -9,7 +9,7 @@ export function libraryTrack(record: LibraryTrackRecord): TrackData {
   const fileName =
     typeof record.fileName === 'string'
       ? record.fileName
-      : record.filePath.split(/[\\/]/).pop() || record.id
+      : (typeof record.filePath === 'string' ? record.filePath : '').split(/[\\/]/).pop() || record.id
   const { queueEntryId: _queueEntryId, ...metadata } = record
   const artists = libraryArtistCredits(record as Partial<TrackData>)
   return {
@@ -23,6 +23,7 @@ export function libraryTrack(record: LibraryTrackRecord): TrackData {
     title: typeof record.title === 'string' ? record.title : fileName,
     artist: typeof record.artist === 'string' ? record.artist : '未知艺术家',
     album: typeof record.album === 'string' ? record.album : '未知专辑',
+    filePath: typeof record.filePath === 'string' ? record.filePath : '',
     fileName,
     duration:
       typeof record.duration === 'number' && Number.isFinite(record.duration) ? record.duration : 0,

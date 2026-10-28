@@ -10,8 +10,7 @@ function savedTrack(value: unknown): TrackData {
     typeof value !== 'object' ||
     !('id' in value) ||
     typeof value.id !== 'string' ||
-    !('filePath' in value) ||
-    typeof value.filePath !== 'string'
+    ('filePath' in value && value.filePath !== undefined && typeof value.filePath !== 'string')
   )
     throw new Error('Saved playback track has no source identity')
   const record = value as import('../../shared/libraryDatabase.ts').LibraryTrackRecord

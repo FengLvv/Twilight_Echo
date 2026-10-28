@@ -25,8 +25,10 @@ export function createServicePort<Incoming, Outgoing>(
     node?: {
       send(message: unknown): void
       on(event: 'message', listener: (message: unknown) => void): void
+      on(event: 'disconnect', listener: () => void): void
     }
     supervise?: (message: unknown, reply: (message: unknown) => void) => void
+    onClose?: (source: 'peer' | 'parent') => void
   } = {}
 ): ServicePort<Incoming, Outgoing> {
   const parent =
@@ -36,8 +38,8 @@ export function createServicePort<Incoming, Outgoing>(
     (process.send
       ? {
           send: (message: unknown) => process.send?.(message),
-          on: (event: 'message', listener: (message: unknown) => void) =>
-            process.on(event, listener)
+          on: (event: 'message' | 'disconnect', listener: (message: unknown) => void) =>
+            process.on(event, listener as (...args: unknown[]) => void)
         }
       : undefined)
   if (!parent && !node) throw new Error('Service requires an Electron parent port or Node IPC')
@@ -48,14 +50,21 @@ export function createServicePort<Incoming, Outgoing>(
   const dispatch = (message: unknown) => {
     for (const listener of listeners) listener(message as Incoming)
   }
+  const listenClose = (port: ServiceMessagePort, source: 'peer' | 'parent') => {
+    ;(port as unknown as { on?: (event: 'close', listener: () => void) => unknown }).on?.('close', () => {
+      options.onClose?.(source)
+    })
+  }
   const parentPost = (message: unknown) =>
     parent ? parent.postMessage(message) : node!.send(message)
-  if (parent)
+  if (parent) {
+    listenClose(parent, 'parent')
     parent.on('message', (event) => {
       const message = event.data as { kind?: string } | null
       if (message?.kind === 'core:attach-service') {
         if (!peerMode || peer || event.ports?.length !== 1) return
         peer = event.ports[0]
+        listenClose(peer, 'peer')
         peer.on('message', (event) => dispatch(event.data))
         peer.start?.()
         for (const reply of startup.splice(0)) peer.postMessage(reply)
@@ -67,7 +76,10 @@ export function createServicePort<Incoming, Outgoing>(
       }
       if (!peerMode) dispatch(event.data)
     })
-  else node!.on('message', dispatch)
+  } else {
+    node!.on('message', dispatch)
+    node!.on?.('disconnect', () => options.onClose?.('parent'))
+  }
   return {
     postMessage(message) {
       if (peer) peer.postMessage(message)

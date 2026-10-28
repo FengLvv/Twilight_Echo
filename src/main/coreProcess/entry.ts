@@ -325,6 +325,8 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       publishSettings()
       if (Object.hasOwn(patch, 'musicIdentification') || Object.hasOwn(patch, 'language')) metadata?.entities?.refreshIdentification(true)
       if (Object.hasOwn(patch, 'genreSeparators')) genres?.invalidate()
+      if (Object.hasOwn(patch, 'playbackResumeMode'))
+        void playback?.flush().catch((error) => console.error('[core.playback]', error))
     }
   })
   function publishSettings(): void {

@@ -32,6 +32,18 @@ type AudioServiceResponse = {
   error?: string
 }
 
+function stopNativeAudioSafely(): boolean {
+  if (!native) return false
+  try {
+    native.Stop()
+    const rawInfo = native.GetPlaybackInfo?.()
+    const info = typeof rawInfo === 'string' ? JSON.parse(rawInfo) : rawInfo
+    return info?.state === 'stopped'
+  } catch {
+    return false
+  }
+}
+
 const servicePort = createServicePort<
   AudioServiceMessage,
   | AudioServiceResponse
@@ -41,19 +53,28 @@ const servicePort = createServicePort<
 >({
   supervise: (raw, reply) => {
     const message = raw as { requestId: string }
-    try {
-      native?.Stop()
-      const rawInfo = native?.GetPlaybackInfo?.()
-      const info = typeof rawInfo === 'string' ? JSON.parse(rawInfo) : rawInfo
-      reply({
-        kind: 'supervisor:audio-stopped',
-        requestId: message.requestId,
-        stopped: !!native && info?.state === 'stopped'
-      })
-    } catch {
-      reply({ kind: 'supervisor:audio-stopped', requestId: message.requestId, stopped: false })
-    }
+    reply({
+      kind: 'supervisor:audio-stopped',
+      requestId: message.requestId,
+      stopped: stopNativeAudioSafely()
+    })
+  },
+  onClose: (source) => {
+    stopNativeAudioSafely()
+    if (source === 'parent') process.exit(0)
   }
+})
+
+process.once('SIGTERM', () => {
+  stopNativeAudioSafely()
+  process.exit(0)
+})
+process.once('disconnect', () => {
+  stopNativeAudioSafely()
+  process.exit(0)
+})
+process.once('exit', () => {
+  stopNativeAudioSafely()
 })
 initializeUtilityDiagnostics('twilight-audio-engine')
 const nativeLoad = loadNativeBindingWithDiagnostics()
