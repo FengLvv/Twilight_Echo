@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/AudioTypes.h"
+#include "SeekableInput.h"
 
 #include <cstddef>
 #include <memory>
@@ -32,6 +33,9 @@ class FFmpegDecoder {
   /* Set before open. Callback/context must outlive decoder IO; callback must
    * be thread-safe and nonblocking. Used by bounded background preparation. */
   void setInterrupt(int (*callback)(void*), void* context);
+  void setInputFactory(std::shared_ptr<const SeekableInputFactory> factory);
+  // Returns true when a custom input was cancelled and must be reopened for seek.
+  bool cancelInput();
   void close();
 
   bool setOutputFormat(const AudioFormat& format, std::string* error);

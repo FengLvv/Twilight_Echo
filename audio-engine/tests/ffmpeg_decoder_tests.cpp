@@ -13,6 +13,9 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <condition_variable>
+#include <mutex>
 #include <iostream>
 #include <iomanip>
 #include <memory>
@@ -25,6 +28,96 @@ using namespace twilight::audio;
 using namespace twilight::audio::test;
 
 namespace {
+
+#if defined(TAE_HAS_FFMPEG)
+struct MemoryAudioInput final : SeekableInput {
+  std::vector<uint8_t> bytes;
+  std::atomic<bool> cancelled{false};
+  explicit MemoryAudioInput(std::vector<uint8_t> data) : bytes(std::move(data)) {}
+  int64_t size() override { return cancelled ? -1 : static_cast<int64_t>(bytes.size()); }
+  int readAt(int64_t position, uint8_t* output, int count) override {
+    if (cancelled || position < 0) return -1;
+    if (static_cast<uint64_t>(position) >= bytes.size()) return 0;
+    const int read = static_cast<int>(std::min<size_t>({static_cast<size_t>(count), bytes.size() - position, 113}));
+    std::copy_n(bytes.data() + position, read, output);
+    return read;
+  }
+  void cancel() override { cancelled = true; }
+};
+
+void assertHostInputMatchesFileSeekEofAndIndependentReopen() {
+  const auto fixture = writePcmWavFixture({"twilight-host-avio.wav", 48000, 2, 16, 48000, false});
+  std::ifstream file(fixture.path(), std::ios::binary);
+  const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), {});
+  std::vector<std::shared_ptr<MemoryAudioInput>> readers;
+  auto factory = std::make_shared<const SeekableInputFactory>([&](const std::string& source) -> std::shared_ptr<SeekableInput> {
+    if (source != "host-audio://fixture") return nullptr;
+    auto reader = std::make_shared<MemoryAudioInput>(bytes);
+    readers.push_back(reader);
+    return reader;
+  });
+  FFmpegDecoder host, reference, second;
+  host.setInputFactory(factory);
+  second.setInputFactory(factory);
+  std::string error;
+  assert(host.open("host-audio://fixture", &error));
+  assert(second.open("host-audio://fixture", &error));
+  assert(reference.open(fixture.string(), &error));
+  auto format = host.outputFormat();
+  format.sampleFormat = AudioSampleFormat::Float32Interleaved;
+  format.bitDepth = 32;
+  for (auto* decoder : {&host, &reference, &second}) assert(decoder->setOutputFormat(format, &error));
+  std::vector<float> actual(1024), expected(1024);
+  size_t total = 0;
+  for (;;) {
+    const auto count = host.readFrames(actual.data(), 512, &error);
+    assert(count == reference.readFrames(expected.data(), 512, &error));
+    assert(std::equal(actual.begin(), actual.begin() + count * 2, expected.begin()));
+    total += count;
+    if (!count) break;
+  }
+  assert(total == 48000 && host.eof());
+  for (auto* decoder : {&host, &reference}) assert(decoder->seek(0.5, &error));
+  assert(host.readFrames(actual.data(), 512, &error) == reference.readFrames(expected.data(), 512, &error));
+  assert(actual == expected);
+  assert(host.cancelInput());
+  assert(readers[0]->cancelled && !readers[1]->cancelled);
+  assert(second.readFrames(actual.data(), 512, &error) == 512);
+  assert(host.open("host-audio://fixture", &error));
+  assert(readers.size() == 3 && !readers.back()->cancelled);
+  // A provider which declines a local path must preserve the original native IO.
+  assert(host.open(fixture.string(), &error));
+  assert(!host.cancelInput());
+}
+
+void assertHostInputCancellationUnblocksOpen() {
+  struct BlockingInput final : SeekableInput {
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool entered = false, cancelled = false;
+    int64_t size() override { return 100000; }
+    int readAt(int64_t, uint8_t*, int) override {
+      std::unique_lock lock(mutex);
+      entered = true;
+      changed.notify_all();
+      changed.wait(lock, [&] { return cancelled; });
+      return -1;
+    }
+    void cancel() override { std::lock_guard lock(mutex); cancelled = true; changed.notify_all(); }
+  };
+  auto input = std::make_shared<BlockingInput>();
+  FFmpegDecoder decoder;
+  decoder.setInputFactory(std::make_shared<const SeekableInputFactory>([&](const std::string&) { return input; }));
+  auto opened = std::async(std::launch::async, [&] { std::string error; return decoder.open("host-audio://blocked", &error); });
+  {
+    std::unique_lock lock(input->mutex);
+    assert(input->changed.wait_for(lock, std::chrono::seconds(2), [&] { return input->entered; }));
+  }
+  assert(decoder.cancelInput());
+  assert(opened.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
+  assert(!opened.get());
+}
+#endif
 
 std::string readTextFile(const std::filesystem::path& path) {
   std::ifstream input(path);
@@ -696,6 +789,8 @@ int main(int argc,char** argv) {
   assertDecoderDirectPendingHelperShrinksToActualSamples();
 #if defined(TAE_HAS_FFMPEG)
   assertDecoderReportsPcm("twilight-fixture-s16.wav", 16);
+  assertHostInputMatchesFileSeekEofAndIndependentReopen();
+  assertHostInputCancellationUnblocksOpen();
   assertFlacTailHandling(false, false, true);
   assertFlacTailHandling(true, false, true);
   assertFlacTailHandling(true, true, true);

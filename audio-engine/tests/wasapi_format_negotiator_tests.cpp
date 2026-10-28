@@ -855,6 +855,100 @@ void testExclusiveRenderFramePolicySeparatesEventAndPushMode() {
 void testExclusiveDeviceInUseIsRetryableStartupFailure() {
   assert(wasapi::isDeviceInUse(AUDCLNT_E_DEVICE_IN_USE));
   assert(!wasapi::isDeviceInUse(AUDCLNT_E_UNSUPPORTED_FORMAT));
+
+  int totalDelayMs = 0;
+  int previousDelayMs = 0;
+  for (const int delayMs : wasapi::kExclusiveDeviceInUseRetryDelaysMs) {
+    assert(delayMs > 0);
+    assert(delayMs >= previousDelayMs);
+    previousDelayMs = delayMs;
+    totalDelayMs += delayMs;
+  }
+  assert(totalDelayMs >= 500);
+}
+
+void testExclusiveInitFailureClassificationDistinguishesDeviceInUseFromFormatRejection() {
+  const std::string formatSummary = "44100Hz 2ch int16 16bit";
+
+  const auto inUseNoHolder = wasapi::describeExclusiveInitFailure(AUDCLNT_E_DEVICE_IN_USE, formatSummary);
+  assert(std::string(inUseNoHolder.reasonCode) == "device_in_use");
+  assert(inUseNoHolder.message.find("占用") != std::string::npos);
+  assert(inUseNoHolder.message.find("设备拒绝协商格式") == std::string::npos);
+
+  const auto inUseExternalHolder = wasapi::describeExclusiveInitFailure(
+      AUDCLNT_E_DEVICE_IN_USE,
+      formatSummary,
+      {{4321, "foobar2000.exe", false, false}});
+  assert(std::string(inUseExternalHolder.reasonCode) == "device_in_use");
+  assert(inUseExternalHolder.message.find("foobar2000.exe (PID 4321)") != std::string::npos);
+  assert(inUseExternalHolder.message.find("设备拒绝协商格式") == std::string::npos);
+
+  const auto inUseStaleSelf = wasapi::describeExclusiveInitFailure(
+      AUDCLNT_E_DEVICE_IN_USE,
+      formatSummary,
+      {{7028, "TwilightEcho.exe", true, false}});
+  assert(std::string(inUseStaleSelf.reasonCode) == "device_in_use");
+  assert(inUseStaleSelf.message.find("PID 7028") != std::string::npos);
+  assert(inUseStaleSelf.message.find("TwilightEcho") != std::string::npos);
+
+  const auto inUseZombieSelf = wasapi::describeExclusiveInitFailure(
+      AUDCLNT_E_DEVICE_IN_USE,
+      formatSummary,
+      {{7028, "TwilightEcho.exe", true, true}});
+  assert(std::string(inUseZombieSelf.reasonCode) == "device_in_use");
+  assert(inUseZombieSelf.message.find("PID 7028") != std::string::npos);
+  assert(inUseZombieSelf.message.find("重新插拔 DAC") != std::string::npos);
+
+  const auto exclusiveNotAllowed =
+      wasapi::describeExclusiveInitFailure(AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED, formatSummary);
+  assert(std::string(exclusiveNotAllowed.reasonCode) == "exclusive_not_allowed");
+  assert(exclusiveNotAllowed.message.find("未允许独占模式") != std::string::npos);
+
+  const auto invalidated =
+      wasapi::describeExclusiveInitFailure(AUDCLNT_E_DEVICE_INVALIDATED, formatSummary);
+  assert(std::string(invalidated.reasonCode) == "device_invalidated");
+
+  const auto endpointFailed =
+      wasapi::describeExclusiveInitFailure(AUDCLNT_E_ENDPOINT_CREATE_FAILED, formatSummary);
+  assert(std::string(endpointFailed.reasonCode) == "endpoint_create_failed");
+
+  const auto unsupportedFormat =
+      wasapi::describeExclusiveInitFailure(AUDCLNT_E_UNSUPPORTED_FORMAT, formatSummary);
+  assert(std::string(unsupportedFormat.reasonCode) == "backend_open_failure");
+  assert(unsupportedFormat.message.find("设备拒绝协商格式 44100Hz 2ch int16 16bit") != std::string::npos);
+}
+
+void testExclusiveDefaultPeriodFallbackSkipsNonPeriodErrors() {
+  const REFERENCE_TIME requested = wasapi::framesToReferenceTime(128, 48000);
+  const REFERENCE_TIME defaultPeriod = wasapi::framesToReferenceTime(480, 48000);
+
+  assert(!wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_DEVICE_IN_USE, requested, defaultPeriod));
+  assert(!wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED, requested, defaultPeriod));
+  assert(!wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_DEVICE_INVALIDATED, requested, defaultPeriod));
+  assert(!wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_ENDPOINT_CREATE_FAILED, requested, defaultPeriod));
+  assert(wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_BUFFER_SIZE_ERROR, requested, defaultPeriod));
+  assert(!wasapi::shouldRetryExclusiveInitWithDefaultPeriod(
+      AUDCLNT_E_BUFFER_SIZE_ERROR, defaultPeriod, defaultPeriod));
+}
+
+void testWasapiExclusiveBackendWiresInitFailureClassificationAndSessionInspection() {
+  const std::filesystem::path testFilePath(__FILE__);
+  const std::filesystem::path sourcePath =
+      testFilePath.parent_path().parent_path() / "output" / "wasapi" / "WasapiExclusiveBackend.cpp";
+  const std::string source = readTextFile(sourcePath);
+  const std::string initBody = extractFunctionBody(source, "bool initializeAudioClient(");
+  const std::string configureBody =
+      extractFunctionBody(source, "bool configureStream(const AudioFormat& requestedFormat, std::string* error)");
+
+  assert(initBody.find("kExclusiveDeviceInUseRetryDelaysMs") != std::string::npos);
+  assert(initBody.find("inspectActiveEndpointHolders") != std::string::npos);
+  assert(initBody.find("describeExclusiveInitFailure") != std::string::npos);
+  assert(configureBody.find("shouldRetryExclusiveInitWithDefaultPeriod") != std::string::npos);
 }
 
 void testFloatRenderHelperZerosOnlyUnrenderedTail() {
@@ -971,6 +1065,9 @@ int main() {
   testExclusiveInitialRenderLeavesWakeupHeadroom();
   testExclusiveRenderFramePolicySeparatesEventAndPushMode();
   testExclusiveDeviceInUseIsRetryableStartupFailure();
+  testExclusiveInitFailureClassificationDistinguishesDeviceInUseFromFormatRejection();
+  testExclusiveDefaultPeriodFallbackSkipsNonPeriodErrors();
+  testWasapiExclusiveBackendWiresInitFailureClassificationAndSessionInspection();
   testFloatRenderHelperZerosOnlyUnrenderedTail();
   testFloatRenderHelperDoesNotPreclearFullRender();
   testFloatRenderHelperZerosAllWithoutCallback();

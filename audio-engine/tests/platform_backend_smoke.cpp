@@ -193,6 +193,9 @@ int main() {
     assert(backend.getLatencyFrames() > 0);
     const OutputInfo info = backend.outputInfo();
     assert(info.actualBackend == "oboe");
+    assert(!info.supportsOutputPerfect);
+    assert(!info.outputPerfect);
+    assert(!info.pcmPassthrough);
     assertActualFormatFacts(info);
     assertLatencyFacts(info);
     assert(backend.start([](float*, size_t frames) { return frames; }, nullptr, &error));

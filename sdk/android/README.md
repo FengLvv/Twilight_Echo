@@ -20,6 +20,21 @@ This directory provides the Android NDK / CMake build entry and JNI bridge (`lib
 
 ## Gradle `externalNativeBuild` Integration
 
+Build Android FFmpeg first (NDK r27+, Bash, GNU make, curl and tar):
+
+```bash
+export ANDROID_NDK_HOME=/path/to/android-ndk
+bash sdk/android/ffmpeg/build-ffmpeg.sh /path/to/ffmpeg-root
+```
+
+This builds LGPL-only FFmpeg 7.1.2 shared libraries for the four Android ABIs,
+with audio decoders and 16 KiB ELF alignment. Native networking is disabled: an
+engine-scoped `TAE_SetInputProvider` supplies authorized, cancellable random reads
+on decode workers. `open` creates an independent stream; returning null retains
+ordinary native file IO. The Android host uses independent content descriptors
+for active and preloaded decoders. The provider is installed once before playback.
+Use idempotent `TAE_SetPaused` for platform interruptions; `TAE_Pause` remains a toggle.
+
 In `clients/android/app/build.gradle.kts` (or module `build.gradle.kts`):
 
 ```kotlin
@@ -33,6 +48,7 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DTAE_ENABLE_OBOE=ON",
+                    "-DTAE_FFMPEG_ROOT=/path/to/ffmpeg-root",
                     "-DTAE_BUILD_NAPI=OFF",
                     "-DTAE_BUILD_TESTS=OFF"
                 )

@@ -5201,6 +5201,10 @@ void FFmpegDecoder::setInterrupt(int (*callback)(void*), void* context) {
   impl_->interruptContext = context;
 }
 
+// Synthetic sources have no host input; blocked reads use the interrupt above.
+void FFmpegDecoder::setInputFactory(std::shared_ptr<const SeekableInputFactory>) {}
+bool FFmpegDecoder::cancelInput() { return false; }
+
 bool FFmpegDecoder::open(const std::string& source, std::string* error) {
   if (impl_->positionFrames > 0 && source.find("blocked-reconnect") != std::string::npos &&
       g_blockNextReconnect.exchange(false)) {

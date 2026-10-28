@@ -49,8 +49,26 @@ TAE_API TAE_Result TAE_SetEventCallback(TAE_EngineHandle engine, TAE_EventCallba
  */
 TAE_API TAE_Result TAE_SetStateEventsEnabled(TAE_EngineHandle engine, int enabled);
 
+/** Optional host input, installed before playback. open returns a fresh stream or
+ * NULL to use ordinary native file/protocol IO. read_at returns bytes, 0 EOF or
+ * a negative error. size/read_at/close run off the realtime thread; cancel may
+ * race with reads and must promptly unblock them. Callbacks and user_data must
+ * remain valid until engine destruction AND all open streams have closed. */
+typedef struct TAE_InputCallbacks {
+  void* (*open)(const char* source, void* user_data);
+  int64_t (*size)(void* stream);
+  int (*read_at)(void* stream, int64_t position, uint8_t* bytes, int count);
+  void (*cancel)(void* stream);
+  void (*close)(void* stream);
+} TAE_InputCallbacks;
+TAE_API TAE_Result TAE_SetInputProvider(TAE_EngineHandle engine, const TAE_InputCallbacks* callbacks, void* user_data);
+
 TAE_API TAE_Result TAE_Play(TAE_EngineHandle engine, const char* source, double start_time_seconds);
+/** Prepare a source and its output in paused state, without briefly starting playback. */
+TAE_API TAE_Result TAE_Load(TAE_EngineHandle engine, const char* source, double start_time_seconds);
 TAE_API TAE_Result TAE_Pause(TAE_EngineHandle engine);
+/** Idempotent pause/resume for platform focus and transport controls. TAE_Pause remains a toggle. */
+TAE_API TAE_Result TAE_SetPaused(TAE_EngineHandle engine, int paused);
 TAE_API TAE_Result TAE_Stop(TAE_EngineHandle engine);
 TAE_API TAE_Result TAE_Seek(TAE_EngineHandle engine, double position_seconds);
 TAE_API TAE_Result TAE_SetVolume(TAE_EngineHandle engine, double volume);

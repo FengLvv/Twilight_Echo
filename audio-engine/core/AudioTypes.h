@@ -288,6 +288,13 @@ struct OutputInfo {
   int actualSampleRate = 0;
   int actualBitDepth = 0;
   int actualChannels = 0;
+  // Stream request and Android-reported hardware format are separate observations.
+  int requestedSampleRate = 0;
+  std::string requestedSampleFormat;
+  int hardwareSampleRate = 0;
+  int hardwareBitDepth = 0;
+  int hardwareChannels = 0;
+  std::string hardwareSampleFormat;
   std::string perfectReasonCode;
   std::string capabilityReason;
   bool driverDopCapable = false;
