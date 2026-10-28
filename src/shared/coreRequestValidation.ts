@@ -25,6 +25,7 @@ import { CORE_SPECIALIZED_SETTINGS } from './coreSettings.ts'
 import { PERSONAL_DOMAINS, validPersonalExportOptions } from './personalBackup.ts'
 import { LIBRARY_PAGE_SIZE, LIBRARY_MAX_PAGE_SIZE } from './libraryDatabase.ts'
 import { validCoreAudioPayload } from './coreAudio.ts'
+import { validAudioRecoveryPayload } from './audioRecovery.ts'
 import {
   CORE_STATE_DOMAINS,
   CORE_STATE_LARGE_ROW_BYTES,
@@ -845,6 +846,9 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
     case 'audio.vst3.edit':
     case 'audio.vst3.chooseDirectory':
       return validCoreDspPayload(name, p)
+    case 'audio.recovery':
+    case 'audio.recovery.start':
+      return validAudioRecoveryPayload(name, p)
     case 'audio.output':
     case 'audio.outputTest':
     case 'audio.outputTest.play':

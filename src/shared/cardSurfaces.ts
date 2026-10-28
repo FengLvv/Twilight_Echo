@@ -19,6 +19,7 @@ export const CARD_SURFACE_SELECTOR = [
   '.online-empty',
   '.home-library-switch > button',
   '.online-shortcuts > button',
+  '.figures > button',
   '.fresh-tile',
   '.gallery-tile',
   '.archive-activity-panel',

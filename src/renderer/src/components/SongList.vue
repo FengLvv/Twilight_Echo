@@ -41,7 +41,7 @@ import {
   useListeningStatsStore
 } from '../stores/useListeningStatsStore'
 import type { Track } from '../types/music'
-import { copyTrackNamePages } from '../utils/copyTrackNames'
+import { copyTrackNamePages } from '../composables/copyTrackNames'
 import { getTrackSearchBlob, normalizeSearchText } from '../utils/localLibrarySearch'
 const getLogicalTrackSource = (track: Track): string => track.source ?? 'local'
 import { useEscapeToClose } from '../app/useDismissLayer.ts'

@@ -766,10 +766,20 @@
     }
   }
 
+  if (typeof g.DOMException !== 'function') {
+    var PortableDOMException = function DOMException(message, name) {
+      var error = new Error(message === undefined ? '' : String(message))
+      Object.setPrototypeOf(error, PortableDOMException.prototype)
+      define(error, 'name', name === undefined ? 'Error' : String(name))
+      define(error, 'code', 0)
+      return error
+    }
+    PortableDOMException.prototype = Object.create(Error.prototype)
+    define(PortableDOMException.prototype, 'constructor', PortableDOMException)
+    g.DOMException = PortableDOMException
+  }
   var makeAbortError = function (name, message) {
-    var error = new Error(message)
-    error.name = name
-    return error
+    return new g.DOMException(message, name)
   }
   if (typeof g.AbortController !== 'function') {
     var PortableAbortSignal = function AbortSignal() {

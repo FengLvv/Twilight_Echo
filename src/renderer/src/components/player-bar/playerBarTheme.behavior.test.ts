@@ -363,7 +363,7 @@ const checkDashboardDefaults=()=>{
   const ink=style.getPropertyValue('--home-ink')
   checkBackground(track,'color-mix(in srgb, '+ink+' 12%, transparent)','reset restores dashboard track','::before')
   checkBackground(fill,'linear-gradient(90deg, '+style.getPropertyValue('--home-accent')+', '+style.getPropertyValue('--te-accent-cyan')+')','reset restores dashboard fill')
-  checkBackground(button,'linear-gradient(145deg, color-mix(in srgb, '+style.getPropertyValue('--home-accent')+' 82%, '+style.getPropertyValue('--home-card')+'), color-mix(in srgb, '+style.getPropertyValue('--home-accent')+' 90%, '+ink+'))','reset restores themed dashboard play surface')
+  checkBackground(button,style.getPropertyValue('--te-home-action-surface'),'reset restores themed dashboard play surface')
 }
 window.runPlayerThemeTests=async()=>{
   await boot()
@@ -382,7 +382,7 @@ window.runPlayerThemeTests=async()=>{
       const homeRect=button.getBoundingClientRect()
       expect(homeRect.width>=44&&homeRect.height>=44,'dashboard transport keeps a usable hit target')
       const homeStyle=getComputedStyle(bar)
-      checkBackground(button,'linear-gradient(145deg, color-mix(in srgb, '+homeStyle.getPropertyValue('--home-accent')+' 82%, '+homeStyle.getPropertyValue('--home-card')+'), color-mix(in srgb, '+homeStyle.getPropertyValue('--home-accent')+' 90%, '+homeStyle.getPropertyValue('--home-ink')+'))',tone+' dashboard play surface follows its theme after cover changes')
+      checkBackground(button,homeStyle.getPropertyValue('--te-home-action-surface'),tone+' dashboard play surface follows its theme after cover changes')
       expect(getComputedStyle(button).color!==getComputedStyle(button).backgroundColor,tone+' dashboard play icon contrasts with its surface')
     }
   }

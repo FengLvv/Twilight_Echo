@@ -4,6 +4,7 @@ import SettingsGroup from './SettingsGroup.vue'
 import { useSettingsDisclosure } from './settingsDisclosureRegistry.ts'
 import { storeToRefs } from 'pinia'
 import AudioDeviceProfilesPanel from '@renderer/components/settings-page/AudioDeviceProfilesPanel.vue'
+import AudioTroubleshootingPanel from './AudioTroubleshootingPanel.vue'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAudioOutputDspStore } from '../../stores/useAudioOutputDspStore'
 import { useCoreConnection } from '../../stores/coreConnection.ts'
@@ -59,7 +60,7 @@ import {
 } from './types.ts'
 
 withDefaults(defineProps<{ autoAnalyzeBpm?: boolean }>(), { autoAnalyzeBpm: false })
-const emit = defineEmits<{ toggleAutoAnalyzeBpm: [] }>()
+const emit = defineEmits<{ toggleAutoAnalyzeBpm: []; exportAudioDiagnostics: [] }>()
 
 const { settings, updateSettings } = useSettingsStore()
 const { locale, t } = useLocale()
@@ -1145,6 +1146,7 @@ function setContinuitySampleRate(event: Event): void {
         </div>
       </SettingsGroup>
     </div>
+    <AudioTroubleshootingPanel @export-diagnostics="emit('exportAudioDiagnostics')" />
     <SettingsGroup
       id="playback-transitions"
       title="歌曲衔接"

@@ -1322,6 +1322,7 @@ onBeforeUnmount(() => {
           <PlaybackSettingsSection
             :auto-analyze-bpm="settings.autoAnalyzeBpm"
             @toggle-auto-analyze-bpm="toggleAutoAnalyzeBpm"
+            @export-audio-diagnostics="exportAudioDiagnostics"
           /><DspSettingsSection
             @open-equalizer="emit('openEqualizer')"
             @open-dsp-rack="emit('openDspRack')"

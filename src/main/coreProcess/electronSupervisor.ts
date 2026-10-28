@@ -71,6 +71,7 @@ import { createNetworkCorePlatform } from '../network/corePlatform.ts'
 import { resolveAuthorizationBatch } from '../security/authorizationBatch.ts'
 import { createDspCorePlatform } from '../dsp/corePlatform.ts'
 import { createAutoMixCorePlatform } from '../audio/autoMixCorePlatform.ts'
+import { createAudioRecoveryCorePlatform } from '../audio/recoveryCorePlatform.ts'
 import { projectCoreSettings } from './settingsProjection.ts'
 import type { CoreSettingsState } from '../../shared/coreSettings.ts'
 import {
@@ -149,6 +150,7 @@ export function createElectronCoreSupervisor(
       await Promise.all([castOutput.stop(), autoMixProcesses.idle()])
     },
     platform: {
+      ...createAudioRecoveryCorePlatform(),
       'remote.confirmDevice': async ({ deviceName, address }, signal) => {
         signal.throwIfAborted()
         const result = await dialog.showMessageBox({

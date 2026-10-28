@@ -13,6 +13,8 @@ import {
 import { useAudioOutputDspStore } from '../stores/useAudioOutputDspStore'
 import { useCoreConnection } from '../stores/coreConnection.ts'
 import { usePlayerStore } from '../stores/usePlayerStore'
+import { useSettingsStore } from '../stores/useSettingsStore'
+import { resolvePlayerBarPresentation } from '../../../shared/playerBar.ts'
 import DashboardPlaybackProgress from './local-dashboard/DashboardPlaybackProgress.vue'
 import {
   DEFAULT_DSP_OUTPUT_STAGE,
@@ -49,6 +51,7 @@ const audioOutputDspStore = useAudioOutputDspStore()
 const { currentTrack, isPlaying } = playbackStore
 const { audioProcessing, playbackInfo, outputInfo } = storeToRefs(audioOutputDspStore)
 const { playTrack, togglePlay, next, prev } = playbackStore
+const { settings } = useSettingsStore()
 const dashboardTopStats = computed(() =>
   props.previewTracks ? [] : getMostListenedTracks(TOP_TRACK_COUNT)
 )
@@ -215,6 +218,17 @@ const heroIsCurrent = computed(
 const heroPlayLabel = computed(() =>
   !heroIsCurrent.value ? '开始收听' : isPlaying.value ? '暂停' : '播放'
 )
+
+// The player bar already carries progress and prev/next while it stays on screen;
+// repeating them in the hero gives the page two competing transports.
+const playerBarCoversHome = computed(() => {
+  const playerBar = settings.value.playerBar
+  // Settings snapshots without the field keep the default always-visible bar.
+  if (!playerBar) return true
+  const { hidden, autoHide } = resolvePlayerBarPresentation(playerBar, { onPlayingPage: false })
+  return !hidden && !autoHide
+})
+const heroShowsTransport = computed(() => heroIsCurrent.value && !playerBarCoversHome.value)
 
 const heroCoverKey = computed(
   () =>
@@ -448,6 +462,26 @@ const DITHER_LABELS: Record<string, string> = {
   noiseShaped: '二阶噪声整形'
 }
 
+// Node params keep the engine's enum values; the dashboard shows their names.
+const DSP_PARAM_LABELS: Record<string, string> = {
+  off: '关闭',
+  track: '单曲增益',
+  album: '专辑增益',
+  loudnorm: 'R128 响度',
+  graphic: '图形',
+  parametric: '参数',
+  custom: '自定义',
+  bauer: 'Bauer',
+  bs2b: 'BS2B',
+  meier: 'Meier',
+  mono: '单声道',
+  stereo: '立体声'
+}
+
+function paramLabel(value: string): string {
+  return DSP_PARAM_LABELS[value] ?? value
+}
+
 const dspSceneState = ref<DspSceneState | null>(null)
 const polledDspGraphStatus = ref<DspGraphStatus | null>(null)
 const dspRouteDialogOpen = ref(false)
@@ -562,20 +596,20 @@ function formatMetric(value: number | null | undefined, digits = 1, unit = ''): 
 function dspNodeDetail(node: DspGraphNode): string {
   switch (node.type) {
     case 'replayGain':
-      return `${stringParam(node, 'mode', 'track')} · ${numberParam(node, 'preampDb').toFixed(1)} dB`
+      return `${paramLabel(stringParam(node, 'mode', 'track'))} · ${numberParam(node, 'preampDb').toFixed(1)} dB`
     case 'equalizer':
-      return `${arrayLengthParam(node, 'bands')} 段 · ${stringParam(node, 'mode', 'parametric')}`
+      return `${arrayLengthParam(node, 'bands')} 段 · ${paramLabel(stringParam(node, 'mode', 'parametric'))}`
     case 'dynamicEqualizer':
       return `${arrayLengthParam(node, 'bands')} 个动态频段`
     case 'convolver':
       return node.params.impulseResponseAssetId || stringParam(node, 'impulseResponsePath')
-        ? `IR · Wet ${Math.round(numberParam(node, 'wet', 1) * 100)}%`
+        ? `IR · 湿声 ${Math.round(numberParam(node, 'wet', 1) * 100)}%`
         : '未选择 IR'
     case 'crossfeed':
-      return `${stringParam(node, 'algorithm', 'custom')} · ${Math.round(numberParam(node, 'strength', 0.35) * 100)}%`
+      return `${paramLabel(stringParam(node, 'algorithm', 'custom'))} · ${Math.round(numberParam(node, 'strength', 0.35) * 100)}%`
     case 'channelMatrix':
     case 'channelStrip':
-      return stringParam(node, 'layout', 'stereo').toUpperCase()
+      return paramLabel(stringParam(node, 'layout', 'stereo'))
     case 'bassManagement':
       return `${numberParam(node, 'crossoverHz', 80).toFixed(0)} Hz · LR4`
     case 'gate':
@@ -585,9 +619,9 @@ function dspNodeDetail(node: DspGraphNode): string {
     case 'multibandCompressor':
       return `${Math.max(2, arrayLengthParam(node, 'bands'))} 段`
     case 'stereoField':
-      return `Width ${numberParam(node, 'width', 1).toFixed(2)}`
+      return `宽度 ${numberParam(node, 'width', 1).toFixed(2)}`
     case 'loudnessContour':
-      return `Amount ${numberParam(node, 'amount').toFixed(1)}`
+      return `强度 ${numberParam(node, 'amount').toFixed(1)}`
     case 'truePeakLimiter':
       return `${numberParam(node, 'ceilingDb', -0.1).toFixed(1)} dBTP`
     case 'nativePlugin':
@@ -595,7 +629,7 @@ function dspNodeDetail(node: DspGraphNode): string {
     case 'vst3Plugin':
       return node.vst3?.catalogId || '未选择插件'
     case 'meter':
-      return 'EBU R128 · True Peak'
+      return 'EBU R128 · 真峰值'
   }
 }
 
@@ -713,6 +747,13 @@ const dspOutputStages = computed<DspRouteStage[]>(() => {
 })
 
 const dspRouteStages = computed(() => [...dspNodeStages.value, ...dspOutputStages.value])
+// The home card names only the stages that touch the signal; the dialog keeps the
+// whole graph. SRC is always configured, so it counts only while it converts.
+const compactRouteStages = computed(() =>
+  dspRouteStages.value.filter((stage) =>
+    stage.type === 'resampler' ? stage.active : stage.enabled
+  )
+)
 const dspProcessingActive = computed(
   () =>
     playbackInfo.value?.dspActive === true ||
@@ -793,7 +834,6 @@ const dspOutputDeviceDetail = computed(() => {
 })
 
 const activeDspCount = computed(() => dspRouteStages.value.filter((stage) => stage.active).length)
-const enabledDspCount = computed(() => dspRouteStages.value.filter((stage) => stage.enabled).length)
 const dspGraphLatencyMs = computed(() => {
   const frames = dspGraphStatus.value?.totalLatencyFrames ?? 0
   const rate = actualOutputSampleRate.value || sourceSampleRate.value
@@ -895,18 +935,6 @@ function closeDspRouteDialog(): void {
           <p class="masthead-kicker">{{ dateKicker }} · 本地音乐库</p>
           <h1 class="masthead-title">{{ greeting }}</h1>
         </div>
-        <button
-          v-if="hasLibrary"
-          type="button"
-          class="masthead-shuffle"
-          :title="`从 ${dashboardTrackCount} 首歌曲中随机播放`"
-          @click="shuffleAll"
-        >
-          <span class="masthead-shuffle-icon" aria-hidden="true"
-            ><i class="ph ph-shuffle"></i
-          ></span>
-          <span class="masthead-shuffle-label">随机播放</span>
-        </button>
       </header>
 
       <section
@@ -959,7 +987,6 @@ function closeDspRouteDialog(): void {
                 <span v-if="heroIsCurrent && isPlaying" class="eq" aria-hidden="true">
                   <i></i><i></i><i></i>
                 </span>
-                <i v-else class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>
                 {{ heroLabel }}
               </span>
 
@@ -970,25 +997,21 @@ function closeDspRouteDialog(): void {
                 </p>
               </div>
               <p class="hero-meta" :title="heroTrack?.album || '本地音乐'">
-                <span class="hero-release">
-                  <i class="ph ph-disc" aria-hidden="true"></i>
-                  <span class="hero-album">{{ heroTrack?.album || '本地音乐' }}</span>
-                </span>
+                <span class="hero-album">{{ heroTrack?.album || '本地音乐' }}</span>
                 <span v-if="heroAudioMeta" class="hero-audio-meta">{{ heroAudioMeta }}</span>
               </p>
 
-              <DashboardPlaybackProgress v-if="heroIsCurrent" />
+              <DashboardPlaybackProgress v-if="heroShowsTransport" />
 
               <div
-                v-if="heroTrack"
                 class="hero-actions"
-                :class="{ 'is-current': heroIsCurrent }"
+                :class="{ 'is-current': heroShowsTransport }"
                 role="group"
                 aria-label="播放控制"
               >
                 <button
                   type="button"
-                  v-if="heroIsCurrent"
+                  v-if="heroShowsTransport"
                   class="transport-button"
                   title="上一首"
                   aria-label="上一首"
@@ -997,21 +1020,22 @@ function closeDspRouteDialog(): void {
                   <PlaybackIcon name="previous" />
                 </button>
                 <button
+                  v-if="heroTrack"
                   type="button"
                   class="transport-button transport-play"
-                  :class="{ 'is-idle': !heroIsCurrent }"
+                  :class="{ 'is-labelled': !heroShowsTransport }"
                   :title="heroPlayLabel"
                   :aria-label="heroPlayLabel"
                   @click="heroIsCurrent ? togglePlay() : playDashboardTrack(heroTrack)"
                 >
                   <PlaybackIcon :name="heroIsCurrent && isPlaying ? 'pause' : 'play'" />
-                  <span v-if="!heroIsCurrent" class="transport-play-label">{{
+                  <span v-if="!heroShowsTransport" class="transport-play-label">{{
                     heroPlayLabel
                   }}</span>
                 </button>
                 <button
                   type="button"
-                  v-if="heroIsCurrent"
+                  v-if="heroShowsTransport"
                   class="transport-button"
                   title="下一首"
                   aria-label="下一首"
@@ -1019,12 +1043,27 @@ function closeDspRouteDialog(): void {
                 >
                   <PlaybackIcon name="next" />
                 </button>
+                <button
+                  v-else
+                  type="button"
+                  class="hero-secondary"
+                  :title="`从 ${dashboardTrackCount} 首歌曲中随机播放`"
+                  @click="shuffleAll"
+                >
+                  <i class="ph ph-shuffle" aria-hidden="true"></i>
+                  <span>随机播放</span>
+                </button>
               </div>
             </div>
 
-            <div :key="`art:${heroCoverKey}`" class="hero-art" aria-hidden="true">
+            <div
+              :key="`art:${heroCoverKey}`"
+              class="hero-art"
+              :class="{ 'is-live': heroIsCurrent && isPlaying }"
+              aria-hidden="true"
+            >
               <span class="hero-art-echo"></span>
-              <span class="hero-art-frame" :class="{ 'is-live': heroIsCurrent && isPlaying }">
+              <span class="hero-art-frame">
                 <CoverImg
                   v-if="heroTrack?.cover || heroTrack?.coverSource"
                   :cover="heroTrack?.cover"
@@ -1039,106 +1078,32 @@ function closeDspRouteDialog(): void {
           </div>
         </section>
 
-        <!-- ── Library figures ─────────────────────────────────────────── -->
+        <!-- ── Library shortcuts ───────────────────────────────────────── -->
         <section class="figures" aria-label="音乐库一览">
           <button type="button" class="figure" @click="emit('select-view', 'allSongs', null)">
-            <strong>{{ dashboardTrackCount.toLocaleString('zh-CN') }}</strong>
-            <span>首歌曲</span>
-            <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+            <i class="ph ph-music-notes figure-icon" aria-hidden="true"></i>
+            <span class="figure-copy">
+              <strong>{{ dashboardTrackCount.toLocaleString('zh-CN') }}</strong>
+              <span>首歌曲 · 共 {{ totalDuration.value }} {{ totalDuration.unit }}</span>
+            </span>
+            <i class="ph ph-arrow-up-right figure-arrow" aria-hidden="true"></i>
           </button>
           <button type="button" class="figure" @click="emit('select-view', 'albums', null)">
-            <strong>{{ dashboardAlbumCount.toLocaleString('zh-CN') }}</strong>
-            <span>张专辑</span>
-            <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+            <i class="ph ph-vinyl-record figure-icon" aria-hidden="true"></i>
+            <span class="figure-copy">
+              <strong>{{ dashboardAlbumCount.toLocaleString('zh-CN') }}</strong>
+              <span>张专辑</span>
+            </span>
+            <i class="ph ph-arrow-up-right figure-arrow" aria-hidden="true"></i>
           </button>
           <button type="button" class="figure" @click="emit('select-view', 'artists', null)">
-            <strong>{{ dashboardArtistCount.toLocaleString('zh-CN') }}</strong>
-            <span>位艺术家</span>
-            <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+            <i class="ph ph-microphone-stage figure-icon" aria-hidden="true"></i>
+            <span class="figure-copy">
+              <strong>{{ dashboardArtistCount.toLocaleString('zh-CN') }}</strong>
+              <span>位艺术家</span>
+            </span>
+            <i class="ph ph-arrow-up-right figure-arrow" aria-hidden="true"></i>
           </button>
-          <div class="figure is-static">
-            <strong>
-              {{ totalDuration.value }}<small class="figure-unit">{{ totalDuration.unit }}</small>
-            </strong>
-            <span>收藏总时长</span>
-          </div>
-        </section>
-
-        <!-- ── Live signal path ────────────────────────────────────────── -->
-        <section
-          class="signal-card"
-          role="button"
-          tabindex="0"
-          aria-label="打开实时 DSP 输出线路"
-          @click="openDspRouteDialog"
-          @keydown.enter.prevent="openDspRouteDialog"
-          @keydown.space.prevent="openDspRouteDialog"
-        >
-          <div class="signal-head">
-            <div class="signal-title">
-              <span class="signal-kicker">SIGNAL PATH</span>
-              <h2>播放链路</h2>
-              <small>{{ activeDspSceneName }}</small>
-            </div>
-            <div class="signal-head-state">
-              <span class="signal-summary">
-                <span><i class="ph ph-stack"></i>{{ enabledDspCount }} 个启用阶段</span>
-                <span><i class="ph ph-timer"></i>{{ dspGraphLatencyMs.toFixed(2) }} ms</span>
-              </span>
-              <span class="dsp-state" :class="{ on: dspEngineOn, live: dspProcessingActive }">
-                <span class="dsp-state-dot" aria-hidden="true"></span>
-                {{ dspStatusText }}
-              </span>
-              <i class="ph ph-caret-right signal-caret" aria-hidden="true"></i>
-            </div>
-          </div>
-
-          <div class="dsp-route-strip is-compact">
-            <div class="route-stage route-endpoint-stage" title="播放源">
-              <span class="route-stage-icon"><i class="ph ph-music-notes"></i></span>
-              <div class="route-stage-copy">
-                <small>SOURCE</small>
-                <strong>{{ dspSourceDetail }}</strong>
-              </div>
-            </div>
-
-            <template v-for="stage in dspRouteStages" :key="stage.id">
-              <span
-                class="route-connector"
-                :class="{ active: stage.active || dspProcessingActive }"
-                aria-hidden="true"
-              ></span>
-              <div
-                class="route-stage"
-                :class="[`is-${stage.state}`, { 'is-active': stage.active }]"
-                :title="`${stage.label} · ${stage.stateLabel} · ${stage.detail}`"
-              >
-                <span class="route-stage-icon"><i :class="stage.icon"></i></span>
-                <div class="route-stage-copy">
-                  <small>{{ stage.shortLabel }}</small>
-                  <strong>{{ stage.detail }}</strong>
-                </div>
-              </div>
-            </template>
-
-            <span
-              class="route-connector"
-              :class="{ active: playbackInfo?.state === 'playing' }"
-              aria-hidden="true"
-            ></span>
-            <div class="route-stage route-endpoint-stage is-output" title="实际输出">
-              <span class="route-stage-icon"><i class="ph ph-speaker-hifi"></i></span>
-              <div class="route-stage-copy">
-                <small>OUTPUT</small>
-                <strong>{{ dspOutputDetail }}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div class="signal-foot">
-            <span>{{ dspOutputDeviceDetail }}</span>
-            <strong>{{ activeDspCount }}/{{ dspRouteStages.length }} LIVE</strong>
-          </div>
         </section>
 
         <!-- ── Recently added ──────────────────────────────────────────── -->
@@ -1316,6 +1281,60 @@ function closeDspRouteDialog(): void {
               <span class="gallery-name">{{ album.name }}</span>
               <span class="gallery-artist">{{ album.artist || '未知艺术家' }}</span>
             </button>
+          </div>
+        </section>
+
+        <!-- ── Live signal path ────────────────────────────────────────── -->
+        <section
+          class="signal-card"
+          role="button"
+          tabindex="0"
+          aria-label="打开实时 DSP 输出线路"
+          @click="openDspRouteDialog"
+          @keydown.enter.prevent="openDspRouteDialog"
+          @keydown.space.prevent="openDspRouteDialog"
+        >
+          <div class="signal-head">
+            <div class="signal-title">
+              <h2>播放链路</h2>
+              <small>{{ activeDspSceneName }}</small>
+            </div>
+
+            <div class="dsp-route-strip is-compact">
+              <span class="route-endpoint-stage" title="播放源">{{ dspSourceDetail }}</span>
+              <!-- Each connector travels with the stage after it, so a wrapped line never ends on a dash. -->
+              <span v-for="stage in compactRouteStages" :key="stage.id" class="route-link">
+                <span
+                  class="route-connector"
+                  :class="{ active: stage.active || dspProcessingActive }"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  class="route-stage"
+                  :class="[`is-${stage.state}`, { 'is-active': stage.active }]"
+                  :title="`${stage.label} · ${stage.stateLabel} · ${stage.detail}`"
+                  >{{ stage.label }}</span
+                >
+              </span>
+              <span class="route-link">
+                <span
+                  class="route-connector"
+                  :class="{ active: playbackInfo?.state === 'playing' }"
+                  aria-hidden="true"
+                ></span>
+                <span class="route-endpoint-stage is-output" :title="dspOutputDeviceDetail">{{
+                  dspOutputDetail
+                }}</span>
+              </span>
+            </div>
+
+            <div class="signal-head-state">
+              <span class="dsp-state" :class="{ on: dspEngineOn, live: dspProcessingActive }">
+                <span class="dsp-state-dot" aria-hidden="true"></span>
+                {{ dspStatusText }}
+              </span>
+              <i class="ph ph-caret-right signal-caret" aria-hidden="true"></i>
+            </div>
           </div>
         </section>
       </template>

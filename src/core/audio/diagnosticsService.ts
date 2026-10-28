@@ -64,6 +64,7 @@ export class CoreAudioDiagnosticsService {
       ['end-file', 'end-file', 'info'],
       ['start-file', 'start-file', 'info'],
       ['ready', 'engine-ready', 'info'],
+      ['audio-service-restarting', 'audio-service-restarting', 'info'],
       ['config-applied', 'output-config-applied', 'info'],
       ['loudnorm-status', 'loudnorm-status', 'info'],
       ['audio-device-options-changed', 'device-options-changed', 'info'],

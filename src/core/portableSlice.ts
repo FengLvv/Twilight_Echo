@@ -831,6 +831,8 @@ class PortableQueueAndLibraryStore {
           this.libraryIds.add(track.id)
         }
       }
+      // Restored rows are new content to anything that read the empty store.
+      this.libraryRevisionCounter++
     }
     if (Array.isArray(state.queues)) {
       this.queues.clear()
@@ -2604,6 +2606,9 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
     queueStore,
     async initialize() {
       await ensureEnvelopeLoaded()
+      // Desktop restores the engine volume before the Core starts; a portable engine boots at
+      // its own default, so the remembered volume is applied before playback reads it.
+      await options.audioEngine.setVolume(currentSettings.softwareVolume)
       await application.initialize()
     },
     seedTracks(tracks) {

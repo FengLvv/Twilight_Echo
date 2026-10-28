@@ -85,6 +85,14 @@ test('mouse side-button history commands cross the sandbox as validated events',
   )
 })
 
+test('track names use a write-only invoke bridge without requesting browser clipboard access', () => {
+  const source = readFileSync(new URL('./domains/systemApi.ts', import.meta.url), 'utf8')
+  assert.match(source, /ipcRenderer\.invoke\('window:copy-track-names', text\)/)
+  assert.doesNotMatch(source, /clipboard\.readText|clipboard\.writeText/)
+  const declarations = readFileSync(new URL('./index.d.ts', import.meta.url), 'utf8')
+  assert.match(declarations, /copyTrackNames: \(text: string\) => Promise<void>/)
+})
+
 test('EQ clipboard exposes validated band DTOs rather than arbitrary system clipboard text', () => {
   const source = readFileSync(new URL('./domains/systemApi.ts', import.meta.url), 'utf8')
   assert.match(source, /equalizerClipboardApi: EqualizerClipboardApi/)

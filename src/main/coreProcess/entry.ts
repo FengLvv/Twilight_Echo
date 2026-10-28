@@ -168,6 +168,7 @@ import { randomUUID } from 'node:crypto'
 import { createSourceResolver } from '../../core/playback/sourceResolver.ts'
 import { AudioEngineManager } from '../audioEngineManager.ts'
 import { AudioEngineServiceBinding } from '../audioEngineServiceClient.ts'
+import { CoreAudioRecoveryService } from '../../core/audio/recoveryService.ts'
 import { LibraryDatabaseServiceClient } from '../library/libraryDatabaseServiceClient.ts'
 import { createPlaybackSessionStoreBundle } from '../persistence/playbackSessionRepository.ts'
 import { createCorePlaybackRepository } from '../persistence/corePlaybackRepository.ts'
@@ -1925,6 +1926,15 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     dsp,
     output,
     search,
+    audioRecovery: new CoreAudioRecoveryService({
+      engine: audio,
+      playback,
+      configuration: output,
+      windows: process.platform === 'win32',
+      confirmWindowsRestart: (signal) => platform!.call('audio.confirmWindowsRestart', {}, signal),
+      restartWindowsServices: () => platform!.callJoined('audio.restartWindowsServices', {}),
+      changed: () => application?.changed()
+    }),
     epoch: config.epoch,
     playback,
     cast,

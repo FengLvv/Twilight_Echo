@@ -177,6 +177,7 @@ test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/cor
     'src/core/application.ts',
     'src/core/projections.ts',
     'src/core/portableSlice.ts',
+    'src/core/portableEmbeddedHost.ts',
     'src/core/playback/',
     'src/core/settings/',
     'src/core/catalog/',

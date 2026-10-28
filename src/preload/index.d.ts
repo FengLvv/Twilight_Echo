@@ -352,6 +352,7 @@ interface WindowAPI {
     ) => () => void
   }
   window: EqualizerClipboardApi & {
+    copyTrackNames: (text: string) => Promise<void>
     getState: () => Promise<import('../shared/windowChrome.ts').WindowChromeState>
     onStateChanged: (
       callback: (state: import('../shared/windowChrome.ts').WindowChromeState) => void

@@ -2,6 +2,7 @@ import type { CoreCastStart, CoreCastState, CoreCastDevice } from './coreCast.ts
 import type { CoreAbLoopCommand, CoreAbLoopState } from './coreAbLoop.ts'
 import type { CoreLibraryQueries } from './coreLibrary.ts'
 import type { CoreAudioDiagnosticsQuery, AudioDiagnosticReport } from './coreAudioDiagnostics.ts'
+import type { AudioRecoveryKind, AudioRecoveryState } from './audioRecovery.ts'
 import type { CorePlaylistQueries, CorePlaylistCommands } from './corePlaylists.ts'
 import type { CoreRemoteCommands, CoreRemoteQueries } from './coreRemote.ts'
 import type { CoreQueueSubmitCommand, CoreQueueInsert, CoreQueueTrackInput } from './coreQueueSubmission.ts'
@@ -361,6 +362,7 @@ export interface CoreCommands extends CorePlaylistCommands, CoreRemoteCommands {
   'cast.end': { revision: number }
   'audio.outputTest.play': { revision: number; exclusive: boolean }
   'audio.outputTest.stop': Record<string, never>
+  'audio.recovery.start': { kind: AudioRecoveryKind }
   'audio.audition.measure': CoreAuditionMeasure
   'audio.audition.select': { revision: number; id: string; side: 'a' | 'b' }
   'audio.audition.end': { revision: number }
@@ -577,6 +579,7 @@ export interface CoreQueries
     output: { offset: number; total: number; items: CoreCastDevice[] }
   }
   'audio.outputTest': { input: Record<string, never>; output: CoreOutputTestState }
+  'audio.recovery': { input: Record<string, never>; output: AudioRecoveryState }
   'audio.audition': { input: Record<string, never>; output: CoreAuditionState }
   'audio.dsp': { input: Record<string, never>; output: CoreDspState }
   'audio.dsp.status': { input: Record<string, never>; output: DspGraphStatus }
@@ -864,6 +867,8 @@ const OPERATIONS: Record<
   'audio.outputTest': { kind: 'query', permission: 'settings:read' },
   'audio.outputTest.play': { kind: 'command', permission: 'settings:write' },
   'audio.outputTest.stop': { kind: 'command', permission: 'settings:write' },
+  'audio.recovery': { kind: 'query', permission: 'settings:read' },
+  'audio.recovery.start': { kind: 'command', permission: 'settings:write' },
   'audio.audition': { kind: 'query', permission: 'settings:read' },
   'audio.audition.measure': { kind: 'command', permission: 'settings:write' },
   'audio.audition.select': { kind: 'command', permission: 'settings:write' },

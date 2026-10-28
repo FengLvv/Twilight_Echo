@@ -615,6 +615,7 @@ html:not([data-theme='dark']) :is(.audio-workspace, .settings-preview-page) {
       .home .empty-stage,
       .home .chart-panel,
       .home .cal-panel,
+      .home .figure,
       .signal-card,
       .chart-card,
       .profile-card,
@@ -761,7 +762,7 @@ html:not([data-theme='dark']) :is(.audio-workspace, .settings-preview-page) {
       [data-te-surface-material='transparent']
     )
     .home
-    :is(.feature-card, .signal-card, .chart-panel, .cal-panel, .empty-stage) {
+    :is(.feature-card, .signal-card, .chart-panel, .cal-panel, .empty-stage, .figure) {
     --te-neutral-900: var(--te-overlay-text);
     --te-neutral-500: var(--te-overlay-muted);
     --home-ink: var(--te-overlay-text);

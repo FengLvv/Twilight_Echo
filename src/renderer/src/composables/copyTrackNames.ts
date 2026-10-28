@@ -24,7 +24,8 @@ export async function copyTrackNamePages(
   if (!lines.length) return
   const { pushNotice } = useAppNoticeStore()
   try {
-    await navigator.clipboard.writeText(lines.join('\n'))
+    // Native menu callbacks and paged selections have no browser clipboard permission.
+    await window.api.window.copyTrackNames(lines.join('\n'))
     pushNotice({
       kind: 'success',
       message: lines.length > 1 ? `已复制 ${lines.length} 首歌曲名和作者` : '已复制歌曲名和作者',

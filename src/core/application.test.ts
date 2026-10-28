@@ -87,6 +87,7 @@ function fixture(
     stop: async () => {
       calls.push('stop')
     },
+    recoverAudio: async (restart) => restart(),
     seek: async () => {},
     navigate: async () => {},
     setVolume: async () => {},

@@ -510,6 +510,12 @@ export class AudioEngineManager extends EventEmitter {
   }
 
   private handleAudioServiceCrash(reason: string, options?: { fatal?: boolean }): void {
+    this.resetAudioServiceState(reason)
+    this.emit('audio-service-crash', { reason, fatal: options?.fatal === true })
+    this.publishPlaybackInfo()
+  }
+
+  private resetAudioServiceState(reason: string): void {
     this.playback.queueToken = ''
     this.outputConfigServiceGeneration += 1
     this.nativeVolumeSynced = false
@@ -557,8 +563,41 @@ export class AudioEngineManager extends EventEmitter {
       },
       recoveryCount: this.playbackInfo.recoveryCount + 1
     }
-    this.emit('audio-service-crash', { reason, fatal: options?.fatal === true })
+  }
+
+  canRestartAudioEngine(): boolean {
+    return !this.destroyed && typeof this.audioServiceBinding?.restart === 'function'
+  }
+
+  async restartAudioEngine(maintenance?: () => Promise<void>): Promise<void> {
+    const binding = this.audioServiceBinding
+    if (this.destroyed || !binding?.restart)
+      throw new Error('Audio recovery requires the isolated audio engine')
+    let restored: { outputRouteSynced: boolean; restoreErrors: string[] } | null = null
+    const ready = (result: NonNullable<typeof restored>) => { restored = result }
+    this.on('audio-service-ready', ready)
+    this.resetAudioServiceState('')
+    this.emit('audio-service-restarting')
     this.publishPlaybackInfo()
+    try {
+      let restartError: unknown
+      try {
+        await binding.restart(maintenance)
+      } catch (error) {
+        restartError = error
+      }
+      await this.audioServiceReadyRestore
+      if (restartError) throw restartError
+      // The process's ready ACK alone does not prove the saved route/DSP/volume
+      // was restored. Use the same completion evidence as crash recovery.
+      const result = restored as { outputRouteSynced: boolean; restoreErrors: string[] } | null
+      if (!result?.outputRouteSynced)
+        throw new Error(result?.restoreErrors.join('; ') || 'Audio engine configuration was not restored')
+      this.lastNativeError = ''
+      await this.getAudioOutputState()
+    } finally {
+      this.off('audio-service-ready', ready)
+    }
   }
 
   /**

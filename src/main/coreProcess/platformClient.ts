@@ -35,6 +35,7 @@ export class CorePlatformClient {
   callJoined<
     K extends
       | 'network.sftp'
+      | 'audio.restartWindowsServices'
       | 'network.mountCommand'
       | 'cache.clearPlatform'
       | 'automix.probe'
@@ -83,6 +84,7 @@ export class CorePlatformClient {
       const timer = setTimeout(
         () => {
           if (
+            name === 'audio.restartWindowsServices' ||
             name === 'cache.clearPlatform' ||
             name === 'automix.probe' ||
             name === 'automix.probeInstall' ||
@@ -104,7 +106,8 @@ export class CorePlatformClient {
           dispose()
           reject(new Error(`${name} timed out; outcome may be unknown`))
         },
-        name === 'remote.confirmDevice' ||
+        name === 'audio.confirmWindowsRestart' ||
+          name === 'remote.confirmDevice' ||
           name === 'ncm.officialLogin' ||
           name === 'ncm.chooseUploadFiles' ||
           name === 'ncm.chooseDownloadFile' ||
@@ -117,6 +120,8 @@ export class CorePlatformClient {
           name.endsWith('.chooseImportFile') ||
           name.endsWith('.chooseExportFile')
           ? 185_000
+          : name === 'audio.restartWindowsServices'
+            ? 190_000
           : name === 'automix.decodeArchiveEntry'
             ? 310_000
             : name === 'automix.runWorker'

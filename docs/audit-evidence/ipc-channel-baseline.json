@@ -322,6 +322,7 @@
     "themes:validateAssets",
     "trayPlayer:getBootstrap",
     "window:copy-eq-bands",
+    "window:copy-track-names",
     "window:getState",
     "window:paste-eq-bands",
     "window:showTrayPlayer"
@@ -674,6 +675,7 @@
     "themes:validateAssets",
     "trayPlayer:getBootstrap",
     "window:copy-eq-bands",
+    "window:copy-track-names",
     "window:getState",
     "window:paste-eq-bands",
     "window:showTrayPlayer"

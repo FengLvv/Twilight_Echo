@@ -43,6 +43,8 @@ const require = createRequire(import.meta.url)
 type UtilityProcessLike = {
   postMessage: (message: AudioServiceRequest | AudioServicePing) => void
   kill: () => void
+  terminate?: () => Promise<void>
+  removeListener?: (event: 'exit', listener: (code: number | null) => void) => unknown
   on: (
     event: 'message' | 'exit' | 'error',
     listener:
@@ -178,6 +180,7 @@ export interface AudioEngineServiceBindingOptions {
   requestTimeoutMs?: number
   topologyRequestTimeoutMs?: number
   restartDelayMs?: number
+  restartTimeoutMs?: number
   maxInFlightRequests?: number
   electron?: ElectronModule
   launch?: () => UtilityProcessLike
@@ -186,6 +189,7 @@ export interface AudioEngineServiceBindingOptions {
 export class AudioEngineServiceBinding extends EventEmitter implements NativeAudioBinding {
   private readonly options: AudioEngineServiceBindingOptions
   private child: UtilityProcessLike | null = null
+  private retiringChild: UtilityProcessLike | null = null
   private pending = new Map<string, PendingRequest>()
   private requestTimeoutMs: number
   private topologyRequestTimeoutMs: number
@@ -193,6 +197,8 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
   private maxInFlightRequests: number
   private stopped = false
   private restarting = false
+  private restartTimer: ReturnType<typeof setTimeout> | null = null
+  private manualRestart: Promise<void> | null = null
   // Set when the child reported a fatal startup contract failure (a missing or
   // incomplete native addon). Such a child fails identically every time, so the
   // binding latches here and refuses to fork again until something outside
@@ -583,6 +589,8 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
 
   destroy(): void {
     this.stopped = true
+    if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = null
     this.clearHealthProbe()
     this.rejectQueuedDspState(new Error('音频服务已停止'))
     for (const pending of this.pending.values()) {
@@ -594,6 +602,64 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
     this.coalescedControls.clear()
     this.child?.kill()
     this.child = null
+    this.retiringChild?.kill()
+  }
+
+  restart(maintenance?: () => Promise<void>): Promise<void> {
+    if (this.manualRestart) return this.manualRestart
+    const work = this.restartManually(maintenance)
+    this.manualRestart = work.finally(() => {
+      this.manualRestart = null
+    })
+    return this.manualRestart
+  }
+
+  private async restartManually(maintenance?: () => Promise<void>): Promise<void> {
+    if (this.stopped) throw new Error('Audio service has been destroyed')
+    if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = null
+    this.restarting = true
+    this.recordFailure('Audio engine is restarting')
+    const previous = this.retiringChild ?? this.child
+    this.retiringChild = previous
+    this.child = null
+    // Keep the old child and the restart gate on a failed exit ACK. A retry may
+    // rejoin that process; neither polling nor a timer may launch an audio peer.
+    if (previous) await terminateAudioServiceChild(previous, this.options.restartTimeoutMs ?? 20_000)
+    this.retiringChild = null
+    this.generation++
+    this.clearServiceDerivedCaches()
+    let maintenanceError: unknown
+    try {
+      await maintenance?.()
+    } catch (error) {
+      maintenanceError = error
+    }
+    // UAC cancellation or a failed system-service restart must still leave the
+    // application's own engine usable. There is no automatic playback resume.
+    this.fatalReason = ''
+    this.restartAttempts = 0
+    await new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error) => {
+        clearTimeout(timer)
+        this.off('ready', ready)
+        this.off('crash', failed)
+        if (error) reject(error)
+        else resolve()
+      }
+      const ready = () => finish()
+      const failed = (reason: string) => finish(new Error(reason))
+      const timer = setTimeout(
+        () => finish(new Error('Audio engine did not become ready after restart')),
+        this.options.restartTimeoutMs ?? 20_000
+      )
+      this.on('ready', ready)
+      this.on('crash', failed)
+      this.restarting = false
+      this.start()
+      if (!this.child) finish(new Error('Audio engine could not be started'))
+    })
+    if (maintenanceError) throw maintenanceError
   }
 
   private start(): void {
@@ -893,7 +959,8 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
       this.restartDelayMs * 2 ** (this.restartAttempts - 1),
       MAX_AUDIO_SERVICE_RESTART_BACKOFF_MS
     )
-    setTimeout(() => {
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null
       this.restarting = false
       this.start()
     }, backoffMs)
@@ -1119,6 +1186,7 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
   }
 
   private callUnobserved(method: keyof NativeAudioBinding, args: unknown[]): Promise<unknown> {
+    if (this.restarting) return Promise.reject(new Error('Audio engine is restarting'))
     if (this.fatalReason) return Promise.reject(new Error(this.fatalReason))
     if (!this.child && !this.restarting) this.start()
     const child = this.child
@@ -1275,6 +1343,33 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
 
   private recordTransientFailure(message: string): void {
     this.lastErrorJson = JSON.stringify({ message })
+  }
+}
+
+async function terminateAudioServiceChild(child: UtilityProcessLike, timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let exit: ((code: number | null) => void) | undefined
+  const terminated = child.terminate
+    ? child.terminate()
+    : new Promise<void>((resolve, reject) => {
+        exit = () => resolve()
+        child.on('exit', exit)
+        try {
+          child.kill()
+        } catch (error) {
+          reject(error)
+        }
+      })
+  try {
+    await Promise.race([
+      terminated,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Audio service exit was not confirmed; restart withheld')), timeoutMs)
+      })
+    ])
+  } finally {
+    clearTimeout(timer)
+    if (exit) child.removeListener?.('exit', exit)
   }
 }
 

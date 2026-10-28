@@ -21,6 +21,8 @@ import type { CorePlatformId } from './audioEngineTypes.ts'
 import { PERSONAL_MUSIC_ARTWORK_MAX_BYTES } from './personalMusicArtwork.ts'
 /** Platform capabilities, not a generic main-process method invocation surface. */
 export interface CorePlatformOperations extends CoreModelPackPlatformOperations {
+  'audio.confirmWindowsRestart': { input: Record<string, never>; output: boolean }
+  'audio.restartWindowsServices': { input: Record<string, never>; output: void }
   'remote.confirmDevice': {
     input: { deviceName: string; address: string }
     output: boolean
@@ -346,6 +348,8 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
         (payload as { deviceId: string }).deviceId.length > 0 &&
         (payload as { deviceId: string }).deviceId.length <= 512
       )
+    case 'audio.confirmWindowsRestart':
+    case 'audio.restartWindowsServices':
     case 'dsp.environment':
     case 'dsp.chooseExportFile':
     case 'dsp.chooseVst3Directory':

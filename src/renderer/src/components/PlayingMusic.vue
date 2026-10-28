@@ -1303,6 +1303,23 @@ html[data-te-motion='reduced'] .playback-view-leave-to {
   opacity: 0.8;
 }
 
+/* Dither the final dark composite, not the artwork before blur/dimming.
+   Neutral monochrome grain breaks up 8-bit bands without tinting the cover;
+   the small, cached tile stays static and never covers the foreground. */
+:global(html[data-theme='dark'] .playing-music.bg-blur .backdrop:has(.backdrop-cover-wrap)) {
+  isolation: isolate;
+}
+
+:global(html[data-theme='dark'] .playing-music.bg-blur .backdrop:has(.backdrop-cover-wrap)::after) {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('../assets/images/playback-dither.svg') repeat;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+}
+
 .backdrop-fluid {
   position: absolute;
   inset: 0;
