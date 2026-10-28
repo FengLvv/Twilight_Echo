@@ -337,6 +337,11 @@ bool CoreAudioBackend::open(const std::string& deviceId, const AudioFormat& requ
   impl_->outputInfo.devicePathKind = "hal";
   impl_->outputInfo.deviceName = impl_->deviceName;
   impl_->outputInfo.actualDeviceName = impl_->deviceName;
+  std::string actualDeviceId = impl_->host->deviceUid(selectedDevice);
+  if (actualDeviceId.empty() && !deviceId.empty() && deviceId != "auto" && deviceId != "default") {
+    actualDeviceId = deviceId;
+  }
+  impl_->outputInfo.actualDeviceId = actualDeviceId;
   impl_->outputInfo.actualOutputFormat = sampleFormatToString(impl_->outputFormat.sampleFormat);
   impl_->outputInfo.actualSampleRate = impl_->outputFormat.sampleRate;
   impl_->outputInfo.actualBitDepth = impl_->outputFormat.bitDepth;

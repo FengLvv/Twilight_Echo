@@ -88,6 +88,10 @@ class ICoreAudioHost {
 
   virtual bool findOutputDevice(const std::string& requestedDeviceId, CoreAudioDeviceID* outDeviceId, std::string* error) = 0;
   virtual std::string deviceName(CoreAudioDeviceID deviceId) = 0;
+  virtual std::string deviceUid(CoreAudioDeviceID deviceId) {
+    (void)deviceId;
+    return {};
+  }
   virtual int outputChannelCount(CoreAudioDeviceID deviceId) = 0;
   virtual double getNominalSampleRate(CoreAudioDeviceID deviceId) = 0;
   virtual bool setNominalSampleRate(CoreAudioDeviceID deviceId, double rate, std::string* error) = 0;

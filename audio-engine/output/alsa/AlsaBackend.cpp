@@ -722,6 +722,7 @@ bool AlsaBackend::open(const std::string& deviceId, const AudioFormat& requested
       directHw ? "hw" : (impl_->deviceId.rfind("plughw:", 0) == 0 ? "plughw" : "default");
   impl_->outputInfo.deviceName = impl_->deviceName;
   impl_->outputInfo.actualDeviceName = impl_->deviceName;
+  impl_->outputInfo.actualDeviceId = impl_->deviceId;
   impl_->outputInfo.actualOutputFormat = sampleFormatToString(impl_->outputFormat.sampleFormat);
   impl_->outputInfo.actualSampleRate = impl_->outputFormat.sampleRate;
   impl_->outputInfo.actualBitDepth = impl_->outputFormat.bitDepth;
