@@ -88,7 +88,7 @@ export interface CoreApplicationDependencies {
   opra?: Pick<OpraCatalog, 'search' | 'getProfile' | 'getStatus' | 'refresh'>
   playlistSources?: CorePlaylistSourceEdits
   revealAudioFile?(path: string): Promise<void>
-  remote?: Pick<CoreRemoteService, 'status' | 'setEnabled' | 'rotatePin' | 'shutdown'>
+  remote?: Pick<CoreRemoteService, 'status' | 'setEnabled' | 'rotatePin' | 'decidePairing' | 'revokeDevice' | 'shutdown'>
   recordingCatalog?: CoreRecordingCatalog
   catalog?: CoreCatalogService
   genres?: CoreGenresService
@@ -1230,11 +1230,15 @@ export class CoreApplication {
       }
       case 'remote.status':
       case 'remote.setEnabled':
+      case 'remote.decidePairing':
+      case 'remote.revokeDevice':
       case 'remote.rotatePin': {
         const remote = this.dependencies.remote
         if (!remote) throw failure('NOT_READY', 'Remote control is unavailable')
         if (request.name === 'remote.status') return remote.status()
         if (request.name === 'remote.setEnabled') return remote.setEnabled(request.payload.enabled)
+        if (request.name === 'remote.decidePairing') return remote.decidePairing(request.payload.requestId, request.payload.allow)
+        if (request.name === 'remote.revokeDevice') return remote.revokeDevice(request.payload.id)
         return remote.rotatePin()
       }
       case 'audio.outputTest':

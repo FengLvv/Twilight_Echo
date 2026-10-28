@@ -4,6 +4,7 @@ import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import ts from 'typescript'
 import { validCorePlatformPayload, type CorePlatformRequest } from '../../shared/corePlatform.ts'
+import { parsePersonalMusicArtwork } from '../../shared/personalMusicArtwork.ts'
 
 const source = readFileSync(new URL('./remoteArtwork.ts', import.meta.url), 'utf8')
 const ast = ts.createSourceFile('artwork.ts', source, ts.ScriptTarget.Latest, true)
@@ -34,6 +35,7 @@ test('phone artwork resolves grants to bounded raster bytes and never exports so
   const reads: string[] = []
   const resolve = runInNewContext(code, {
     Buffer,
+    parsePersonalMusicArtwork,
     Request,
     Uint8Array,
     globalThis: { fetch: async () => {} },
@@ -54,4 +56,40 @@ test('phone artwork resolves grants to bounded raster bytes and never exports so
   assert.equal(await resolve('twilight-media://image/grant', signal), 'data:image/jpeg;base64,BA==')
   assert.equal(await resolve('https://private-source/cover.png', signal), null)
   assert.equal(await resolve('data:image/png;base64,' + 'A'.repeat(250_000), signal), null)
+})
+
+test('a large user-owned bitmap is downscaled to a bounded phone preview', async () => {
+  const small = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4AWP4DwQACfsD/c8LaHIAAAAASUVORK5CYII=',
+    'base64'
+  )
+  const ancillary = Buffer.alloc(1_700_000)
+  ancillary.writeUInt32BE(ancillary.length - 12, 0)
+  ancillary.write('tEXt', 4)
+  const large = Buffer.concat([small.subarray(0, -12), ancillary, small.subarray(-12)])
+  const cover = `data:image/png;base64,${large.toString('base64')}`
+  assert.ok(parsePersonalMusicArtwork(cover))
+  assert.equal(
+    validCorePlatformPayload({
+      kind: 'core:platform',
+      epoch: 'one',
+      requestId: 'preview',
+      name: 'artwork.remotePreview',
+      payload: { cover }
+    } as CorePlatformRequest),
+    true
+  )
+  let resized = false
+  const resolve = runInNewContext(code, {
+    Buffer,
+    parsePersonalMusicArtwork,
+    resizeCoverImageBytes: (bytes: Uint8Array, mime: string) => {
+      resized = true
+      assert.equal(bytes.length, large.length)
+      assert.equal(mime, 'image/png')
+      return { bytes: new Uint8Array([4]), mime: 'image/jpeg' }
+    }
+  }) as (cover: string, signal: AbortSignal) => Promise<string | null>
+  assert.equal(await resolve(cover, new AbortController().signal), 'data:image/jpeg;base64,BA==')
+  assert.equal(resized, true)
 })

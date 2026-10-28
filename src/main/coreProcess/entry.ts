@@ -1,6 +1,10 @@
 import '../../adapters-node/index.ts'
 import { CoreMusicExplorationService } from '../../core/library/explorationService.ts'
-import { networkInterfaces } from 'node:os'
+import { networkInterfaces, hostname } from 'node:os'
+import { CoreDiscoveryAdvertisement } from '../remote/coreDiscovery.ts'
+import { createPersistentDevicePairing } from '../remote/deviceTrust.ts'
+import { persistentLibraryId } from '../remote/libraryIdentity.ts'
+import { RemoteMediaResolver } from '../../core/remote/media.ts'
 import { CoreCastService } from '../../core/cast/service.ts'
 import { CoreNcmCloudTransferService } from '../../core/ncm/cloudTransferService.ts'
 import { RemoteHttpServer } from '../../core/cast/httpServer.ts'
@@ -818,6 +822,9 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   })
   const sourceResources = new SourceResources()
   const mediaServer = new RemoteHttpServer({
+      serverName: hostname(), devicePairing: createPersistentDevicePairing(config.root),
+      discovery: new CoreDiscoveryAdvertisement(),
+      confirmDevice: ({ deviceName, address }, signal) => platform!.call('remote.confirmDevice', { deviceName, address }, signal),
       staticRoot: config.remoteStaticRoot ?? '',
       addresses: () =>
         Object.values(networkInterfaces()).flatMap((entries) =>
@@ -1687,6 +1694,14 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   }
   const remote = new CoreRemoteService({
     server: mediaServer, settings, playback,
+    providerSession: () => plugins?.readNcmSession() ?? Promise.resolve({ providerId: 'ncm', loggedIn: false }),
+    media: new RemoteMediaResolver({ libraryId: persistentLibraryId(config.root),
+      resolve: async (sourceId) => {
+        const status = await database!.catalogStatus()
+        return database!.catalogResolve(sourceId, status.revision)
+      },
+      authorizeFile: (path) => platform!.call('paths.authorizeAudioFile', { path }),
+      grants: mediaServer.getMediaGrants() }),
     playlistRecords: (query, signal) => playlists.records(query, signal),
     castActive: () => cast.active(),
     resolveCover: (cover) => platform!.call('artwork.remotePreview', { cover }),

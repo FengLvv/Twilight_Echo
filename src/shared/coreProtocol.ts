@@ -855,6 +855,8 @@ const OPERATIONS: Record<
   'remote.status': { kind: 'query', permission: 'settings:read' },
   'remote.setEnabled': { kind: 'command', permission: 'settings:write' },
   'remote.rotatePin': { kind: 'command', permission: 'settings:write' },
+  'remote.decidePairing': { kind: 'command', permission: 'settings:write' },
+  'remote.revokeDevice': { kind: 'command', permission: 'settings:write' },
   'cast.devices': { kind: 'query', permission: 'playback:read' },
   'cast.discover': { kind: 'command', permission: 'playback:write' },
   'cast.start': { kind: 'command', permission: 'playback:write' },

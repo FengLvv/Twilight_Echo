@@ -441,6 +441,8 @@ export interface CoreHttpsPort {
 }
 
 export interface PortableNetSocket extends PortableDuplexStream {
+  /** True only for a TLS socket; plain HTTP sockets leave this unset. */
+  encrypted?: boolean
   remoteAddress?: string
   remoteFamily?: string
   remotePort?: number

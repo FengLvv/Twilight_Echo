@@ -9,6 +9,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { RemoteAuthSession } from './auth.ts'
+import { RemoteCoreBridge } from '../../core/remote/coreBridge.ts'
+import type { CoreSnapshot } from '../../shared/coreProtocol.ts'
 
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -346,4 +348,133 @@ test('real remote HTTP mediaOnly closes control surface and PIN rotation revokes
   }
   assert.equal(server.getStatus().pin, null)
   assert.equal(server.getStatus().enabled, false)
+})
+
+test('Core bridge discovery, RPC and initial SSE use the authenticated existing LAN surface', async (t) => {
+  const { server, base, request } = await fixture(t)
+  const discovery = () => fetch(`${base}/api/status`).then((response) => response.json())
+  assert.equal(((await discovery()) as { coreBridge: boolean }).coreBridge, false)
+  let calls = 0
+  server.setCoreRpcHandler(async (envelope) => {
+    calls++
+    return {
+      kind: 'response',
+      requestId: envelope.requestId,
+      epoch: 'desktop',
+      ok: true,
+      value: { connected: true }
+    }
+  })
+  const status = (await discovery()) as {
+    coreBridge: boolean
+    coreBridgeVersion: number
+    capabilities: { queries: string[]; commands: string[] }
+  }
+  assert.equal(status.coreBridge, true)
+  assert.equal(status.coreBridgeVersion, 1)
+  assert.ok(status.capabilities.queries.includes('metadata.entity.detail'))
+  assert.ok(status.capabilities.commands.includes('playback.replaceQueue'))
+  assert.ok(!status.capabilities.queries.includes('library.paths.lookup'))
+  assert.ok(!status.capabilities.queries.includes('providers.session'))
+  const payload = {
+    requestId: 'phone',
+    epoch: 'epoch-boot',
+    kind: 'query',
+    name: 'core.getSnapshot',
+    payload: {}
+  }
+  assert.equal(
+    (await fetch(`${base}/api/core/rpc`, { method: 'POST', body: JSON.stringify(payload) })).status,
+    401
+  )
+  assert.equal((await request('/api/core/rpc', { method: 'POST', body: '{}' })).status, 400)
+  assert.equal(calls, 0)
+  const response = await request('/api/core/rpc', { method: 'POST', body: JSON.stringify(payload) })
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), {
+    kind: 'response',
+    requestId: 'phone',
+    epoch: 'desktop',
+    ok: true,
+    value: { connected: true }
+  })
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  const state = {
+    kind: 'state',
+    epoch: 'desktop',
+    sequence: 1,
+    snapshot: { epoch: 'desktop', sequence: 1 }
+  }
+  server.updateCoreStateEvent(state)
+  assert.equal((await fetch(`${base}/api/core/events`)).status, 401)
+  const events = await request('/api/core/events')
+  const reader = events.body!.getReader()
+  let initial = ''
+  try {
+    while (!initial.includes(`data: ${JSON.stringify(state)}\n\n`)) {
+      const chunk = await reader.read()
+      assert.equal(chunk.done, false)
+      initial += new TextDecoder().decode(chunk.value)
+    }
+    assert.match(initial, /event: core_state/)
+  } finally {
+    await reader.cancel()
+  }
+  server.rotatePin()
+  assert.equal(
+    (await request('/api/core/rpc', { method: 'POST', body: JSON.stringify(payload) })).status,
+    401
+  )
+  assert.equal(calls, 1)
+  await server.start(0, { mode: 'mediaOnly' })
+  assert.equal((await request('/api/core/events')).status, 404)
+  assert.equal(
+    (await request('/api/core/rpc', { method: 'POST', body: JSON.stringify(payload) })).status,
+    404
+  )
+})
+
+test('HTTP cannot export a provider session, including forged TLS headers and payloads', async t => {
+  const { server, base, request } = await fixture(t)
+  let reads = 0
+  const bridge = new RemoteCoreBridge({
+    snapshot: () => ({ phase: 'ready', epoch: 'desktop' }) as CoreSnapshot,
+    request: (async () => { throw new Error('Unexpected Core request') }) as never,
+    playback: {} as never,
+    resolveCover: async () => null,
+    signal: new AbortController().signal,
+    failed: error => { throw error },
+    providerSession: async () => { reads++; return { providerId: 'ncm', loggedIn: true, cookie: 'MUSIC_U=private' } }
+  })
+  server.setCoreRpcHandler((envelope, principal, context) => {
+    assert.equal(context?.encrypted, false)
+    return bridge.handle(envelope, principal, context)
+  })
+  const payload = { requestId: 'session', epoch: 'desktop', kind: 'query', name: 'providers.session', payload: { providerId: 'ncm' } }
+  const init = { method: 'POST', body: JSON.stringify(payload),
+    headers: { 'x-forwarded-proto': 'https', forwarded: 'proto=https' } }
+  assert.equal((await fetch(`${base}/api/core/rpc`, init)).status, 401)
+  const response = await request('/api/core/rpc', init)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  const result = await response.json() as { ok: boolean; error: { code: string } }
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'FORBIDDEN')
+  assert.doesNotMatch(JSON.stringify(result), /MUSIC_U|cookie|private/)
+  payload.payload = { providerId: 'ncm', encrypted: true } as typeof payload.payload
+  assert.equal((await (await request('/api/core/rpc', { ...init, body: JSON.stringify(payload) })).json() as typeof result).error.code, 'INVALID_REQUEST')
+  assert.equal(reads, 0)
+})
+
+test('revocation while awaiting a provider session prevents sending the completed credential reply', async t => {
+  const { server, request } = await fixture(t)
+  server.setCoreRpcHandler(async envelope => {
+    server.rotatePin()
+    return { requestId: envelope.requestId, ok: true, value: { cookie: 'MUSIC_U=must-not-send' } }
+  })
+  const response = await request('/api/core/rpc', { method: 'POST', body: JSON.stringify({
+    requestId: 'session', epoch: 'desktop', kind: 'query', name: 'providers.session', payload: { providerId: 'ncm' }
+  }) })
+  assert.equal(response.status, 401)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.doesNotMatch(await response.text(), /cookie|MUSIC_U|must-not-send/)
 })

@@ -10,6 +10,7 @@ import type { LibraryPage } from '../../shared/libraryDatabase.ts'
 import { createDefaultSettings } from '../settings/normalization.ts'
 import { CoreRemoteService } from './service.ts'
 import type { CorePlaybackSession } from '../playback/session.ts'
+import type { RemoteProviderSession } from '../../shared/remoteCoreBridge.ts'
 
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve))
 const track = (id: string) => ({
@@ -49,10 +50,21 @@ function fixture(t: test.TestContext, enabled = false) {
   let receive!: (message: CoreClientMessage) => void
   let snapshot: unknown,
     disconnected = false
+  let prepareAdoption = () => {}
+  let resolveCover = async (_handle: string | null): Promise<string | null> => null
+  let providerSession = async (): Promise<RemoteProviderSession> => ({ providerId: 'ncm', loggedIn: false })
+  const coreEvents: Record<string, unknown>[] = []
   let query = async (request: CoreRequestEnvelope): Promise<unknown> => {
     if (request.name === 'player.presentation') return { cover: null }
     if (request.name === 'library.tracks')
       return { tracks: [track('D:/private-song')], offset: 0, total: 1, revision: 4 }
+    if (request.name === 'library.byIds')
+      return {
+        tracks: (request.payload as { ids: string[] }).ids.map(track),
+        offset: 0,
+        total: 1,
+        revision: 4
+      }
     if (request.name === 'playlists.catalog')
       return { items: [{ id: 'mix', name: 'Mix', count: 2 }], total: 1, offset: 0, revision: 2 }
     if (request.name === 'playlists.view')
@@ -114,7 +126,8 @@ function fixture(t: test.TestContext, enabled = false) {
     },
     updatePlaybackSnapshot: (value: unknown) => {
       snapshot = value
-    }
+    },
+    updateCoreStateEvent: (value: Record<string, unknown>) => coreEvents.push(value)
   }
   const application = {
     connect: (identity: CoreClientIdentity, send: typeof receive) => {
@@ -154,6 +167,8 @@ function fixture(t: test.TestContext, enabled = false) {
         await produce(async (page) => {
           rows.push(...page)
         })
+        prepareAdoption()
+        await options?.beforeAdopt?.(options.play !== false)
         options?.guard?.()
         selected.push(
           typeof options?.selectedIndex === 'function'
@@ -173,7 +188,8 @@ function fixture(t: test.TestContext, enabled = false) {
       page: privatePage
     }),
     castActive: () => castActive,
-    resolveCover: async () => null,
+    resolveCover: (handle) => resolveCover(handle),
+    providerSession: () => providerSession(),
     now: () => 123,
     failed: (error) => failures.push(error)
   })
@@ -188,6 +204,17 @@ function fixture(t: test.TestContext, enabled = false) {
     edits,
     selected,
     failures,
+    coreEvents,
+    current: () => state,
+    beforeAdopt(callback: () => void) {
+      prepareAdoption = callback
+    },
+    cover(callback: typeof resolveCover) {
+      resolveCover = callback
+    },
+    providerSession(callback: typeof providerSession) {
+      providerSession = callback
+    },
     snapshot: () => snapshot,
     disconnected: () => disconnected,
     cast(value: boolean) {
@@ -277,7 +304,6 @@ test('mixed playlist playback keeps private sources, CUE and repeated occurrence
   await assert.rejects(f.service.command({ action: 'play' }), /core_not_ready/)
 })
 
-
 test('Roon-style Core RPC bridge translates mobile CoreRequestEnvelope queries and commands', async (t) => {
   const f = fixture(t, true)
   await turn()
@@ -326,4 +352,579 @@ test('Roon-style Core RPC bridge translates mobile CoreRequestEnvelope queries a
   assert.equal(modeRes.ok, true)
   assert.equal(f.requests.at(-1)?.name, 'playback.mode')
   assert.deepEqual(f.requests.at(-1)?.payload, { mode: 'repeat' })
+})
+
+let rpcSerial = 0
+function rpc(
+  name: string,
+  payload: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    requestId: `mobile-${++rpcSerial}`,
+    epoch: 'test',
+    kind: 'query',
+    name,
+    payload,
+    ...extra
+  }
+}
+function command(
+  name: string,
+  payload: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {}
+) {
+  return rpc(name, payload, { kind: 'command', ...extra })
+}
+function code(response: Record<string, unknown>) {
+  return (response.error as { code?: string } | undefined)?.code
+}
+async function search(f: ReturnType<typeof fixture>) {
+  const result = await f.service.handleCoreRpc(rpc('search.songs', { query: '' }))
+  assert.equal(result.ok, true)
+  return (result.value as { items: Array<{ id: string }> }).items
+}
+
+test('mobile selection resolves issued references in Core and preserves order, repeats and paused intent', async (t) => {
+  const f = fixture(t, true)
+  const [track] = await search(f)
+  assert.match(track.id, /^remote-track:/)
+  assert.doesNotMatch(track.id, /private|D:/)
+  const result = await f.service.handleCoreRpc(
+    command(
+      'playback.replaceQueue',
+      {
+        id: 'default',
+        expectedRevision: 7,
+        startIndex: 1,
+        play: false,
+        tracks: [
+          { ...track, title: 'untrusted', source: 'http://attacker', filePath: 'D:/injected.flac' },
+          track
+        ]
+      },
+      { expectedRevision: 7 }
+    )
+  )
+  assert.equal(result.ok, true)
+  assert.deepEqual(f.rows, [{ id: 'D:/private-song' }, { id: 'D:/private-song' }])
+  assert.deepEqual(f.selected, [1])
+  assert.equal(f.requests.filter((r) => r.name === 'library.byIds').length, 1)
+  assert.doesNotMatch(JSON.stringify(result), /private|injected|attacker/)
+})
+
+test('queue mutations reject missing, conflicting and stale revisions without dispatch', async (t) => {
+  const f = fixture(t, true)
+  const [track] = await search(f)
+  for (const [payload, extra, expected] of [
+    [{ tracks: [track] }, {}, 'INVALID_REQUEST'],
+    [{ tracks: [track], expectedRevision: 6 }, {}, 'STALE_REVISION'],
+    [{ tracks: [track], expectedRevision: 7 }, { expectedRevision: 6 }, 'INVALID_REQUEST'],
+    [{ tracks: [track], expectedRevision: 7 }, { epoch: 'retired-core' }, 'STALE_EPOCH'],
+    [{ id: 'other-queue', tracks: [track], expectedRevision: 7 }, {}, 'STALE_REVISION']
+  ] as const) {
+    const before = f.requests.length
+    assert.equal(
+      code(await f.service.handleCoreRpc(command('playback.replaceQueue', payload, extra))),
+      expected
+    )
+    assert.equal(f.requests.length, before)
+  }
+  assert.deepEqual(f.selected, [])
+})
+
+test('queue replacement rejects arbitrary IDs and missing or unsupported sources before adoption', async (t) => {
+  const f = fixture(t, true)
+  const [track] = await search(f)
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('playback.replaceQueue', {
+          tracks: [{ id: 'D:/private-song', source: 'local' }],
+          expectedRevision: 7
+        })
+      )
+    ),
+    'NOT_FOUND'
+  )
+  f.query(async () => ({ tracks: [], revision: 4, total: 0, offset: 0 }))
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('playback.replaceQueue', {
+          tracks: [track],
+          expectedRevision: 7
+        })
+      )
+    ),
+    'NOT_FOUND'
+  )
+  f.query(async () => ({
+    tracks: [{ id: 'D:/private-song', source: 'network' }],
+    revision: 4,
+    total: 1,
+    offset: 0
+  }))
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('playback.replaceQueue', {
+          tracks: [track],
+          expectedRevision: 7
+        })
+      )
+    ),
+    'UNSUPPORTED_CAPABILITY'
+  )
+  assert.deepEqual(f.selected, [])
+})
+
+test('queue changes while resolving tracks or immediately before adoption do not overwrite the new queue', async (t) => {
+  for (const timing of ['read', 'adopt']) {
+    const f = fixture(t, true)
+    const [track] = await search(f)
+    const change = () => f.state({ ...f.current(), queue: { ...f.current().queue!, revision: 8 } })
+    if (timing === 'read')
+      f.query(async () => {
+        change()
+        return {
+          tracks: [{ id: 'D:/private-song', source: 'local' }],
+          revision: 4,
+          offset: 0,
+          total: 1
+        }
+      })
+    else f.beforeAdopt(change)
+    assert.equal(
+      code(
+        await f.service.handleCoreRpc(
+          command('playback.replaceQueue', {
+            tracks: [track],
+            expectedRevision: 7
+          })
+        )
+      ),
+      'STALE_REVISION',
+      timing
+    )
+    assert.deepEqual(f.selected, [], timing)
+  }
+})
+
+test('mobile queue selection forwards the observed occurrence and revision instead of choosing a new one', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  const request = command(
+    'playback.selectQueueIndex',
+    {
+      id: 'queue',
+      revision: 7,
+      index: 1,
+      occurrenceId: 'second-occurrence'
+    },
+    { expectedRevision: 7 }
+  )
+  assert.equal((await f.service.handleCoreRpc(request)).ok, true)
+  assert.equal(f.requests.at(-1)?.name, 'queue.select')
+  assert.equal(f.requests.at(-1)?.epoch, 'test')
+  assert.deepEqual(f.requests.at(-1)?.payload, {
+    id: 'queue',
+    revision: 7,
+    index: 1,
+    occurrenceId: 'second-occurrence'
+  })
+  const before = f.requests.length
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('playback.selectQueueIndex', {
+          revision: 6,
+          index: 1,
+          occurrenceId: 'second-occurrence'
+        })
+      )
+    ),
+    'STALE_REVISION'
+  )
+  assert.equal(f.requests.length, before)
+})
+
+test('a retried command ID is never dispatched a second time, including overlapping retries', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  let release!: () => void
+  let entered!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  f.query(async (request) => {
+    assert.equal(request.name, 'playback.next')
+    entered()
+    await gate
+  })
+  const first = f.service.handleCoreRpc(command('playback.next', {}, { commandId: 'one-intent' }))
+  await started
+  try {
+    assert.equal(
+      code(
+        await f.service.handleCoreRpc(command('playback.next', {}, { commandId: 'one-intent' }))
+      ),
+      'OUTCOME_UNKNOWN'
+    )
+  } finally {
+    release()
+  }
+  assert.equal((await first).ok, true)
+  assert.equal(f.requests.filter((r) => r.name === 'playback.next').length, 1)
+})
+
+test('bridge exposes only bounded public operations and rejects malformed envelopes', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  const before = f.requests.length
+  for (const name of [
+    'settings.state',
+    'library.paths.lookup',
+    'library.byIds',
+    'metadata.entity.override',
+    'library.syncTracks',
+    'queue.submit',
+    'plugins.list'
+  ]) {
+    assert.equal(code(await f.service.handleCoreRpc(rpc(name))), 'FORBIDDEN', name)
+  }
+  for (const request of [
+    rpc('search.songs', { query: '', limit: 201 }),
+    rpc('search.songs', { query: '', offset: -1 }),
+    rpc('search.songs', { query: '', folder: 'D:/music' }),
+    rpc('search.songs', {}, { protocolVersion: 99 }),
+    rpc('search.songs', {}, { kind: 'cancel' }),
+    rpc('search.songs', {}, { role: 'desktop' }),
+    rpc('search.songs', {}, { requestId: '' }),
+    command('playback.setVolume', { volume: 2 }),
+    command('playback.setPlayMode', { mode: 'invalid' })
+  ])
+    assert.equal(code(await f.service.handleCoreRpc(request)), 'INVALID_REQUEST')
+  assert.equal(f.requests.length, before)
+  assert.equal(
+    (await f.service.handleCoreRpc(rpc('search.songs', { query: '', offset: 100, limit: 20 }))).ok,
+    true
+  )
+  assert.deepEqual(f.requests.at(-1)?.payload, {
+    search: '',
+    searchLiteral: true,
+    sort: 'insertion',
+    direction: 'asc',
+    offset: 100,
+    limit: 20
+  })
+})
+
+test('RPC and SSE use the same Android-compatible, path-free track projection', async (t) => {
+  const f = fixture(t, true)
+  f.state({
+    ...f.current(),
+    error: 'C:/private/secret.flac',
+    track: {
+      ...track('C:/private/song.flac'),
+      ncmSongId: 123,
+      artists: [{ id: 1, name: 'Correct Artist' }],
+      subTrack: 'C:/private/disc.cue'
+    }
+  } as unknown as CoreSnapshot)
+  const response = await f.service.handleCoreRpc(
+    rpc('core.getSnapshot', {}, { epoch: 'epoch-boot' })
+  )
+  const value = response.value as { track: { id: string; artists: string[]; ncmSongId: string } }
+  assert.deepEqual(value.track.artists, ['Correct Artist'])
+  assert.equal(value.track.ncmSongId, '123')
+  assert.doesNotMatch(JSON.stringify(response), /C:|private|secret|subTrack/)
+  assert.deepEqual(f.coreEvents.at(-1)?.snapshot, value)
+})
+
+test('restarting Core and rotating the pairing PIN invalidate compatibility references', async (t) => {
+  const f = fixture(t, true)
+  const [first] = await search(f)
+  const cached = f.coreEvents.at(-1)?.snapshot as { track: { id: string } }
+  f.service.rotatePin()
+  const fresh = await f.service.handleCoreRpc(rpc('core.getSnapshot'))
+  assert.notEqual((fresh.value as { track: { id: string } }).track.id, cached.track.id)
+  assert.deepEqual(f.coreEvents.at(-1)?.snapshot, fresh.value)
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('playback.replaceQueue', {
+          tracks: [first],
+          expectedRevision: 7
+        })
+      )
+    ),
+    'NOT_FOUND'
+  )
+  const [second] = await search(f)
+  f.state({ ...f.current(), epoch: 'new-core' })
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command(
+          'playback.replaceQueue',
+          {
+            tracks: [second],
+            expectedRevision: 7
+          },
+          { epoch: 'new-core' }
+        )
+      )
+    ),
+    'NOT_FOUND'
+  )
+  assert.deepEqual(f.selected, [])
+})
+
+test('catalog IDs and approved metadata remain readable without exposing source paths or artwork grants', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  const read: string[] = []
+  f.cover(async (handle) => {
+    read.push(handle!)
+    return 'data:image/png;base64,preview'
+  })
+  f.query(async (request) => {
+    if (request.name === 'catalog.query')
+      return {
+        revision: 5,
+        total: 1,
+        offset: 0,
+        items: [
+          {
+            id: 'artist-entity',
+            kind: 'artist',
+            title: 'Corrected Name',
+            artist: '',
+            identity: 'source',
+            sourceCount: 1
+          }
+        ]
+      }
+    if (request.name === 'catalog.sources')
+      return {
+        revision: 5,
+        total: 1,
+        offset: 0,
+        items: [
+          {
+            id: 'source-stable-id',
+            provider: 'local',
+            recordingId: 'recording-id',
+            releaseId: 'release-id',
+            availability: 'indexed',
+            inLibrary: true,
+            preferred: true,
+            track: { ...track('private'), filePath: 'D:/private.flac', subTrack: 'D:/private.cue' }
+          }
+        ]
+      }
+    if (request.name === 'metadata.entity.detail')
+      return {
+        entityId: 'artist-entity',
+        targetId: 'matched-artist',
+        revision: 9,
+        name: 'Corrected Name',
+        introduction: {
+          value: 'User correction',
+          language: 'zh-Hans',
+          origin: 'manual',
+          attribution: null
+        },
+        manualArtwork: { dataUrl: 'data:image/png;base64,manual' },
+        artworkOverride: { mode: 'value' },
+        facts: [],
+        imports: [{ credentials: 'do-not-export' }],
+        artwork: [
+          {
+            handle: 'twilight-media://image/private-grant',
+            scope: 'artist',
+            targetRef: { provider: 'musicbrainz', kind: 'artist', idType: 'mbid', value: 'artist' },
+            attribution: { provider: 'public-artwork', license: 'CC-BY' },
+            usage: {
+              display: true,
+              cache: false,
+              crossSource: true,
+              export: false,
+              expiresAt: 12345
+            }
+          }
+        ]
+      }
+    throw new Error('Unexpected request')
+  })
+  const artists = await f.service.handleCoreRpc(rpc('catalog.query', { kind: 'artist', limit: 20 }))
+  assert.equal(artists.ok, true)
+  assert.deepEqual(f.requests.at(-1)?.payload, { kind: 'artist', limit: 20, scope: 'library' })
+  assert.equal(
+    code(await f.service.handleCoreRpc(rpc('catalog.query', { kind: 'artist', scope: 'all' }))),
+    'FORBIDDEN'
+  )
+  const sources = await f.service.handleCoreRpc(
+    rpc('catalog.sources', { entityId: 'recording-id' })
+  )
+  assert.equal(sources.ok, true)
+  assert.doesNotMatch(JSON.stringify(sources), /private|subTrack|remote-track/)
+  const detail = await f.service.handleCoreRpc(
+    rpc('metadata.entity.detail', { entityId: 'artist-entity', language: 'zh-Hans' })
+  )
+  assert.equal(detail.ok, true)
+  const view = detail.value as {
+    introduction: { value: string }
+    artwork: Array<{ usage: { cache: boolean }; dataUrl: string }>
+    manualArtwork: { dataUrl: string }
+    artworkOverride: { mode: string }
+  }
+  assert.equal(view.introduction.value, 'User correction')
+  assert.equal(view.artwork[0].usage.cache, false)
+  assert.match(view.artwork[0].dataUrl, /^data:image/)
+  assert.equal(view.manualArtwork.dataUrl, 'data:image/png;base64,preview')
+  assert.equal(view.artworkOverride.mode, 'value')
+  assert.deepEqual(read, ['twilight-media://image/private-grant', 'data:image/png;base64,manual'])
+  assert.doesNotMatch(JSON.stringify(detail), /private-grant|imports|credentials|do-not-export/)
+})
+
+test('library artwork resolves issued references and bounded previews rather than client paths', async (t) => {
+  const f = fixture(t, true)
+  const [track] = await search(f)
+  f.cover(async () => 'data:image/webp;base64,preview')
+  f.query(async (request) => {
+    assert.equal(request.name, 'library.artwork')
+    assert.deepEqual(request.payload, { ids: ['D:/private-song'] })
+    return { revision: 4, items: [{ id: 'D:/private-song', cover: 'cover://private.png' }] }
+  })
+  const response = await f.service.handleCoreRpc(rpc('library.artwork', { ids: [track.id] }))
+  assert.equal(response.ok, true)
+  assert.deepEqual(response.value, {
+    revision: 4,
+    items: [{ id: track.id, cover: 'data:image/webp;base64,preview' }]
+  })
+  assert.equal(
+    code(await f.service.handleCoreRpc(rpc('library.artwork', { ids: ['file:///private.png'] }))),
+    'NOT_FOUND'
+  )
+  assert.equal(
+    code(await f.service.handleCoreRpc(rpc('library.artwork', { ids: Array(9).fill(track.id) }))),
+    'INVALID_REQUEST'
+  )
+})
+
+test('errors from native or storage code never expose paths or credentials to the network', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  f.query(async () => {
+    throw new Error('D:/private/secret.flac token=credential')
+  })
+  const result = await f.service.handleCoreRpc(command('playback.play'))
+  assert.equal(code(result), 'FAILED')
+  assert.doesNotMatch(JSON.stringify(result), /private|secret|credential|D:/)
+  assert.equal(f.failures.length, 1)
+})
+
+test('provider sessions require authenticated transport encryption, not caller assertions', async t => {
+  const f = fixture(t, true)
+  let reads = 0
+  f.providerSession(async () => {
+    reads++
+    return { providerId: 'ncm', loggedIn: true, cookie: 'MUSIC_U=test-secret' }
+  })
+  const query = () => rpc('providers.session', { providerId: 'ncm' })
+  for (const [principal, context] of [[undefined, { encrypted: true }], ['phone', undefined],
+    ['phone', { encrypted: false }]] as const) {
+    assert.equal(code(await f.service.handleCoreRpc(query(), principal, context)), 'FORBIDDEN')
+  }
+  assert.equal(code(await f.service.handleCoreRpc(
+    rpc('providers.session', { providerId: 'ncm', encrypted: true }), 'phone', { encrypted: true })), 'INVALID_REQUEST')
+  assert.equal(reads, 0)
+  const result = await f.service.handleCoreRpc(query(), 'phone', { encrypted: true })
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.value, { providerId: 'ncm', loggedIn: true, cookie: 'MUSIC_U=test-secret' })
+  assert.equal(reads, 1)
+  assert.ok(!f.requests.some(request => String(request.name) === 'providers.session'))
+  assert.ok(!JSON.stringify(f.coreEvents).includes('test-secret'))
+})
+
+test('provider sessions are ncm-only and never include unrelated settings or signed-out cookies', async t => {
+  const f = fixture(t, true)
+  for (const payload of [{}, { providerId: '' }, { providerId: 3 }, { providerId: 'ncm', key: 'cookie' }]) {
+    assert.equal(code(await f.service.handleCoreRpc(rpc('providers.session', payload), 'phone', { encrypted: true })), 'INVALID_REQUEST')
+  }
+  assert.equal(code(await f.service.handleCoreRpc(rpc('providers.session', { providerId: 'other' }),
+    'phone', { encrypted: true })), 'UNSUPPORTED_CAPABILITY')
+  f.providerSession(async () => ({ providerId: 'ncm', loggedIn: false, cookie: 'MUSIC_U=stale-secret' }))
+  const result = await f.service.handleCoreRpc(rpc('providers.session', { providerId: 'ncm' }), 'phone', { encrypted: true })
+  assert.deepEqual(result.value, { providerId: 'ncm', loggedIn: false })
+  assert.doesNotMatch(JSON.stringify(result), /cookie|stale-secret/)
+  f.providerSession(async () => ({ providerId: 'ncm', loggedIn: true, cookie: 'MUSIC_U=current', profile: 'private' } as RemoteProviderSession))
+  const signedIn = await f.service.handleCoreRpc(rpc('providers.session', { providerId: 'ncm' }), 'phone', { encrypted: true })
+  assert.doesNotMatch(JSON.stringify(signedIn), /profile|private/)
+})
+
+test('credential-read failures cannot leak the original exception into network replies or logs', async t => {
+  const f = fixture(t, true)
+  f.providerSession(async () => { throw new Error('MUSIC_U=secret-from-keyring') })
+  const result = await f.service.handleCoreRpc(rpc('providers.session', { providerId: 'ncm' }), 'phone', { encrypted: true })
+  assert.equal(code(result), 'FAILED')
+  assert.doesNotMatch(JSON.stringify(result), /MUSIC_U|secret-from-keyring/)
+  assert.equal(f.failures.length, 1)
+  assert.doesNotMatch(String(f.failures[0]), /MUSIC_U|secret-from-keyring/)
+})
+
+test('stable catalog playback uses the native source and catalog revision contract', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  const result = await f.service.handleCoreRpc(
+    command('catalog.play', {
+      sourceId: 'source-stable-id',
+      revision: 5
+    })
+  )
+  assert.equal(result.ok, true)
+  assert.equal(f.requests.at(-1)?.name, 'catalog.play')
+  assert.equal(f.requests.at(-1)?.epoch, 'test')
+  assert.deepEqual(f.requests.at(-1)?.payload, { sourceId: 'source-stable-id', revision: 5 })
+  const before = f.requests.length
+  assert.equal(
+    code(
+      await f.service.handleCoreRpc(
+        command('catalog.play', {
+          sourceId: 'source-stable-id',
+          revision: 5,
+          filePath: 'D:/injected.flac'
+        })
+      )
+    ),
+    'INVALID_REQUEST'
+  )
+  assert.equal(f.requests.length, before)
+})
+
+test('bridge bounds outstanding requests and releases capacity after failures', async (t) => {
+  const f = fixture(t, true)
+  await turn()
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  f.query(async () => {
+    await gate
+    throw new Error('database unavailable')
+  })
+  const pending = Array.from({ length: 8 }, () => f.service.handleCoreRpc(rpc('search.songs')))
+  try {
+    assert.equal(code(await f.service.handleCoreRpc(rpc('search.songs'))), 'BUSY')
+  } finally {
+    release()
+  }
+  for (const result of await Promise.all(pending)) assert.equal(code(result), 'FAILED')
+  f.query(async () => ({ tracks: [], total: 0, offset: 0, revision: 4 }))
+  assert.equal((await f.service.handleCoreRpc(rpc('search.songs'))).ok, true)
 })

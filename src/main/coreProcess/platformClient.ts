@@ -104,7 +104,8 @@ export class CorePlatformClient {
           dispose()
           reject(new Error(`${name} timed out; outcome may be unknown`))
         },
-        name === 'ncm.officialLogin' ||
+        name === 'remote.confirmDevice' ||
+          name === 'ncm.officialLogin' ||
           name === 'ncm.chooseUploadFiles' ||
           name === 'ncm.chooseDownloadFile' ||
           name === 'automix.chooseArchive' ||

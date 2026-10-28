@@ -12,12 +12,15 @@ export interface MediaStreamGrant {
   contentType: string
   title?: string
   expiresAt: number
+  /** Only the new phone-stream contract uses authenticated, version-pinned bounded reads. */
+  stream?: { principal: string; libraryId: string; sourceId: string; sourceVersion: string }
 }
 
 export interface IssueMediaGrantOptions {
   contentType?: string
   title?: string
   ttlMs?: number
+  stream?: MediaStreamGrant['stream']
 }
 
 export class MediaStreamGrantStore {
@@ -44,6 +47,7 @@ export class MediaStreamGrantStore {
       filePath,
       contentType: options.contentType ?? 'application/octet-stream',
       title: options.title,
+      stream: options.stream,
       expiresAt: this.now() + (options.ttlMs ?? this.ttlMs)
     })
     return token
@@ -89,6 +93,11 @@ export class MediaStreamGrantStore {
 
   revoke(token: string): void {
     this.grants.delete(token)
+  }
+
+  revokeStreams(principal?: string): void {
+    for (const [token, grant] of this.grants)
+      if (grant.stream && (!principal || grant.stream.principal === principal)) this.grants.delete(token)
   }
 
   clear(): void {

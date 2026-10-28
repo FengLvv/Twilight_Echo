@@ -13,7 +13,7 @@ const body = ast.statements
   .map((s) => s.getText(ast))
   .join('\n')
 const code = ts.transpileModule(
-  `${body}\n;({remoteStatus,remoteStatusError,remoteBusy,refreshRemoteStatus,toggleRemote,rotateRemotePin})`,
+  `${body}\n;({remoteStatus,remoteStatusError,remoteBusy,refreshRemoteStatus,toggleRemote,rotateRemotePin,decideRemotePairing,revokeRemoteDevice})`,
   {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
   }
@@ -80,4 +80,25 @@ test('remote startup failure stays visible without optimistic settings mutation'
   assert.equal(f.entry.remoteStatus.value, null)
   assert.equal(f.entry.remoteStatusError.value, 'bind failed')
   assert.deepEqual(f.emits, [])
+})
+
+test('device approval and revocation use local Core commands and replace the displayed status', async (t) => {
+  const f = fixture(t)
+  f.respond({ pairingRequests: [], trustedDevices: [{ id: 'phone', name: '我的手机' }] })
+  await f.entry.decideRemotePairing('request', true)
+  assert.equal(f.entry.remoteStatus.value.trustedDevices[0].id, 'phone')
+  f.respond(new Error('device store unavailable'))
+  await f.entry.revokeRemoteDevice('phone')
+  assert.equal(f.entry.remoteStatusError.value, 'device store unavailable')
+  assert.equal(f.entry.remoteStatus.value.trustedDevices.length, 1)
+  f.respond({ pairingRequests: [], trustedDevices: [] })
+  await f.entry.revokeRemoteDevice('phone')
+  assert.equal(f.entry.remoteStatusError.value, '')
+  assert.equal(f.entry.remoteStatus.value.trustedDevices.length, 0)
+  assert.equal(f.entry.remoteBusy.value, false)
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [
+    { name: 'remote.decidePairing', payload: { requestId: 'request', allow: true } },
+    { name: 'remote.revokeDevice', payload: { id: 'phone' } },
+    { name: 'remote.revokeDevice', payload: { id: 'phone' } }
+  ])
 })

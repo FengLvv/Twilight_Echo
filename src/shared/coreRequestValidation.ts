@@ -799,6 +799,8 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
       )
     case 'remote.status':
     case 'remote.setEnabled':
+    case 'remote.decidePairing':
+    case 'remote.revokeDevice':
     case 'remote.rotatePin':
       return validCoreRemotePayload(name, p)
     case 'cast.state':

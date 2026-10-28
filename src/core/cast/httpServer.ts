@@ -10,6 +10,7 @@ import { PortableBuffer } from '../../shared/portableBytes.ts'
 import { join, extname } from '../../shared/portablePath.ts'
 import { parseByteRange } from './byteRange.ts'
 import { RemoteAuthSession } from './auth.ts'
+import { RemoteDevicePairing } from './devicePairing.ts'
 import { MediaStreamGrantStore, guessAudioContentType } from './mediaTokens.ts'
 import {
   createEmptyRemotePlaybackSnapshot,
@@ -24,13 +25,21 @@ import {
 } from '../../shared/remoteControl.ts'
 import { REMOTE_SSE_HEARTBEAT_MS } from '../../shared/remoteControl.ts'
 import { parseJsonWithNestingLimit } from '../../shared/jsonSafety.ts'
+import { mediaSourceVersion } from '../remote/media.ts'
+import { REMOTE_STREAM_RANGE_BYTES } from '../../shared/remoteMedia.ts'
+import {
+  REMOTE_CORE_BRIDGE_VERSION,
+  REMOTE_CORE_COMMANDS,
+  REMOTE_CORE_QUERIES,
+  type RemoteCoreRpcContext
+} from '../../shared/remoteCoreBridge.ts'
 
 export type RemoteServerMode = 'full' | 'mediaOnly'
 
 export type RemoteCommandHandler = (command: PlayerRemoteCommand) => Promise<void> | void
 export type RemoteBrowseHandler = (request: RemoteBrowseRequest) => Promise<RemoteBrowseResult>
 export type RemoteCoreRpcHandler = (
-  envelope: Record<string, unknown>
+  envelope: Record<string, unknown>, principal?: string, context?: RemoteCoreRpcContext
 ) => Promise<Record<string, unknown>>
 
 export class RemoteCommandError extends Error {
@@ -43,6 +52,13 @@ export class RemoteCommandError extends Error {
 }
 
 export interface RemoteHttpServerOptions {
+  serverName?: string
+  devicePairing?: RemoteDevicePairing
+  confirmDevice?(request: import('../../shared/remoteControl.ts').RemotePairingRequest, signal: AbortSignal): Promise<boolean>
+  discovery?: {
+    start(info: { serverId: string; name: string; port: number }): Promise<void>
+    stop(): Promise<void>
+  }
   staticRoot: string
   addresses(): readonly string[]
   now?: () => number
@@ -63,6 +79,12 @@ export class RemoteHttpServer {
   private mode: RemoteServerMode = 'full'
   private lastError: string | null = null
   private readonly auth: RemoteAuthSession
+  private readonly devicePairing: RemoteDevicePairing
+  private discovery: 'advertising' | 'unavailable' | 'off' = 'off'
+  private discoveryError: string | null = null
+  private readonly sseAuthorization = new Map<PortableServerResponse, string>()
+  private readonly approvals = new Map<string, AbortController>()
+  private readonly phoneReads = new Map<PortableServerResponse, string>()
   private readonly mediaGrants: MediaStreamGrantStore
   private readonly staticRoot: string
   private readonly options: RemoteHttpServerOptions
@@ -82,6 +104,7 @@ export class RemoteHttpServer {
   constructor(options: RemoteHttpServerOptions) {
     this.options = options
     this.auth = options.auth ?? new RemoteAuthSession()
+    this.devicePairing = options.devicePairing ?? new RemoteDevicePairing({ now: options.now })
     this.mediaGrants = options.mediaGrants ?? new MediaStreamGrantStore()
     this.staticRoot = options.staticRoot
     this.onCommand = options.onCommand ?? null
@@ -121,13 +144,19 @@ export class RemoteHttpServer {
   getStatus(): RemoteControlStatus {
     const mediaOnly = this.mode === 'mediaOnly' && this.server != null
     return {
+      serverId: this.devicePairing.serverId,
+      serverName: this.options.serverName ?? 'Twilight Echo',
+      discovery: this.discovery,
+      discoveryError: this.discoveryError,
+      pairingRequests: this.enabled && !mediaOnly ? this.devicePairing.pending() : [],
+      trustedDevices: this.devicePairing.devices(),
       // "enabled" means full remote control is on — never true for media-only cast.
       enabled: this.enabled && !mediaOnly,
       running: this.server != null && this.port != null,
       port: this.port,
       pin: this.enabled && !mediaOnly ? this.auth.getPin() : null,
       urls: this.enabled && !mediaOnly && this.port != null ? this.listLanUrls(this.port) : [],
-      paired: this.enabled && !mediaOnly ? this.auth.isPaired() : false,
+      paired: this.enabled && !mediaOnly ? this.auth.isPaired() || this.devicePairing.devices().length > 0 : false,
       clientCount: this.sseClients.size,
       lastError: this.lastError,
       mediaOnly
@@ -164,6 +193,7 @@ export class RemoteHttpServer {
     if (this.server) {
       if (this.mode === desiredMode) return this.getStatus()
       this.applyMode(desiredMode)
+      await this.syncDiscovery()
       return this.getStatus()
     }
     this.applyMode(desiredMode)
@@ -186,7 +216,26 @@ export class RemoteHttpServer {
       })
     })
 
+    await this.syncDiscovery()
     return this.getStatus()
+  }
+
+  private async syncDiscovery(): Promise<void> {
+    if (!this.options.discovery) return
+    this.discoveryError = null
+    try {
+      if (this.enabled && this.port && this.onCoreRpc) {
+        await this.options.discovery.start({ serverId: this.devicePairing.serverId,
+          name: this.options.serverName ?? 'Twilight Echo', port: this.port })
+        this.discovery = 'advertising'
+      } else {
+        await this.options.discovery.stop()
+        this.discovery = 'off'
+      }
+    } catch {
+      this.discovery = 'unavailable'
+      this.discoveryError = '局域网发现不可用，请检查防火墙的 UDP 5353 权限；仍可通过地址连接。'
+    }
   }
 
   private resolveAllowedOrigin(origin: string | undefined, host: string): string | null {
@@ -226,6 +275,10 @@ export class RemoteHttpServer {
     }
     this.sseClients.clear()
     // Revoke pair tokens when leaving full mode; keep cast media grants.
+    this.sseAuthorization.clear()
+    this.revokePhoneStreams()
+    this.devicePairing.clearPending()
+    this.cancelApprovals()
     if (previous === 'full') this.auth.revokeToken()
   }
 
@@ -233,6 +286,9 @@ export class RemoteHttpServer {
     this.enabled = false
     this.mode = 'full'
     this.stopHeartbeat()
+    await this.syncDiscovery()
+    this.devicePairing.clearPending()
+    this.cancelApprovals()
     for (const client of this.sseClients) {
       try {
         client.end()
@@ -241,6 +297,7 @@ export class RemoteHttpServer {
       }
     }
     this.sseClients.clear()
+    this.sseAuthorization.clear()
     this.mediaGrants.clear()
     this.auth.revokeToken()
 
@@ -255,9 +312,48 @@ export class RemoteHttpServer {
   }
 
   rotatePin(): string {
+    this.cancelApprovals()
+    this.revokePhoneStreams()
+    this.devicePairing.revoke()
     const pin = this.auth.rotatePin()
     this.broadcastSse('auth', { paired: false })
     return pin
+  }
+
+  decidePairing(requestId: string, allow: boolean): RemoteControlStatus {
+    if (!this.devicePairing.decide(requestId, allow)) throw new RemoteCommandError('pair_request_expired', 404)
+    this.approvals.get(requestId)?.abort()
+    return this.getStatus()
+  }
+
+  private cancelApprovals(): void {
+    for (const controller of this.approvals.values()) controller.abort()
+    this.approvals.clear()
+  }
+
+  revokeDevice(id: string): RemoteControlStatus {
+    this.devicePairing.revoke(id)
+    this.revokePhoneStreams(id)
+    this.dropUnauthorizedClients()
+    return this.getStatus()
+  }
+
+  private revokePhoneStreams(principal?: string): void {
+    this.mediaGrants.revokeStreams(principal)
+    for (const [response, owner] of this.phoneReads)
+      if (!principal || owner === principal) response.destroy()
+  }
+
+  private dropUnauthorizedClients(): void {
+    for (const client of this.sseClients) {
+      const bearer = this.sseAuthorization.get(client) ?? ''
+      if (!this.authorizedBearer(bearer)) {
+        this.writeSse(client, 'event: auth\ndata: {"paired":false}\n\n')
+        client.end()
+        this.sseClients.delete(client)
+        this.sseAuthorization.delete(client)
+      }
+    }
   }
 
   issueMediaUrl(filePath: string, title?: string): string | null {
@@ -318,7 +414,8 @@ export class RemoteHttpServer {
   ): Promise<void> {
     try {
       const hostHeader = req.headers.host
-      const host = (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) ?? `127.0.0.1:${this.port ?? 0}`
+      const host =
+        (Array.isArray(hostHeader) ? hostHeader[0] : hostHeader) ?? `127.0.0.1:${this.port ?? 0}`
       const url = new URL(req.url ?? '/', `http://${host}`)
       const remoteIp = (req.socket.remoteAddress ?? '').replace(/^::ffff:/i, '')
       if (remoteIp && !isPrivateOrLocalIp(remoteIp) && remoteIp !== '::1') {
@@ -336,7 +433,9 @@ export class RemoteHttpServer {
       if (req.method === 'OPTIONS') {
         res.writeHead(
           204,
-          corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin)
+          corsHeaders(
+            (res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin
+          )
         )
         res.end()
         return
@@ -344,7 +443,7 @@ export class RemoteHttpServer {
 
       // Media-only cast bind: only capability-token media streaming is exposed.
       if (this.mode === 'mediaOnly') {
-        if (req.method === 'GET' && url.pathname.startsWith('/media/')) {
+        if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/media/')) {
           const token = url.pathname.slice('/media/'.length)
           await this.serveMedia(req, res, token)
           return
@@ -370,9 +469,17 @@ export class RemoteHttpServer {
         this.sendJson(res, 200, {
           requiresPairing: true,
           paired: this.auth.isPaired(),
+          serverId: this.devicePairing.serverId,
+          serverName: this.options.serverName ?? 'Twilight Echo',
+          pairingMode: 'approval-v1',
           app: 'Twilight Echo',
-          coreBridge: true,
-          protocolVersion: 1
+          coreBridge: this.onCoreRpc !== null,
+          protocolVersion: 1,
+          coreBridgeVersion: REMOTE_CORE_BRIDGE_VERSION,
+          capabilities: this.onCoreRpc
+            ? { queries: REMOTE_CORE_QUERIES.filter(name => name !== 'providers.session' || req.socket.encrypted === true),
+                commands: REMOTE_CORE_COMMANDS }
+            : null
         })
         return
       }
@@ -385,7 +492,54 @@ export class RemoteHttpServer {
           this.sendJson(res, 401, { error: result.reason })
           return
         }
+        this.dropUnauthorizedClients()
         this.sendJson(res, 200, { token: result.token })
+        return
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/pair/requests') {
+        if (origin && this.resolveAllowedOrigin(origin, host) === null) {
+          this.sendJson(res, 403, { error: 'origin_not_allowed' }); return
+        }
+        const body = await readJsonBody(req)
+        try {
+          const ticket = this.devicePairing.request(body?.deviceName, remoteIp)
+          this.sendJson(res, 202, ticket)
+          const pending = this.devicePairing.pending().find(p => p.id === ticket.requestId)!
+          if (this.options.confirmDevice) {
+            const controller = new AbortController()
+            this.approvals.set(ticket.requestId, controller)
+            const timer = setTimeout(() => controller.abort(), 120_000)
+            void this.options.confirmDevice(pending, controller.signal).then(allow => {
+              if (!controller.signal.aborted) this.devicePairing.decide(ticket.requestId, allow)
+            }).catch(() => { this.devicePairing.decide(ticket.requestId, false) }).finally(() => {
+              clearTimeout(timer); this.approvals.delete(ticket.requestId)
+            })
+          }
+        } catch (error) {
+          this.sendJson(res, error instanceof Error && error.message === 'invalid_device_name' ? 400 : 429,
+            { error: error instanceof Error ? error.message : 'pair_request_failed' })
+        }
+        return
+      }
+      if (req.method === 'POST' && url.pathname === '/api/pair/claim') {
+        const body = await readJsonBody(req)
+        const result = typeof body?.requestId === 'string' && typeof body?.claimSecret === 'string' &&
+          body.requestId.length <= 64 && body.claimSecret.length <= 128
+          ? this.devicePairing.claim(body.requestId, body.claimSecret) : null
+        this.sendJson(res, result ? 200 : 404, result ?? { error: 'pair_request_expired' })
+        return
+      }
+      if (req.method === 'POST' && url.pathname === '/api/pair/cancel') {
+        const body = await readJsonBody(req)
+        const result = typeof body?.requestId === 'string' && typeof body?.claimSecret === 'string' &&
+          body.requestId.length <= 64 && body.claimSecret.length <= 128
+          ? this.devicePairing.claim(body.requestId, body.claimSecret) : null
+        if (result?.state === 'pending') {
+          this.devicePairing.decide(body!.requestId as string, false)
+          this.approvals.get(body!.requestId as string)?.abort()
+        }
+        this.sendJson(res, result ? 200 : 404, { cancelled: !!result })
         return
       }
 
@@ -398,12 +552,16 @@ export class RemoteHttpServer {
         return
       }
 
-      if (req.method === 'GET' && (url.pathname === '/api/events' || url.pathname === '/api/core/events')) {
+      if (
+        req.method === 'GET' &&
+        (url.pathname === '/api/events' || url.pathname === '/api/core/events')
+      ) {
         if (!this.authorize(req, url)) {
           this.sendJson(res, 401, { error: 'unauthorized' })
           return
         }
-        this.attachSse(res)
+        const authorization = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization
+        this.attachSse(res, authorization ?? `Bearer ${url.searchParams.get('token') ?? ''}`)
         return
       }
 
@@ -425,7 +583,14 @@ export class RemoteHttpServer {
           this.sendJson(res, 503, { error: 'core_rpc_handler_missing' })
           return
         }
-        const responseEnvelope = await this.onCoreRpc(body)
+        const responseEnvelope = await this.onCoreRpc(body, this.mediaPrincipal(req) ?? undefined,
+          { encrypted: req.socket.encrypted === true })
+        // A credential read may await the provider/keyring. Revocation or disabling remote
+        // control while it is pending must also prevent the completed response being sent.
+        if (body.name === 'providers.session' && (!this.enabled || !this.authorize(req, url))) {
+          this.sendJson(res, 401, { error: 'unauthorized' })
+          return
+        }
         this.sendJson(res, 200, responseEnvelope)
         return
       }
@@ -482,7 +647,7 @@ export class RemoteHttpServer {
         return
       }
 
-      if (req.method === 'GET' && url.pathname.startsWith('/media/')) {
+      if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/media/')) {
         const token = url.pathname.slice('/media/'.length)
         await this.serveMedia(req, res, token)
         return
@@ -501,11 +666,23 @@ export class RemoteHttpServer {
   private authorize(req: PortableIncomingMessage, url: URL): boolean {
     const authHeader = req.headers.authorization
     const authorization = Array.isArray(authHeader) ? authHeader[0] : authHeader
-    if (this.auth.authorizeBearer(authorization)) return true
+    if (this.authorizedBearer(authorization)) return true
     return this.auth.authorizeTokenQuery(url.searchParams.get('token'))
   }
 
-  private attachSse(res: PortableServerResponse): void {
+  private authorizedBearer(header: string | undefined): boolean {
+    if (this.auth.authorizeBearer(header)) return true
+    const token = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim())?.[1] : undefined
+    return !!token && this.devicePairing.authorize(token)
+  }
+
+  private mediaPrincipal(req: PortableIncomingMessage): string | null {
+    const header = Array.isArray(req.headers.authorization) ? req.headers.authorization[0] : req.headers.authorization
+    const token = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim())?.[1] : undefined
+    return token ? this.devicePairing.principal(token) ?? (this.auth.authorizeBearer(header) ? 'pin-session' : null) : null
+  }
+
+  private attachSse(res: PortableServerResponse, bearer: string): void {
     // S3: 超过上限直接 429 拒绝，避免无限长连接。
     if (this.sseClients.size >= this.sseMaxClients) {
       this.sendJson(res, 429, { error: 'too_many_event_connections' })
@@ -519,8 +696,10 @@ export class RemoteHttpServer {
       connection: 'keep-alive'
     })
     this.sseClients.add(res)
+    this.sseAuthorization.set(res, bearer)
     reqOnClose(res, () => {
       this.sseClients.delete(res)
+      this.sseAuthorization.delete(res)
     })
     this.writeSse(res, `event: state\ndata: ${JSON.stringify(this.snapshot)}\n\n`)
     if (this.coreStateEvent) {
@@ -537,6 +716,7 @@ export class RemoteHttpServer {
       writableLength + PortableBuffer.byteLength(payload) > this.sseMaxBufferedBytes
     ) {
       this.sseClients.delete(client)
+      this.sseAuthorization.delete(client)
       client.destroy()
       return
     }
@@ -544,6 +724,7 @@ export class RemoteHttpServer {
       client.write(payload)
     } catch {
       this.sseClients.delete(client)
+      this.sseAuthorization.delete(client)
       client.destroy()
     }
   }
@@ -567,7 +748,9 @@ export class RemoteHttpServer {
     }
     const body = coreFs.readFileSync(path)
     res.writeHead(200, {
-      ...corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
+      ...corsHeaders(
+        (res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin
+      ),
       'content-type': contentType,
       'content-length': body.length,
       'cache-control': 'no-cache'
@@ -583,6 +766,27 @@ export class RemoteHttpServer {
     const grant = this.mediaGrants.resolve(token)
     if (!grant) {
       this.sendJson(res, 404, { error: 'media_token_invalid' })
+      return
+    }
+
+    if (grant.stream) {
+      if (!this.enabled || this.mediaPrincipal(req) !== grant.stream.principal) {
+        this.sendJson(res, 401, { error: 'unauthorized' }); return
+      }
+      if (this.phoneReads.size >= 4) {
+        this.sendJson(res, 429, { error: 'media_busy' }); return
+      }
+      this.phoneReads.set(res, grant.stream.principal)
+      try {
+        const read = async () => {
+          if (!this.mediaGrants.resolve(token) || res.destroyed) {
+            if (!res.destroyed) this.sendJson(res, 404, { error: 'media_token_invalid' })
+            return
+          }
+          await this.servePhoneFile(req, res, grant.filePath!, grant.contentType, grant.stream!.sourceVersion)
+        }
+        await (this.options.useSource ? this.options.useSource(read) : read())
+      } finally { this.phoneReads.delete(res) }
       return
     }
 
@@ -606,6 +810,45 @@ export class RemoteHttpServer {
       await this.serveFile(req, res, filePath, grant.contentType)
     }
     await (this.options.useSource ? this.options.useSource(read) : read())
+  }
+
+  /** Bounded authenticated reads keep renewal/revocation effective during a long phone session.
+   * Read one descriptor and check its generation before and after reading: replacement files
+   * can never supply the next range of an already-pinned representation. Cast is unchanged. */
+  private async servePhoneFile(req: PortableIncomingMessage, res: PortableServerResponse,
+    path: string, type: string, version: string): Promise<void> {
+    const file = await coreFs.promises.open(path, 'r').catch(() => null)
+    if (!file) { this.sendJson(res, 404, { error: 'media_missing' }); return }
+    try {
+      const stat = await file.stat()
+      if (!stat.isFile() || mediaSourceVersion(stat) !== version) {
+        this.sendJson(res, 409, { error: 'source_changed' }); return
+      }
+      const headers = { 'content-type': type, 'accept-ranges': 'bytes', 'cache-control': 'no-store', etag: `"${version}"` }
+      if (req.headers['if-match'] && req.headers['if-match'] !== `"${version}"`) {
+        this.sendJson(res, 412, { error: 'source_changed' }); return
+      }
+      if (req.method === 'HEAD') { res.writeHead(200, { ...headers, 'content-length': stat.size }); res.end(); return }
+      const range = typeof req.headers.range === 'string' ? parseByteRange(req.headers.range, stat.size) : null
+      if (!range || range.end - range.start + 1 > REMOTE_STREAM_RANGE_BYTES) {
+        res.writeHead(416, { ...headers, 'content-range': `bytes */${stat.size}` }); res.end(); return
+      }
+      const size = range.end - range.start + 1
+      const bytes = new Uint8Array(size)
+      let read = 0
+      while (read < size) {
+        const part = await file.read(bytes, read, size - read, range.start + read)
+        if (!part.bytesRead) break
+        read += part.bytesRead
+      }
+      if (read !== size || mediaSourceVersion(await file.stat()) !== version) {
+        this.sendJson(res, 409, { error: 'source_changed' }); return
+      }
+      if (res.destroyed) return
+      res.writeHead(206, { ...headers, 'content-length': size,
+        'content-range': `bytes ${range.start}-${range.end}/${stat.size}` })
+      res.end(bytes)
+    } finally { await file.close() }
   }
 
   private async serveFile(
@@ -743,7 +986,9 @@ export class RemoteHttpServer {
   private sendJson(res: PortableServerResponse, status: number, body: unknown): void {
     const payload = PortableBuffer.from(JSON.stringify(body), 'utf8')
     res.writeHead(status, {
-      ...corsHeaders((res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin),
+      ...corsHeaders(
+        (res as PortableServerResponse & { teCorsOrigin?: string | null }).teCorsOrigin
+      ),
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       'content-length': payload.length

@@ -5,6 +5,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CoreApplication, type CoreApplicationDependencies } from './application.ts'
+import { CoreRemoteService } from './remote/service.ts'
+import { createDefaultSettings } from './settings/normalization.ts'
 import { CoreStateDatabase } from '../main/library/coreStateDatabase.ts'
 import { emptyCoreStateCounts, type CoreStateApi } from '../shared/coreState.ts'
 import type {
@@ -325,6 +327,126 @@ function fixture(
   })
   return { application, playback, scan, calls, messages, connect, request }
 }
+
+test('Android bridge selection and controls use the real Core permission and query boundary', async (t) => {
+  const db = new LibraryDatabase(':memory:')
+  t.after(() => db.close())
+  db.replaceDocument({
+    version: 2,
+    revision: 0,
+    folders: [],
+    exclusions: [],
+    tracks: [
+      {
+        id: 'D:/private/track.flac',
+        source: 'local',
+        filePath: 'D:/private/track.flac',
+        title: 'Desktop song',
+        artist: 'Artist',
+        album: 'Album',
+        duration: 120,
+        fileName: 'track.flac',
+        size: 1,
+        cover: null,
+        lyrics: null
+      }
+    ]
+  })
+  const f = fixture(t, true, undefined, undefined, undefined, undefined, undefined, {
+    library: {
+      queryTracks: async (query) => db.queryTracks(query),
+      queryCollections: async (...args) => db.queryCollections(...args),
+      getTracksByIds: async (...args) => db.getTracksByIds(...args),
+      lookupTracksByPaths: async (...args) => db.lookupTracksByPaths(...args),
+      lookupPlaylistTracks: async (...args) => db.lookupPlaylistTracks(...args),
+      getMetadata: async () => db.getMetadata(),
+      readLibraryQueue: async (...args) => db.readLibraryQueue(...args)
+    }
+  })
+  const rows: LibraryQueueSeedItem[] = []
+  f.playback.fromPages = async (produce, options) => {
+    await produce(async (items) => {
+      rows.push(...items)
+    })
+    options?.guard?.()
+  }
+  const remoteSettings = createDefaultSettings('win32')
+  const remote = new CoreRemoteService({
+    server: {
+      setCommandHandler() {},
+      setBrowseHandler() {},
+      setCoreRpcHandler() {},
+      updatePlaybackSnapshot() {},
+      updateCoreStateEvent() {},
+      stop: async () => {}
+    } as never,
+    settings: {
+      read: () => remoteSettings,
+      update: (patch) => Object.assign(remoteSettings, patch)
+    },
+    playback: f.playback,
+    playlistRecords: async () => {
+      throw new Error('Not used')
+    },
+    castActive: () => false,
+    resolveCover: async () => null,
+    failed: () => {},
+    now: () => 0
+  })
+  remote.attach(f.application)
+  t.after(() => remote.shutdown())
+  await f.application.initialize()
+  const envelope = (requestId: string, kind: string, name: string, payload = {}) => ({
+    protocolVersion: 1,
+    requestId,
+    epoch: 'current',
+    kind,
+    name,
+    payload
+  })
+  const found = await remote.handleCoreRpc(
+    envelope('search', 'query', 'search.songs', { query: 'Desktop' })
+  )
+  assert.equal(found.ok, true)
+  const view = (found.value as { items: Array<{ id: string }> }).items[0]
+  assert.match(view.id, /^remote-track:/)
+  assert.doesNotMatch(JSON.stringify(found), /D:|private|filePath/)
+  const selected = await remote.handleCoreRpc({
+    ...envelope('select', 'command', 'playback.replaceQueue', {
+      id: 'default',
+      expectedRevision: 0,
+      tracks: [view, view],
+      startIndex: 1,
+      play: false
+    }),
+    commandId: 'one-selection',
+    expectedRevision: 0
+  })
+  assert.equal(selected.ok, true)
+  assert.deepEqual(rows, [{ id: 'D:/private/track.flac' }, { id: 'D:/private/track.flac' }])
+  assert.equal((await remote.handleCoreRpc(envelope('play', 'command', 'playback.play'))).ok, true)
+  assert.ok(f.calls.includes('play'))
+  assert.equal(
+    (
+      await remote.handleCoreRpc(
+        envelope('volume', 'command', 'playback.setVolume', { volume: 0.5 })
+      )
+    ).ok,
+    true
+  )
+  assert.equal(
+    (
+      await remote.handleCoreRpc(
+        envelope('mode', 'command', 'playback.setPlayMode', { mode: 'loop' })
+      )
+    ).ok,
+    true
+  )
+  const forbidden = await remote.handleCoreRpc(
+    envelope('internal', 'query', 'library.paths.lookup', { paths: ['D:/private/track.flac'] })
+  )
+  assert.equal((forbidden.error as { code: string }).code, 'FORBIDDEN')
+})
 
 test('Core Focus keeps offline saved queries and library playback independent of provider authority', async t => {
   const db = new LibraryDatabase(':memory:')
