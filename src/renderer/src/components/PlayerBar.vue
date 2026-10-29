@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import PlaybackIcon from '@renderer/components/icons/PlaybackIcon.vue'
 import { executeCoreExtension } from '../extensions/corePlugins.ts'
+import { resolvePlayerBarExtensions } from '../extensions/playerBarExtensions.ts'
+import { usePluginFlyout } from '../stores/usePluginFlyout'
 import PlaybackModeIcon from '@renderer/components/icons/PlaybackModeIcon.vue'
 import PlayerControlIcon from '@renderer/components/player-bar/PlayerControlIcon.vue'
 import { clampVolumePercent, createVolumeWheelStepper } from './player-bar/volumeWheel'
@@ -267,9 +269,16 @@ const { locale } = useLocale()
 const coverRef = ref<HTMLElement | null>(null)
 const playerBarShellRef = ref<HTMLElement | null>(null)
 const playButtonColor = computed(() => normalizeAccentColor(dominantColor.value))
-const { uiContributions, syncExtensions } = useExtensionRegistry({ listen: !props.preview })
-const playerBarButtons = computed(() =>
-  uiContributions.value.filter((contribution) => contribution.kind === 'playerBarButton')
+const { uiContributions, experiences, syncExtensions } = useExtensionRegistry({
+  listen: !props.preview
+})
+const pluginFlyout = usePluginFlyout()
+const playerBarExtensions = computed(() =>
+  resolvePlayerBarExtensions(
+    uiContributions.value,
+    experiences.value,
+    isStandard.value && !props.preview
+  )
 )
 const { settings } = useSettingsStore()
 const previewPlayerSettings = computed(
@@ -1217,6 +1226,11 @@ async function runPlayerBarExtension(command?: string): Promise<void> {
   await executeCoreExtension(command, [currentTrack.value])
 }
 
+function togglePlayerBarPanel(button: { pluginId: string; title: string }): void {
+  moreOpen.value = false
+  pluginFlyout.toggle({ pluginId: button.pluginId, title: button.title })
+}
+
 function onToggleClipGuard(): void {
   void setAudioProcessing({ clipGuard: !audioProcessing.value.clipGuard })
 }
@@ -2069,6 +2083,23 @@ onBeforeUnmount(() => {
           </button>
         </template>
 
+        <template v-if="region.name === 'right'">
+          <button
+            v-for="button in playerBarExtensions.inline"
+            :key="`${button.pluginId}:${button.id}`"
+            type="button"
+            class="icon-btn player-misc-icon plugin-playerbar-button"
+            :class="{ active: pluginFlyout.target.value?.pluginId === button.pluginId }"
+            :title="button.title"
+            :aria-label="button.title"
+            :aria-pressed="pluginFlyout.target.value?.pluginId === button.pluginId"
+            aria-haspopup="dialog"
+            @click="togglePlayerBarPanel(button)"
+          >
+            <i :class="button.icon || 'ph ph-puzzle-piece'" aria-hidden="true"></i>
+          </button>
+        </template>
+
         <!-- 形态固有 chrome，永远排在编排出来的控件之后。迷你条 40px 高，塞不下
              续播提示，所以它在迷你形态里仍然不渲染——和这套编排之前的行为一致。 -->
         <div
@@ -2180,7 +2211,7 @@ onBeforeUnmount(() => {
             :translation-layer-selection="translationLayerSelection"
             :show-translation="showTranslation"
             :lyric-controls-pending="lyricsReloading || lyricControlsPending"
-            :player-bar-buttons="playerBarButtons"
+            :player-bar-buttons="playerBarExtensions.menu"
             :is-live-stream="isLiveStream"
             :playback-rate="playbackRate"
             :playback-rate-label="playbackRateLabel"
@@ -2318,6 +2349,20 @@ onBeforeUnmount(() => {
         </div>
         <button class="icon-btn" disabled aria-label="歌词，请先选择歌曲">
           <span class="desktop-lyrics-icon" aria-hidden="true">词</span>
+        </button>
+        <button
+          v-for="button in playerBarExtensions.inline"
+          :key="`${button.pluginId}:${button.id}`"
+          type="button"
+          class="icon-btn player-misc-icon plugin-playerbar-button"
+          :class="{ active: pluginFlyout.target.value?.pluginId === button.pluginId }"
+          :title="button.title"
+          :aria-label="button.title"
+          :aria-pressed="pluginFlyout.target.value?.pluginId === button.pluginId"
+          aria-haspopup="dialog"
+          @click="togglePlayerBarPanel(button)"
+        >
+          <i :class="button.icon || 'ph ph-puzzle-piece'" aria-hidden="true"></i>
         </button>
       </div>
     </div>

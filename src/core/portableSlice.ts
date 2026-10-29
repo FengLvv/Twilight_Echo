@@ -2548,6 +2548,7 @@ export function createPortableMusicCoreHost(options: PortableHostOptions): Porta
         persistence: { dirty: false, failureCount: 0, error: null }
       }),
       page: () => ({ revision: 0, total: 0, offset: 0, items: [] }),
+      pageWithArtwork: async () => ({ revision: 0, total: 0, offset: 0, items: [] }),
       overview: async () => ({
         revision: 0,
         trackCount: 0,

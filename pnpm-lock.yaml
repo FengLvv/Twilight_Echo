@@ -331,6 +331,8 @@ importers:
 
   packages/create-twilight-plugin: {}
 
+  packages/ncm-comments: {}
+
   packages/plugin-api:
     devDependencies:
       typescript:

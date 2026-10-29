@@ -203,7 +203,7 @@ JS 插件实现两个函数：
 `ui` 类型插件贡献受控扩展点，均需 `ui:inject` 权限：
 
 - `sidebarPage`：侧边栏自定义页面
-- `playerBarButton`：播放栏附加按钮
+- `playerBarButton`：播放栏附加按钮。同一插件声明 `launch: "panel"` Experience 时，标准播放栏直接显示按钮并打开其面板；只有命令的扩展及小型布局保留在更多／HiFi 插件菜单。
 - `settingsPanel`：设置页配置区
 - `localSidebarItem`：本地音乐侧栏入口
 - `streamingHome`：流媒体首页入口

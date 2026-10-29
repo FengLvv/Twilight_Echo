@@ -177,6 +177,45 @@ export class CoreStatisticsService {
       }))
     }
   }
+  /** Re-issue artwork grants from private history snapshots, including after a
+   * restart. Public track metadata deliberately contains no durable image URL. */
+  async pageWithArtwork(
+    query: CoreStatisticsQuery,
+    present: ((track: TrackData, signal: AbortSignal) => Promise<{ cover: string | null }>) | undefined,
+    signal: AbortSignal
+  ): Promise<CoreStatisticsPage> {
+    signal.throwIfAborted()
+    const page = this.page(query)
+    if (!present) return page
+    // Capture sources before awaiting so a later playback tick cannot mix rows.
+    const sources = page.items.map((item) => {
+      const stat = this.stats.tracks[item.id]
+      return stat?.track && !item.cover
+        ? {
+            ...stat.track,
+            cover: stat.cover || stat.track.cover,
+            coverSource: stat.coverSource || stat.track.coverSource || null
+          }
+        : null
+    })
+    for (let index = 0; index < page.items.length; index++) {
+      signal.throwIfAborted()
+      const source = sources[index]
+      if (!source?.cover && !source?.coverSource) continue
+      try {
+        page.items[index].cover = (await present(source, signal)).cover
+      } catch {
+        // One expired or unavailable image must not hide the listening history.
+        signal.throwIfAborted()
+      }
+    }
+    signal.throwIfAborted()
+    if (page.revision !== this.revision)
+      throw Object.assign(new Error('Listening history changed; restart the paged query'), {
+        code: 'STALE_REVISION'
+      })
+    return page
+  }
   observe(
     track: TrackData | null,
     info: Pick<PlaybackInfo, 'state' | 'position' | 'duration'>

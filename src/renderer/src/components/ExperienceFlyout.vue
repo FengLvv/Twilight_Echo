@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { usePluginFlyout } from '../stores/usePluginFlyout'
 import { useExtensionRegistry } from '../extensions/registry.ts'
 import { createExperienceBridge } from '../extensions/experienceBridge'
+import { pluginPanelIdentity } from '../extensions/playerBarExtensions.ts'
 
 /**
  * Right-side flyout hosting a plugin panel experience. Deliberately does NOT
@@ -20,6 +21,7 @@ const experience = computed(
       (entry) => entry.pluginId === target.value?.pluginId && entry.launch === 'panel'
     ) ?? null
 )
+const panelIdentity = computed(() => pluginPanelIdentity(experience.value))
 
 const frame = ref<HTMLIFrameElement>()
 const ready = ref(false)
@@ -40,7 +42,12 @@ function handshake(event: MessageEvent): void {
   }
   const channel = new MessageChannel()
   dispose?.()
-  dispose = createExperienceBridge(experience.value!, channel.port1, () => flyout.close(), () => {})
+  dispose = createExperienceBridge(
+    experience.value!,
+    channel.port1,
+    () => flyout.close(),
+    () => {}
+  )
   event.source?.postMessage(
     { type: 'twilight-experience-connect', bridgeVersion: experience.value!.bridgeVersion },
     { targetOrigin: event.origin, transfer: [channel.port2] }
@@ -59,12 +66,13 @@ function frameLoaded(): void {
 }
 
 // Closing or switching panels remounts the iframe; drop the stale session.
-watch([target, experience], () => {
+watch(panelIdentity, () => {
   clearTimeout(deadline)
   dispose?.()
   dispose = undefined
   ready.value = false
   error.value = ''
+  if (target.value && !experience.value) flyout.close()
 })
 
 onMounted(() => window.addEventListener('message', handshake))
@@ -96,6 +104,7 @@ onBeforeUnmount(() => {
         </header>
         <div class="experience-flyout-body">
           <iframe
+            :key="panelIdentity"
             ref="frame"
             :src="experience.url"
             :title="target.title"

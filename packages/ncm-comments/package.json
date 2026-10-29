@@ -1,0 +1,11 @@
+{
+  "name": "@twilight-echo/ncm-comments",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack": "node scripts/pack.mjs",
+    "test:live": "node scripts/live.mjs"
+  }
+}

@@ -1815,7 +1815,7 @@ export class CoreApplication {
       case 'statistics.previewClear':
         return this.dependencies.statistics.previewClear(request.payload.range, request.payload.revision)
       case 'statistics.tracks':
-        return this.dependencies.statistics.page(request.payload)
+        return this.dependencies.statistics.pageWithArtwork(request.payload, this.dependencies.artwork, signal)
       case 'statistics.clear':
         return this.dependencies.statistics.clear(request.payload.range, request.payload.revision)
       case 'state.snapshot':

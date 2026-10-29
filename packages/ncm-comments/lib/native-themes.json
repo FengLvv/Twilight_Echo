@@ -1,0 +1,198 @@
+{
+  "builtin:twilight-echo-default": {
+    "pureWhite": {
+      "background": "#f4f4f7",
+      "surface": "#f8fafc",
+      "hover": "#f3f4f6",
+      "text": "#0f172a",
+      "muted": "#64748b",
+      "border": "rgba(15, 23, 42, 0.08)",
+      "accent": "#2563eb",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "16px",
+      "lyric": "#ffffff"
+    },
+    "dark": {
+      "background": "#17181a",
+      "surface": "#121212",
+      "hover": "rgba(255, 255, 255, 0.065)",
+      "text": "#f7f7f2",
+      "muted": "#9b9b9b",
+      "border": "rgba(255, 255, 255, 0.1)",
+      "accent": "#2563eb",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "16px",
+      "lyric": "#ffffff"
+    }
+  },
+  "builtin:aurora-reference": {
+    "pureWhite": {
+      "background": "#f6f5f8",
+      "surface": "#f1f0f5",
+      "hover": "rgba(81, 68, 222, 0.07)",
+      "text": "#252431",
+      "muted": "#777582",
+      "border": "rgba(81, 68, 222, 0.22)",
+      "accent": "#5144de",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "10px",
+      "lyric": "#4637c8"
+    },
+    "dark": {
+      "background": "#15151d",
+      "surface": "#22222b",
+      "hover": "rgba(172, 160, 255, 0.07)",
+      "text": "#f4f1ff",
+      "muted": "#a09dad",
+      "border": "rgba(172, 160, 255, 0.18)",
+      "accent": "#aca0ff",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "10px",
+      "lyric": "#c6bcff"
+    }
+  },
+  "builtin:obsidian-glass": {
+    "pureWhite": {
+      "background": "#ffffff",
+      "surface": "#ecefec",
+      "hover": "rgba(36, 116, 104, 0.06)",
+      "text": "#202724",
+      "muted": "#646e69",
+      "border": "rgba(32, 39, 36, 0.14)",
+      "accent": "#b94035",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "8px",
+      "lyric": "#ffffff"
+    },
+    "dark": {
+      "background": "#141816",
+      "surface": "#1c211e",
+      "hover": "rgba(125, 187, 173, 0.07)",
+      "text": "#f1f3ed",
+      "muted": "#a0aba4",
+      "border": "rgba(241, 243, 237, 0.14)",
+      "accent": "#ee8978",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "8px",
+      "lyric": "#ffffff"
+    }
+  },
+  "builtin:paper-light": {
+    "pureWhite": {
+      "background": "#f5f4ef",
+      "surface": "#f8fafc",
+      "hover": "#e9ece7",
+      "text": "#202724",
+      "muted": "#6f7471",
+      "border": "#d7dbd6",
+      "accent": "#397963",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "6px",
+      "lyric": "#202724"
+    },
+    "dark": {
+      "background": "#171918",
+      "surface": "#121212",
+      "hover": "rgba(236, 240, 233, 0.06)",
+      "text": "#ecf0e9",
+      "muted": "#a2aba5",
+      "border": "#363d38",
+      "accent": "#a4c5b4",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "6px",
+      "lyric": "#f5f7f2"
+    }
+  },
+  "builtin:neon-gradient": {
+    "pureWhite": {
+      "background": "#fdf2fc",
+      "surface": "#fce8f9",
+      "hover": "rgba(219, 31, 142, 0.07)",
+      "text": "#2b0a45",
+      "muted": "#7d4899",
+      "border": "rgba(219, 31, 142, 0.22)",
+      "accent": "#db1f8e",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "24px",
+      "lyric": "#ffffff"
+    },
+    "dark": {
+      "background": "#080310",
+      "surface": "#120820",
+      "hover": "rgba(255, 63, 164, 0.1)",
+      "text": "#fdeefb",
+      "muted": "#b98fd0",
+      "border": "rgba(255, 63, 164, 0.3)",
+      "accent": "#ff3fa4",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "24px",
+      "lyric": "#ffffff"
+    }
+  },
+  "builtin:studio-split": {
+    "pureWhite": {
+      "background": "#e9ebec",
+      "surface": "#eef0f1",
+      "hover": "#e2e5e6",
+      "text": "#14181a",
+      "muted": "#5b6467",
+      "border": "#c6cbcd",
+      "accent": "#c2410c",
+      "font": "'JetBrains Mono', 'Cascadia Code', 'MiSans', Consolas, monospace",
+      "fontSize": "13px",
+      "radius": "6px",
+      "lyric": "#ffffff"
+    },
+    "dark": {
+      "background": "#121415",
+      "surface": "#17191b",
+      "hover": "#1e2224",
+      "text": "#e8ecea",
+      "muted": "#8b9591",
+      "border": "#2e3437",
+      "accent": "#3ddc97",
+      "font": "'JetBrains Mono', 'Cascadia Code', 'MiSans', Consolas, monospace",
+      "fontSize": "13px",
+      "radius": "6px",
+      "lyric": "#ffffff"
+    }
+  },
+  "builtin:zen-minimal": {
+    "pureWhite": {
+      "background": "#f6f5f0",
+      "surface": "#f1efe9",
+      "hover": "#edebe3",
+      "text": "#26282a",
+      "muted": "#6b6e66",
+      "border": "#e7e4da",
+      "accent": "#47614f",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "12px",
+      "lyric": "#ffffff"
+    },
+    "dark": {
+      "background": "#17191b",
+      "surface": "#1a1d1f",
+      "hover": "rgba(255, 255, 255, 0.045)",
+      "text": "#e9e7df",
+      "muted": "#9a9d97",
+      "border": "#2c2f31",
+      "accent": "#9eb5a4",
+      "font": "'Inter', 'Plus Jakarta Sans', 'MiSans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "fontSize": "14px",
+      "radius": "12px",
+      "lyric": "#ffffff"
+    }
+  }
+}

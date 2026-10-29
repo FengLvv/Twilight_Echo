@@ -1,0 +1,38 @@
+{
+  "id": "com.twilightecho.tool.ncm-comments",
+  "name": "网易云评论",
+  "version": "0.1.2",
+  "description": "浏览热评与最新评论，自动识别本地歌曲并保留可纠正的歌曲关联。",
+  "author": "Twilight Echo contributors",
+  "license": "Apache-2.0",
+  "type": ["tool", "ui"],
+  "main": "index.mjs",
+  "engines": { "twilightEcho": ">=1.4.0-perview.1" },
+  "apiVersion": 4,
+  "permissions": [
+    "ui:inject",
+    "player:observe",
+    "network",
+    "library:read",
+    "settings",
+    "app:settings"
+  ],
+  "contributes": {
+    "experiences": [
+      {
+        "id": "comments",
+        "name": "网易云评论",
+        "entry": "ui/index.html",
+        "bridgeVersion": 2,
+        "launch": "panel"
+      },
+      {
+        "id": "lyrics-comments",
+        "name": "歌词与评论",
+        "entry": "ui/page.html",
+        "bridgeVersion": 2,
+        "launch": "page"
+      }
+    ]
+  }
+}

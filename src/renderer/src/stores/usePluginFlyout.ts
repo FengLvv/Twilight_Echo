@@ -7,7 +7,7 @@ export interface PluginFlyoutTarget {
 
 const target = ref<PluginFlyoutTarget | null>(null)
 
-/** Host-owned right-side flyout for plugin panel experiences (titlebar entry). */
+/** Host-owned flyout for plugin panel experiences opened from native controls. */
 export function usePluginFlyout() {
   return {
     target: computed(() => target.value),
@@ -15,8 +15,7 @@ export function usePluginFlyout() {
       target.value = next
     },
     toggle(next: PluginFlyoutTarget): void {
-      target.value =
-        target.value?.pluginId === next.pluginId ? null : next
+      target.value = target.value?.pluginId === next.pluginId ? null : next
     },
     close(): void {
       target.value = null

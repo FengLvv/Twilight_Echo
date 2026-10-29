@@ -6,7 +6,8 @@ export interface PluginExperience {
   /**
    * How the host surfaces this experience. `page` (default) lists it in the
    * sidebar navigation; `panel` hides it from navigation — the plugin opens it
-   * through its own `titleBarButton` and the host mounts it in a flyout.
+   * through its own `titleBarButton` or standard-layout `playerBarButton`
+   * and the host mounts it in a flyout.
    */
   launch?: 'page' | 'panel'
 }

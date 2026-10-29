@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>网易云评论</title>
+    <link rel="stylesheet" href="native-fonts.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="page.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body tabindex="-1">
+    <main>
+      <header class="song-header">
+        <div class="cover" id="cover" aria-hidden="true">♫</div>
+        <div class="song-info">
+          <span class="eyebrow">此刻，听见共鸣</span>
+          <h1 id="song-title">网易云评论</h1>
+          <p id="song-artist">随音乐，看看大家的故事</p>
+        </div>
+      </header>
+      <div id="association" class="association" hidden></div>
+      <section id="matching" class="matching" aria-label="关联网易云歌曲" hidden>
+        <div class="section-label">找到对应的歌曲版本</div>
+        <p class="hint">核对歌手、专辑与时长，让评论属于这一首。</p>
+        <form id="search-form">
+          <label class="sr-only" for="query">搜索歌名和歌手</label>
+          <div class="input-row">
+            <input id="query" maxlength="200" placeholder="歌名 / 歌手" autocomplete="off" /><button
+              type="button"
+              id="search-submit"
+              class="primary"
+            >
+              搜索
+            </button>
+          </div>
+        </form>
+        <details id="manual-entry">
+          <summary>粘贴网易云歌曲链接或 ID</summary>
+          <form id="link-form">
+            <label class="sr-only" for="song-link">网易云歌曲链接或 ID</label>
+            <div class="input-row">
+              <input
+                id="song-link"
+                maxlength="1024"
+                placeholder="music.163.com/song?id=…"
+                autocomplete="off"
+              /><button type="button" id="associate-song">关联</button>
+            </div>
+          </form>
+        </details>
+        <div id="candidates" class="candidates"></div>
+      </section>
+      <nav class="tabs" aria-label="评论排序" hidden id="tabs">
+        <div role="tablist" aria-label="评论排序">
+          <button
+            id="tab-hot"
+            role="tab"
+            aria-controls="comment-panel"
+            aria-selected="true"
+            tabindex="0"
+          >
+            热评</button
+          ><button
+            id="tab-latest"
+            role="tab"
+            aria-controls="comment-panel"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            最新
+          </button>
+        </div>
+        <button id="refresh" class="icon-button" aria-label="刷新当前评论" title="刷新当前评论">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 18 17" />
+          </svg>
+        </button>
+      </nav>
+      <section id="comment-panel" role="tabpanel" aria-labelledby="tab-hot" class="comment-panel">
+        <div class="count" id="count" hidden></div>
+        <div id="status" class="status" role="status" aria-live="polite">
+          <div class="empty-symbol" aria-hidden="true">“</div>
+          <h2>让音乐先响起</h2>
+          <p>播放一首歌曲，在这里阅读它的评论。</p>
+        </div>
+        <div id="skeleton" class="skeleton" aria-hidden="true" hidden>
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+        <div id="error" class="error" role="alert" hidden>
+          <p id="error-text"></p>
+          <button id="retry">重试</button>
+        </div>
+        <div id="comments" class="comments"></div>
+        <button id="load-more" class="load-more" hidden>加载更多评论</button>
+        <div id="end" class="end" hidden>已经读到这里了</div>
+      </section>
+      <footer>来自网易云音乐 · 只读浏览</footer>
+    </main>
+    <div id="toast" role="status" class="toast" hidden></div>
+  </body>
+</html>

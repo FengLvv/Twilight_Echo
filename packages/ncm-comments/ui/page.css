@@ -1,0 +1,246 @@
+/* Geometry and visual roles follow the native player; colours/fonts are copied
+   from its shipped theme tokens at build time and selected from host settings. */
+:root {
+  font-family: var(--native-font, 'MiSans', 'Microsoft YaHei', system-ui, sans-serif);
+  font-size: var(--native-font-size, 14px);
+  --accent-ink: var(--accent);
+}
+:root[data-theme='light'] {
+  --accent-ink: color-mix(in srgb, var(--accent) 80%, #111);
+}
+.eyebrow,
+.association button,
+.expand {
+  color: var(--accent-ink);
+}
+button.primary {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  color: var(--accent-ink);
+}
+.error,
+.candidate {
+  border-radius: var(--native-radius, 12px);
+}
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *:before {
+  animation: none !important;
+  scroll-behavior: auto !important;
+  transition: none !important;
+}
+body[data-layout='page'] {
+  scroll-behavior: smooth;
+}
+body[data-layout='page'] > .page-stage {
+  min-height: calc(100vh - 1px);
+  position: relative;
+  padding: 24px clamp(24px, 6vw, 96px) 70px;
+}
+.page-top {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  max-width: 1240px;
+  margin: auto;
+}
+.page-back {
+  font-size: 13px;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 0;
+}
+.page-back:hover {
+  background: transparent;
+  color: var(--text);
+}
+.page-stage-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) minmax(0, 720px);
+  gap: clamp(40px, 7vw, 100px);
+  align-items: center;
+  justify-content: center;
+  max-width: 1240px;
+  margin: 35px auto 0;
+  min-height: calc(100vh - 200px);
+}
+.page-record {
+  width: 100%;
+  min-width: 0;
+}
+.page-record-cover {
+  width: min(100%, 340px);
+  aspect-ratio: 1;
+  border-radius: 26px;
+  overflow: hidden;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 72px;
+  border: 1px solid var(--border);
+  box-shadow: 0 26px 70px #0003;
+}
+.page-record-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.page-record-title {
+  font-size: clamp(24px, 2.7vw, 36px);
+  line-height: 1.35;
+  margin: 24px 0 10px;
+  letter-spacing: -0.02em;
+}
+.page-record-artist,
+.page-record-album {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 4px 0;
+}
+.page-record-progress {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.page-lyrics {
+  position: relative;
+  height: calc(100vh - 235px);
+  min-height: 260px;
+  max-height: 660px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 87%, transparent);
+  outline-offset: 6px;
+}
+.page-lyric-lines {
+  padding: 100px 12px 180px;
+}
+.page-lyric-row {
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 550;
+  line-height: 1.65;
+  color: var(--muted);
+  padding: 13px 0;
+  transition: color 0.25s;
+  overflow-wrap: anywhere;
+}
+.page-lyric-row.active {
+  color: var(--text);
+  font-weight: 700;
+}
+.page-lyric-translation {
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-top: 3px;
+}
+.page-no-lyrics {
+  font-size: 18px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.page-comments-hint {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+.page-comments-hint:hover {
+  background: transparent;
+  color: var(--text);
+}
+body[data-layout='page'] main {
+  max-width: 1080px;
+  margin: auto;
+  padding: 44px clamp(24px, 4vw, 54px) 96px;
+  min-height: 70vh;
+  scroll-margin-top: 20px;
+}
+body[data-layout='page'] .song-header {
+  display: none;
+}
+.page-comments-title {
+  font-size: 24px;
+  margin: 0 0 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+body[data-layout='page'] .comment {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+  padding: 24px 0;
+}
+body[data-layout='page'] .avatar {
+  width: 40px;
+  height: 40px;
+}
+body[data-layout='page'] .comment-body {
+  font-size: 14px;
+  line-height: 1.8;
+}
+body[data-layout='page'] .tabs {
+  margin-top: 14px;
+}
+body[data-layout='page'] .candidates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+body[data-layout='page'] .candidate {
+  margin: 0;
+}
+body[data-layout='page'] .matching {
+  max-width: 800px;
+}
+body[data-layout='page'] .input-row {
+  max-width: 600px;
+}
+body[data-layout='page'] .load-more {
+  max-width: 400px;
+  display: block;
+  margin: 24px auto 0;
+}
+@media (max-width: 720px) {
+  .page-stage-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    margin-top: 20px;
+  }
+  .page-record {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    column-gap: 20px;
+    align-items: start;
+  }
+  .page-record-cover {
+    width: 100px;
+    grid-row: span 4;
+    border-radius: 16px;
+  }
+  .page-record-title {
+    font-size: 23px;
+    margin: 0 0 5px;
+  }
+  .page-record-progress {
+    margin-top: 8px;
+  }
+  .page-lyrics {
+    height: calc(100vh - 300px);
+    min-height: 250px;
+  }
+  .page-lyric-lines {
+    padding: 70px 0 110px;
+  }
+  .page-lyric-row {
+    font-size: 20px;
+  }
+  body[data-layout='page'] .candidates {
+    grid-template-columns: 1fr;
+  }
+  body[data-layout='page'] > .page-stage {
+    padding: 18px 24px 45px;
+  }
+}

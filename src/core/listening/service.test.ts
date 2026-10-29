@@ -10,6 +10,7 @@ import { CoreStatisticsService } from './service.ts'
 import { createLibraryListeningProjection } from './libraryProjection.ts'
 import { listeningSourceIdentity } from '../../shared/listeningSourceIdentity.ts'
 import { buildLastPlayedBySource } from './model.ts'
+import { createArtworkProjection } from '../../main/coreProcess/artworkProjection.ts'
 
 const local: TrackData = {
   id: 'local:cue',
@@ -212,6 +213,78 @@ test('cross-source aggregation, skips and completions retain existing thresholds
     [local.id, provider.id]
   )
   assert.equal(saved.tracks['logic:song::singer'].track?.streamUrl, null)
+})
+
+test('recent history re-grants NetEase artwork after repository reload without exposing CDN URLs', async (t) => {
+  const f = await fixture(t)
+  const origin = 'https://p1.music.126.net/album.jpg?token=private'
+  f.observe({ ...provider, id: 'ncm:42', source: 'ncm', ncmSongId: 42,
+    cover: 'twilight-media://image/previous-session', coverSource: origin }, 'playing')
+  f.timers.advance(5_000)
+  f.observe(null, 'stopped')
+  await f.service.flush()
+  const restored = new CoreStatisticsService({
+    repository: new CoreStatisticsRepository({ database: f.database, newId: () => 'restored' }),
+    now: () => f.timers.now, timers: f.timers, changed: () => {}
+  })
+  await restored.initialize()
+  t.after(() => restored.shutdown())
+  const sources: string[] = []
+  const project = createArtworkProjection({
+    normalizeCachedCover: async handle => handle, migrateBase64Cover: () => null,
+    resolve: () => { throw Error('Previous-session grant is unavailable') },
+    grant: source => { sources.push(source); return 'twilight-media://image/current-session' }
+  })
+  const before = restored.exportData()
+  for (const sort of ['recent', 'plays', 'seconds'] as const) {
+    const page = await restored.pageWithArtwork({ sort }, (track, signal) => project({
+      cover: track.cover, coverSource: track.coverSource ?? null
+    }, signal), new AbortController().signal)
+    assert.equal(page.items[0].cover, 'twilight-media://image/current-session')
+    assert.equal(page.items[0].track?.id, 'ncm:42')
+    assert.doesNotMatch(JSON.stringify(page), /https:|token=|private|previous-session/)
+  }
+  assert.deepEqual(sources, [origin, origin, origin])
+  assert.deepEqual(restored.exportData(), before, 'display grants must not replace durable history')
+})
+
+test('history artwork preserves local covers, supports legacy HTTP covers and isolates broken images', async t => {
+  const f = await fixture(t)
+  for (const [title, cover] of [
+    ['Local', 'cover://local.jpg'], ['Legacy', 'https://p2.music.126.net/legacy.jpg'],
+    ['Broken', 'https://p2.music.126.net/broken.jpg'], ['Missing', null]
+  ] as const) {
+    f.observe({ ...provider, id: title, title, cover }, 'playing')
+    f.timers.advance(5_000)
+  }
+  f.observe(null, 'stopped')
+  const projected: string[] = []
+  const page = await f.service.pageWithArtwork({}, async track => {
+    projected.push(track.title)
+    if (track.title === 'Broken') throw Error('Expired grant')
+    assert.equal(track.coverSource, 'https://p2.music.126.net/legacy.jpg')
+    return { cover: 'twilight-media://image/legacy' }
+  }, new AbortController().signal)
+  assert.deepEqual(projected.sort(), ['Broken', 'Legacy'])
+  const covers = Object.fromEntries(page.items.map(item => [item.title, item.cover]))
+  assert.deepEqual(covers, { Missing: null, Broken: null,
+    Legacy: 'twilight-media://image/legacy', Local: 'cover://local.jpg' })
+})
+
+test('history artwork cancels requests and rejects a page changed while granting images', async t => {
+  const f = await fixture(t)
+  f.observe({ ...provider, cover: 'https://p1.music.126.net/a.jpg' }, 'playing')
+  f.timers.advance(5_000)
+  f.observe(null, 'stopped')
+  const controller = new AbortController()
+  await assert.rejects(f.service.pageWithArtwork({}, async () => {
+    controller.abort()
+    return { cover: 'twilight-media://image/late' }
+  }, controller.signal), { name: 'AbortError' })
+  await assert.rejects(f.service.pageWithArtwork({}, async () => {
+    await f.service.clear(null, f.service.getRevision())
+    return { cover: 'twilight-media://image/late' }
+  }, new AbortController().signal), { code: 'STALE_REVISION' })
 })
 
 test('Pause and Stop do not count outcomes, same-track occurrences keep legacy play counting, and 50–90 percent is neither outcome', async (t) => {
