@@ -330,6 +330,25 @@ function fixture(
   return { application, playback, scan, calls, messages, connect, request }
 }
 
+test('comments account and publish use the real provider permission boundary', async (t) => {
+  const calls: string[] = []
+  const f = fixture(t, true, undefined, undefined, undefined, undefined, undefined, { comments: {
+    request: async () => null,
+    account: async () => ({ loggedIn: true, context: 'account' }),
+    publish: async value => { calls.push(value.content); return { status: 'published', comment: null } }
+  } })
+  await f.application.initialize()
+  f.connect('reader', ['library:read'])
+  f.connect('writer', ['providers:call'])
+  const payload = { songId: '42', content: 'Explicit submit', submissionId: 'once', accountContext: 'account' }
+  assert.equal((await f.request('reader', 'comments.account')).ok, false)
+  assert.equal((await f.request('reader', 'comments.publish', payload)).ok, false)
+  assert.deepEqual(calls, [])
+  assert.equal((await f.request('writer', 'comments.account')).ok, true)
+  assert.equal((await f.request('writer', 'comments.publish', payload)).ok, true)
+  assert.deepEqual(calls, ['Explicit submit'])
+})
+
 test('Android bridge selection and controls use the real Core permission and query boundary', async (t) => {
   const db = new LibraryDatabase(':memory:')
   t.after(() => db.close())

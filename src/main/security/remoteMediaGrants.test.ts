@@ -84,6 +84,20 @@ test('remote media grants expose an opaque URL and expire after inactivity', () 
   assert.throws(() => grants.resolve(granted, 'audio'), /expired/)
 })
 
+test('broken disk caches do not discard a valid image response', async () => {
+  for (const broken of ['read', 'write']) {
+    const grants = new RemoteMediaGrantService()
+    const handler = createRemoteMediaRequestHandler({ grants,
+      imageCache: { read: async () => { if (broken === 'read') throw Error('Disk unavailable'); return null },
+        write: async () => { throw Error('Disk full') } },
+      fetch: async () => new Response('valid-image', { headers: { 'content-type': 'image/jpeg' } })
+    })
+    const result = await handler(new Request(grants.grant('https://cdn.test/art.jpg', 'image')))
+    assert.equal(result.status, 200)
+    assert.equal(await result.text(), 'valid-image')
+  }
+})
+
 test('three days of grants retire untouched audio and images without evicting actively used handles', (t) => {
   let now = 0,
     token = 0

@@ -57,7 +57,8 @@ export async function prepareNativeSource(
   } catch (cause) {
     if (cause instanceof SourceAuthorizationError) throw cause
     throw new SourceAuthorizationError(
-      cause instanceof Error ? cause.message : 'Audio source authorization was refused', { cause }
+      cause instanceof Error ? cause.message : 'Audio source authorization was refused',
+      { cause }
     )
   }
 }
@@ -238,6 +239,14 @@ export const createSourceResolver = (
         return await resolve(false)
       } catch (error) {
         if (signal?.aborted) return null
+        // Plugin RPC preserves error messages; turn the provider's finite
+        // entitlement outcomes into the existing source authorization error.
+        // They must reach the UI rather than becoming a generic missing URL.
+        const entitlement =
+          providerId === 'ncm' && error instanceof Error
+            ? /^\[NCM_PLAYBACK_(?:TRIAL_ONLY|AUTH_REQUIRED)\]\s*(.+)$/s.exec(error.message)
+            : null
+        if (entitlement) throw new SourceAuthorizationError(entitlement[1], { cause: error })
         if (error instanceof SourceAuthorizationError && !dependencies.reuseResolvedProviderPaths)
           throw error
         console.warn(

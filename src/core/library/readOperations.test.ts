@@ -161,3 +161,19 @@ test('artwork resolves database-owned origins through the platform and returns d
   })
   assert.equal(JSON.stringify(result).includes('secret'), false)
 })
+
+test('a broken library image preserves other covers while cancellation still propagates', async () => {
+  const database = { getTracksByIds: async () => ({ revision: 3, total: 2, offset: 0, tracks: [
+    { id: 'broken', title: 'Broken', filePath: '' }, { id: 'valid', title: 'Valid', filePath: '' }
+  ], versions: {} }) }
+  const result = await executeLibraryArtwork(database, { ids: ['broken', 'valid'] }, async track => {
+    if (track.id === 'broken') throw Error('Image unavailable')
+    return { cover: 'cover://valid.jpg' }
+  }, new AbortController().signal)
+  assert.deepEqual(result.items, [{ id: 'broken', cover: null }, { id: 'valid', cover: 'cover://valid.jpg' }])
+  const controller = new AbortController()
+  await assert.rejects(executeLibraryArtwork(database, { ids: ['broken', 'valid'] }, async () => {
+    controller.abort()
+    throw Error('Cancelled image')
+  }, controller.signal), { name: 'AbortError' })
+})

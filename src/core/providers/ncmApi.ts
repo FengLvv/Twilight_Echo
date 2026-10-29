@@ -153,7 +153,7 @@ export class NcmApiService<TServer extends Server = Server> {
       const message = err instanceof Error ? err.message : String(err)
       console.error(
         '网易云请求失败：',
-        redactSensitiveText(normalizedPath),
+        redactSensitiveText(normalizedPath.replace(/([?&]content=)[^&]*/g, '$1[REDACTED]')),
         redactSensitiveText(message)
       )
       return {

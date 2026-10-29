@@ -1,4 +1,9 @@
 import '../../adapters-node/index.ts'
+import { NativeCommentsService } from '../../core/comments/service.ts'
+import { NativeCommentPublisher } from '../../core/comments/publisher.ts'
+import { NativeAssociationStore } from './nativeCommentsStore.ts'
+import { NcmClient } from '../../core/comments/client.mjs'
+import { commentsFetch } from './commentsFetch.ts'
 import { CoreMusicExplorationService } from '../../core/library/explorationService.ts'
 import { networkInterfaces, hostname } from 'node:os'
 import { CoreDiscoveryAdvertisement } from '../remote/coreDiscovery.ts'
@@ -134,6 +139,7 @@ import { CoreCatalogPlaybackScope } from '../../core/catalog/playbackScope.ts'
 import { CorePlaylistSubmission, createPlaylistInputResolver } from '../../core/playlists/submission.ts'
 import { CoreAudioDiagnosticsService } from '../../core/audio/diagnosticsService.ts'
 import { CorePlayerPresentationService } from '../../core/playback/presentationService.ts'
+import { createTrackArtworkResolver } from '../../core/playback/artworkResolver.ts'
 import { createQueueInputResolver } from '../../core/playback/queueInputResolver.ts'
 import { authorizeNativeSource } from '../../core/playback/sourceResolver.ts'
 import { CoreSleepTimer } from '../../core/playback/sleepService.ts'
@@ -796,10 +802,33 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       catalog?.invalidate()
     }
   })
-  const presentation = new CorePlayerPresentationService({
-    artwork: (track, signal) => platform!.call('artwork.present', {
-      cover: track.cover ?? null, coverSource: track.coverSource ?? null
+  const resolveArtwork = createTrackArtworkResolver({
+    restore: (keys, signal) => platform!.call('artwork.restoreSources', { keys }, signal),
+    persist: (items, signal) => platform!.call('artwork.rememberSources', { items }, signal),
+    present: (source, signal) => platform!.call('artwork.present', {
+      cover: source.cover, coverSource: source.coverSource ?? null
     }, signal),
+    local: async (id, signal) => {
+      const page = await database!.getTracksByIds([id])
+      signal.throwIfAborted()
+      const record = page.tracks.find(track => track.id === id)
+      return record && getTrackSource(record) === 'local' ? libraryTrack(record) : null
+    },
+    ncm: (ids, signal) => {
+      const provider = plugins?.listProviders().find(provider => provider.id === 'ncm')
+      if (!ncm || !provider || provider.health?.available === false || !isPluginProviderEnabled(provider.health))
+        return Promise.resolve({ code: 200, songs: [] })
+      return ncm.request(`/song/detail?ids=${ids.join(',')}`, '', { signal })
+    },
+    search: (id, query, signal) => {
+      const provider = plugins?.listProviders().find(provider => provider.id === id)
+      if (!provider?.supportedMethods?.includes('searchSongs') || provider.health?.available === false || !isPluginProviderEnabled(provider.health))
+        return Promise.resolve({ items: [] })
+      return plugins!.callProvider(id, 'searchSongs', [query, 20, 0], { signal })
+    }
+  })
+  const presentation = new CorePlayerPresentationService({
+    artwork: (track, signal) => resolveArtwork(track, signal, true),
     playlists,
     supportedMethods: (id) => plugins?.listProviders().find((provider) => provider.id === id)?.supportedMethods ?? [],
     callProvider: (id, method, args, signal) => {
@@ -1524,6 +1553,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
   let ready = false,
     initializedSent = false
   const search = new CoreMusicSearchService({
+    artwork: resolveArtwork,
     database,
     playlists,
     versions: recordingVersions,
@@ -1772,7 +1802,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
       ...config.diagnostics, engine: audio, settings: () => settings.read(),
       failed: (error) => console.error('[core.diagnostics]', error)
     }) : undefined,
-    artwork: (track, signal) => platform!.call('artwork.present', { cover: track.cover, coverSource: track.coverSource ?? null }, signal),
+    artwork: resolveArtwork,
     playlistSubmission: new CorePlaylistSubmission({ playlists, newId: randomUUID, schedule, resolve: createPlaylistInputResolver(resolveQueueInput, database) }),
     presentation,
     outputInfo: async () => (await audio!.getPlaybackInfo()).outputInfo,
@@ -1944,6 +1974,17 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     libraryBackground,
     metadata,
     statistics,
+    comments: new NativeCommentsService(new NativeAssociationStore(config.root),
+      new NcmClient({ fetcher: commentsFetch(() => settings.read()) }),
+      async id => { const record = (await database!.getTracksByIds([id])).tracks[0]; return record ? libraryTrack(record) : undefined },
+      new NativeCommentPublisher({
+        session: async () => plugins ? plugins.readNcmSession() : { loggedIn: false },
+        context: () => plugins?.providerIdentityContext('ncm') ?? 'unavailable',
+        request: (path, cookie, options) => {
+          if (!ncm) throw new Error('网易云服务不可用')
+          return ncm.request(path, cookie, options)
+        }
+      })),
     plugins,
     pluginMarketplace,
     pluginExperiences,

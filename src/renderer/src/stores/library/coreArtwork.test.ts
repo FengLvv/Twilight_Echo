@@ -77,3 +77,15 @@ test('library revision and epoch invalidate cached grants, and a stale result ca
   assert.equal(f.reads.length, 4)
   assert.equal(f.artwork.cachedCount, 1)
 })
+
+test('missing artwork is retried on revisit without waiting for a library revision', async () => {
+  let calls = 0
+  const state = shallowRef({ phase: 'ready', epoch: 'one' } as CoreSnapshot)
+  const artwork = createCoreArtwork({ state, attach: async () => state.value,
+    query: async () => ({ revision: 1, items: [{ id: 'song', cover: ++calls === 1 ? null : 'cover://ready.jpg' }] })
+  } as unknown as Parameters<typeof createCoreArtwork>[0], () => 1)
+  assert.equal(await artwork.read('song'), null)
+  assert.equal(artwork.cachedCount, 0)
+  assert.equal(await artwork.read('song'), 'cover://ready.jpg')
+  assert.equal(calls, 2)
+})

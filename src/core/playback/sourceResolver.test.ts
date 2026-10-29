@@ -6,6 +6,15 @@ const now = 1_000_000
 const ttl = 8 * 60_000
 const track = { id: 'ncm:123', source: 'ncm', filePath: 'ncm:123' }
 
+test('NetEase preview and purchase outcomes retain their actionable messages across provider RPC', async () => {
+  for (const code of ['NCM_PLAYBACK_TRIAL_ONLY', 'NCM_PLAYBACK_AUTH_REQUIRED']) {
+    let calls = 0
+    const resolver = createSourceResolver({ callProvider: async () => { calls++; throw Error(`[${code}] 请确认此发行版本的播放授权`) } })
+    await assert.rejects(resolver.resolve(track), { code: 'SOURCE_ACCESS_DENIED', message: '请确认此发行版本的播放授权' })
+    assert.equal(calls, 1)
+  }
+})
+
 test('native preparation distinguishes a missing source from an authorization refusal for files and SACD selectors', async () => {
   for (const source of ['D:/Music/song.flac', 'D:/Music/disc.iso?area=stereo&track=1']) {
     assert.equal(await prepareNativeSource(source, async () => null), null)

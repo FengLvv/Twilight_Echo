@@ -14,6 +14,17 @@ const request = (name: string, payload: unknown, kind = 'command') => ({
   epoch: 'core:1'
 })
 
+test('comments publication is a bounded provider write with no renderer credentials or arbitrary operations', () => {
+  const input = { songId: '42', content: '喜欢', submissionId: 'once', accountContext: 'account' }
+  assert.equal(isCoreRequest(request('comments.publish', input)), true)
+  assert.equal(isCoreRequest(request('comments.publish', input, 'query')), false)
+  assert.equal(isCoreRequest(request('comments.publish', { ...input, cookie: 'private' })), false)
+  assert.equal(isCoreRequest(request('comments.publish', { ...input, content: ' '.repeat(10000) })), false)
+  assert.equal(isCoreRequest(request('comments.account', {}, 'query')), true)
+  assert.equal(isCoreRequest(request('comments.account', { cookie: 'private' }, 'query')), false)
+  assert.equal(coreOperation('comments.publish')?.permission, 'providers:call')
+})
+
 test('personal metadata operations stay library-write scoped and the full 2 MiB bitmap request crosses the public payload budget', () => {
   const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4AWP4DwQACfsD/c8LaHIAAAAASUVORK5CYII=', 'base64')
   // A bounded PNG ancillary chunk makes a maximum-size structural fixture,

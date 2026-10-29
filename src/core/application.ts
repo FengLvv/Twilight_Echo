@@ -86,6 +86,7 @@ interface Client {
   seen: Set<string>
 }
 export interface CoreApplicationDependencies {
+  comments?: Pick<import('./comments/service.ts').NativeCommentsService, 'request' | 'account' | 'publish'>
   opra?: Pick<OpraCatalog, 'search' | 'getProfile' | 'getStatus' | 'refresh'>
   playlistSources?: CorePlaylistSourceEdits
   revealAudioFile?(path: string): Promise<void>
@@ -1768,6 +1769,18 @@ export class CoreApplication {
         }
         break
       }
+      case 'comments.read':
+      case 'comments.edit': {
+        if (!this.dependencies.comments) throw Object.assign(new Error('评论服务不可用'), { code: 'UNSUPPORTED' })
+        return this.dependencies.comments.request(request.payload, signal)
+      }
+      case 'comments.account':
+      case 'comments.publish': {
+        if (!this.dependencies.comments) throw Object.assign(new Error('评论服务不可用'), { code: 'UNSUPPORTED' })
+        return request.name === 'comments.account'
+          ? this.dependencies.comments.account(signal)
+          : this.dependencies.comments.publish(request.payload, signal)
+      }
       case 'extensions.pluginRequest': {
         if (!this.dependencies.plugins) throw failure('FAILED', 'Plugin runtime unavailable')
         const { id, request: pluginRequest } = request.payload
@@ -1811,7 +1824,7 @@ export class CoreApplication {
       case 'statistics.summary':
         return this.dependencies.statistics.summary()
       case 'statistics.overview':
-        return this.dependencies.statistics.overview()
+        return this.dependencies.statistics.overview(this.dependencies.artwork, signal)
       case 'statistics.previewClear':
         return this.dependencies.statistics.previewClear(request.payload.range, request.payload.revision)
       case 'statistics.tracks':

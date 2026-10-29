@@ -124,6 +124,9 @@ window.runArtworkTests=async()=>{
  expect(!recovered.classList.contains('default-track-cover')&&getComputedStyle(recovered).content==='normal','theme fallback masks real artwork')
  expect(diagnostics.some(e=>e.event==='image.recovered'),'successful recovery is absent from diagnostics')
  expect(recovered.getBoundingClientRect().width===size.width&&recovered.getBoundingClientRect().height===size.height,'fallback changes thumbnail geometry')
+ state.mode='good';props.coreTrackId='not-in-library';props.cover=validCover;props.identity='provided-cover';await settle()
+ expect((await loaded()).src===validCover,'Core track lookup overrides a supplied search/provider cover')
+ props.coreTrackId=undefined;props.cover=null
  state.mode='same';state.calls=0;props.identity='same-handle';await loaded();await settle()
  expect(diagnostics.some(e=>e.event==='retry.resolved'&&e.details.sameHandle===true),'same-handle retry failure cannot be identified')
  expect(state.calls===2,'same-handle diagnostics changed retry behavior')

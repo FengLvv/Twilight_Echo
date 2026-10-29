@@ -999,7 +999,7 @@ test('automatic quality falls back through Hi-Res, lossless, extreme, and standa
   }
 })
 
-test('premium-only tracks return no URL when official and unlock fallbacks are unavailable', async () => {
+test('premium authorization failures are reported without using matched audio', async () => {
   const requests = []
   const provider = await activateProvider(async (path) => {
     requests.push(path)
@@ -1014,7 +1014,7 @@ test('premium-only tracks return no URL when official and unlock fallbacks are u
   })
 
   try {
-    assert.equal(await provider.getPlaybackUrl({ id: 'ncm:79' }, { quality: 'hires' }), null)
+    await assert.rejects(provider.getPlaybackUrl({ id: 'ncm:79' }, { quality: 'hires' }), /NCM_PLAYBACK_AUTH_REQUIRED/)
     assert.deepEqual(
       requests.map((path) => {
         const url = parseRequest(path)
@@ -1029,8 +1029,7 @@ test('premium-only tracks return no URL when official and unlock fallbacks are u
         'v1:standard',
         'br:999000',
         'br:320000',
-        'br:128000',
-        'match:79'
+        'br:128000'
       ]
     )
   } finally {
@@ -1052,7 +1051,7 @@ test('gray tracks use song URL matching only after every official endpoint fails
       }
       return {
         code: 200,
-        data: [{ id: 82, url: null, code: 404, fee: 1, msg: 'copyright unavailable' }]
+        data: [{ id: 82, url: null, code: 404, fee: 0, msg: 'source unavailable' }]
       }
     },
     undefined,
@@ -3253,7 +3252,7 @@ test('lyrics lookup preserves a business error when both lyric endpoints fail', 
   }
 })
 
-test('membership upgrade resolves full audio after trial without reusing trial caches', async () => {
+test('membership upgrade resolves full audio after a trial-only error without reusing trial caches', async () => {
   let member = false
   const writes = []
   const provider = await activateProvider(
@@ -3279,7 +3278,7 @@ test('membership upgrade resolves full audio after trial without reusing trial c
     }
   )
   try {
-    assert.equal(await provider.getPlaybackUrl({ id: 'ncm:79' }), 'https://music.example/trial.mp3')
+    await assert.rejects(provider.getPlaybackUrl({ id: 'ncm:79' }), /NCM_PLAYBACK_TRIAL_ONLY/)
     assert.deepEqual(writes, [])
     member = true
     assert.equal(await provider.getPlaybackUrl({ id: 'ncm:79' }), 'https://music.example/full.mp3')
@@ -3287,6 +3286,57 @@ test('membership upgrade resolves full audio after trial without reusing trial c
   } finally {
     ncmProvider.deactivate()
   }
+})
+
+test('a full lower-quality official stream wins over a higher-quality trial', async () => {
+  const paths = [], cached = []
+  const provider = await activateProvider(async path => {
+    const url = parseRequest(path)
+    paths.push(url.pathname)
+    if (url.pathname !== '/song/url/v1') throw Error('No matching-source fallback is needed')
+    const preview = url.searchParams.get('level') === 'hires'
+    return { code: 200, data: [{ code: 200, id: 91, url: preview ? 'https://music.example/trial.mp3' : 'https://music.example/full.flac', freeTrialInfo: preview ? { start: 0, end: 30 } : null, level: preview ? 'hires' : 'lossless', size: preview ? 1000 : 56035020 }] }
+  }, undefined, { ncm: { cacheSong: async (_id, url) => { cached.push(url); return null } } })
+  try {
+    const result = await provider.getPlaybackUrl({ id: 'ncm:91' }, { quality: 'auto', _twilightSourceIdentity: true })
+    assert.equal(result.streamUrl, 'https://music.example/full.flac')
+    assert.equal(result.providerSource.actualQuality, 'lossless')
+    assert.equal(result.providerSource.bytes, 56035020)
+    assert.deepEqual(cached, ['https://music.example/full.flac'])
+    assert.equal(await provider.getPlaybackUrl({ id: 'ncm:91' }), 'https://music.example/full.flac')
+    assert.deepEqual(paths, ['/song/url/v1', '/song/url/v1'])
+  } finally { ncmProvider.deactivate() }
+})
+
+test('trial-only results never become playback files, AutoMix inputs or matched audio', async () => {
+  let cached = 0, prepared = 0
+  const provider = await activateProvider(async path => {
+    assert.notEqual(parseRequest(path).pathname, '/song/url/match')
+    return { code: 200, data: [{ code: 200, url: 'https://music.example/preview.mp3', freeTrialInfo: { start: 0, end: 30 } }] }
+  }, undefined, { ncm: { cacheSong: async () => { cached++; return null }, prepareAutoMixSong: async () => { prepared++; return 'not-full.flac' } } })
+  try {
+    await assert.rejects(provider.getPlaybackUrl({ id: 'ncm:92' }, { quality: 'standard', _twilightAutoMixPrepare: true }), /NCM_PLAYBACK_TRIAL_ONLY/)
+    assert.equal(cached, 0)
+    assert.equal(prepared, 0)
+  } finally { ncmProvider.deactivate() }
+})
+
+test('an unavailable paid album version cannot turn a matched preview into a full-song cache', async () => {
+  let cached = 0
+  const provider = await activateProvider(async path => {
+    assert.notEqual(parseRequest(path).pathname, '/song/url/match')
+    return { code: 200, data: [{ id: 1436959152, code: -110, url: null, fee: 4, payed: 0 }] }
+  }, undefined, { ncm: { cacheSong: async () => { cached++; return 'short.mp3' } } })
+  try {
+    await assert.rejects(provider.getPlaybackUrl({ id: 'ncm:1436959152' }, { quality: 'standard' }), /NCM_PLAYBACK_AUTH_REQUIRED/)
+    assert.equal(cached, 0)
+  } finally { ncmProvider.deactivate() }
+})
+
+test('a serialized null trial flag still allows an official full stream', async () => {
+  const provider = await activateProvider(async () => ({ code: 200, data: [{ code: 200, url: 'https://music.example/full.flac', freeTrialInfo: 'null' }] }))
+  try { assert.equal(await provider.getPlaybackUrl({ id: 'ncm:93' }), 'https://music.example/full.flac') }
+  finally { ncmProvider.deactivate() }
 })
 
 test('signing in again clears resolved audio and ignores downloads from the old session', async () => {

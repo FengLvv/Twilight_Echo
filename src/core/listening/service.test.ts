@@ -261,11 +261,12 @@ test('history artwork preserves local covers, supports legacy HTTP covers and is
   const projected: string[] = []
   const page = await f.service.pageWithArtwork({}, async track => {
     projected.push(track.title)
+    if (track.title === 'Missing') return { cover: null }
     if (track.title === 'Broken') throw Error('Expired grant')
     assert.equal(track.coverSource, 'https://p2.music.126.net/legacy.jpg')
     return { cover: 'twilight-media://image/legacy' }
   }, new AbortController().signal)
-  assert.deepEqual(projected.sort(), ['Broken', 'Legacy'])
+  assert.deepEqual(projected.sort(), ['Broken', 'Legacy', 'Missing'])
   const covers = Object.fromEntries(page.items.map(item => [item.title, item.cover]))
   assert.deepEqual(covers, { Missing: null, Broken: null,
     Legacy: 'twilight-media://image/legacy', Local: 'cover://local.jpg' })
@@ -285,6 +286,19 @@ test('history artwork cancels requests and rejects a page changed while granting
     await f.service.clear(null, f.service.getRevision())
     return { cover: 'twilight-media://image/late' }
   }, new AbortController().signal), { code: 'STALE_REVISION' })
+})
+
+test('artist ranking thumbnails use the recorded source through the same controlled artwork path', async t => {
+  const f = await fixture(t)
+  f.observe({ ...provider, id: 'ncm:42', source: 'ncm', ncmSongId: 42, cover: null }, 'playing')
+  f.timers.advance(5_000)
+  f.observe(null, 'stopped')
+  const view = await f.service.overview(async track => {
+    assert.equal(track.id, 'ncm:42')
+    return { cover: 'twilight-media://image/artist-recording' }
+  })
+  assert.equal(view.artists[0].cover, 'twilight-media://image/artist-recording')
+  assert.equal(view.artists[0].coverSource, null)
 })
 
 test('Pause and Stop do not count outcomes, same-track occurrences keep legacy play counting, and 50–90 percent is neither outcome', async (t) => {

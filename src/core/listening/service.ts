@@ -33,7 +33,7 @@ import {
   recordListeningOutcome,
   recordListeningSeconds
 } from './model.ts'
-import { selectTopArtists } from './model.ts'
+import { selectTopArtists, normalizeStatText } from './model.ts'
 
 interface Capture {
   generation: number
@@ -110,14 +110,17 @@ export class CoreStatisticsService {
       }
     }
   }
-  async overview(): Promise<CoreStatisticsOverview> {
+  async overview(
+    artwork?: (track: TrackData, signal: AbortSignal) => Promise<{ cover: string | null }>,
+    signal = new AbortController().signal
+  ): Promise<CoreStatisticsOverview> {
     await this.options.history?.ensure()
     const providerByArtist = new Map<string, string>()
     for (const stat of Object.values(this.stats.tracks)) {
       const provider = stat.sourceIds?.find((source) => source.source !== 'local')?.source
       if (provider && !providerByArtist.has(stat.artist)) providerByArtist.set(stat.artist, provider)
     }
-    return {
+    const view: CoreStatisticsOverview = {
       ...this.summary(),
       recorded: summarizeRecordedTracks(this.stats.tracks),
       artists: selectTopArtists(this.stats, 50).map((artist) => ({
@@ -129,6 +132,23 @@ export class CoreStatisticsService {
         mode: null, ready: false, pending: false, revision: null, error: ''
       }) }
     }
+    if (artwork) {
+      const latest = new Map<string, ListeningTrackStatWithId>()
+      for (const [id, stat] of Object.entries(this.stats.tracks)) {
+        const key = normalizeStatText(stat.artist)
+        if (stat.track && stat.lastPlayed >= (latest.get(key)?.lastPlayed ?? -1)) latest.set(key, { ...stat, id })
+      }
+      await Promise.all(view.artists.map(async artist => {
+        const stat = latest.get(artist.id)
+        if (artist.cover || !stat?.track) return
+        try { artist.cover = (await artwork({ ...stat.track, cover: stat.cover || stat.track.cover,
+          coverSource: stat.coverSource || stat.track.coverSource || null }, signal)).cover }
+        catch { signal.throwIfAborted() }
+      }))
+      signal.throwIfAborted()
+      if (view.revision !== this.revision) throw Object.assign(new Error('Listening history changed'), { code: 'STALE_REVISION' })
+    }
+    return view
   }
   previewClear(range: ListeningStatsClearRange, revision: number) {
     if (revision !== this.revision) throw Object.assign(new Error('Listening history changed'), { code: 'STALE_REVISION' })
@@ -198,17 +218,17 @@ export class CoreStatisticsService {
           }
         : null
     })
-    for (let index = 0; index < page.items.length; index++) {
+    await Promise.all(page.items.map(async (item, index) => {
       signal.throwIfAborted()
       const source = sources[index]
-      if (!source?.cover && !source?.coverSource) continue
+      if (!source) return
       try {
-        page.items[index].cover = (await present(source, signal)).cover
+        item.cover = (await present(source, signal)).cover
       } catch {
         // One expired or unavailable image must not hide the listening history.
         signal.throwIfAborted()
       }
-    }
+    }))
     signal.throwIfAborted()
     if (page.revision !== this.revision)
       throw Object.assign(new Error('Listening history changed; restart the paged query'), {

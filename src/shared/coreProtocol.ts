@@ -438,6 +438,8 @@ export interface CoreCommands extends CorePlaylistCommands, CoreRemoteCommands {
   'extensions.music': { id: string; operation: import('./pluginExperience.ts').ExperienceMusicOperation; args: Record<string, unknown> }
   'extensions.export': { id: string; name: string; content: string }
   'extensions.pluginRequest': { id: string; request: unknown }
+  'comments.edit': import('./ncmComments.ts').CommentsEdit
+  'comments.publish': import('./ncmComments.ts').CommentPublish
   'extensions.execute': { command: string; args: unknown[] }
   'statistics.clear': CoreStatisticsClear
   'scan.start': { mode: LocalLibraryScanMode; roots?: string[]; restoreExcluded?: boolean }
@@ -703,6 +705,8 @@ export interface CoreQueries
   'statistics.overview': { input: Record<string, never>; output: CoreStatisticsOverview }
   'statistics.previewClear': { input: CoreStatisticsPreviewQuery; output: CoreStatisticsClearPreview }
   'statistics.tracks': { input: CoreStatisticsQuery; output: CoreStatisticsPage }
+  'comments.read': { input: import('./ncmComments.ts').CommentsRead; output: import('./ncmComments.ts').CommentsResult }
+  'comments.account': { input: Record<string, never>; output: import('./ncmComments.ts').CommentAccount }
   'scan.status': { input: Record<string, never>; output: CoreScanStatus | null }
   'scan.watchers': {
     input: Record<string, never>
@@ -1069,6 +1073,10 @@ const OPERATIONS: Record<
   'extensions.music': { kind: 'command', permission: 'library:write' },
   'extensions.export': { kind: 'command', permission: 'library:read' },
   'extensions.pluginRequest': { kind: 'command', permission: 'extensions:execute' },
+  'comments.edit': { kind: 'command', permission: 'settings:write' },
+  'comments.read': { kind: 'query', permission: 'library:read' },
+  'comments.publish': { kind: 'command', permission: 'providers:call' },
+  'comments.account': { kind: 'query', permission: 'providers:call' },
   'plugins.log': { kind: 'query', permission: 'plugins:manage' },
   'plugins.enable': { kind: 'command', permission: 'plugins:manage' },
   'plugins.disable': { kind: 'command', permission: 'plugins:manage' },

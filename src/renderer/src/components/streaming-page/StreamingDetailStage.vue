@@ -639,6 +639,7 @@ const infoTrack = shallowRef<Track | null>(null)
                 v-if="!row.grouped"
                 :cover="row.track.cover"
                 :cover-source="row.track.coverSource"
+                :identity="row.track.id"
                 class="row-cover"
                 alt=""
               />

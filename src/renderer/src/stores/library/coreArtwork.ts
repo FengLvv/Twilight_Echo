@@ -40,7 +40,9 @@ export function createCoreArtwork(core: Client, revision: () => number | null) {
             const cover = active ? (results.get(item.id) ?? null) : null
             if (active) {
               cache.delete(item.id)
-              cache.set(item.id, cover)
+              // Transient offline/API failures must be retried when the row is
+              // revisited, rather than cached as missing for the whole revision.
+              if (cover) cache.set(item.id, cover)
               if (cache.size > 512) cache.delete(cache.keys().next().value!)
             }
             for (const request of item.requests) request.resolve(cover)

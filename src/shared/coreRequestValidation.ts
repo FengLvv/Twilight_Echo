@@ -1,4 +1,5 @@
 import { validCoreDspPayload } from './coreDsp.ts'
+import { validCommentsRequest, validCommentPublish } from './ncmComments.ts'
 import { EXPERIENCE_MUSIC_OPERATIONS } from './pluginExperience.ts'
 import { validCatalogPayload } from './musicCatalog.ts'
 import { validLibraryHealthPayload } from './libraryHealth.ts'
@@ -1636,6 +1637,13 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
       )
     case 'extensions.pluginRequest':
       return keys(p, ['id', 'request']) && pluginId(p.id) && isBoundedCoreJson(p.request, 256 * 1024)
+    case 'comments.read':
+    case 'comments.edit':
+      return isBoundedCoreJson(p, 64 * 1024) && validCommentsRequest(p, name === 'comments.edit')
+    case 'comments.publish':
+      return isBoundedCoreJson(p, 8 * 1024) && validCommentPublish(p)
+    case 'comments.account':
+      return !!p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length === 0
     case 'state.snapshot':
     case 'imports.previewFile':
     case 'statistics.summary':

@@ -29,6 +29,53 @@ function gate() {
   const promise = new Promise<void>((resolve) => (release = resolve))
   return { promise, release }
 }
+
+test('search rows, grouped preferred tracks and variants retain controlled artwork without private sources', async t => {
+  const f = await fixture(t)
+  f.setTracks([track('local', 'Moon', { cover: 'cover://local.jpg' })])
+  f.options.searchProvider = async () => ({ items: [track('remote:one', 'Moon', {
+    source: 'remote', cover: 'twilight-media://image/old', coverSource: 'https://cdn.test/art?token=secret',
+    streamUrl: 'https://cdn.test/audio?token=secret'
+  })], total: 1 })
+  f.options.artwork = async track => ({ cover: track.source === 'local' ? 'cover://local.jpg' : 'twilight-media://image/current' })
+  const page = await f.service.page({ query: 'Moon' })
+  assert.deepEqual(page.items.map(item => item.track.cover), ['cover://local.jpg', 'twilight-media://image/current'])
+  assert.equal(page.logicalItems[0].preferredTrack.cover, 'cover://local.jpg')
+  assert.ok(page.logicalItems[0].variants.every(item => Boolean(item.track.cover)))
+  assert.doesNotMatch(JSON.stringify(page), /https:|token=|coverSource|filePath|streamUrl/)
+})
+
+test('search retains safe local/session images without a projector and rejects raw remote origins', async t => {
+  const f = await fixture(t)
+  f.setTracks([track('one', 'Moon', { cover: 'cover://one.jpg' })])
+  f.options.searchProvider = async () => ({ items: [track('remote:one', 'Moon', { source: 'remote', cover: 'https://cdn.test/private.jpg' })], total: 1 })
+  const page = await f.service.page({ query: 'Moon' })
+  assert.equal(page.items.find(item => item.track.id === 'one')?.track.cover, 'cover://one.jpg')
+  assert.equal(page.items.find(item => item.track.id === 'remote:one')?.track.cover, null)
+  assert.doesNotMatch(JSON.stringify(page), /cdn\.test/)
+})
+
+test('one failed search image preserves the search results and other covers', async t => {
+  const f = await fixture(t)
+  f.setTracks([track('broken', 'Moon'), track('valid', 'Moonlight')])
+  f.options.artwork = async track => {
+    if (track.id === 'broken') throw Error('Image unavailable')
+    return { cover: 'cover://valid.jpg' }
+  }
+  const page = await f.service.page({ query: 'Moon', scope: 'local' })
+  assert.equal(page.items.find(item => item.track.id === 'broken')?.track.cover, null)
+  assert.equal(page.items.find(item => item.track.id === 'valid')?.track.cover, 'cover://valid.jpg')
+})
+
+test('cancelled and changed search pages cannot publish late artwork', async t => {
+  const f = await fixture(t)
+  f.setTracks([track('one')])
+  const controller = new AbortController()
+  f.options.artwork = async () => { controller.abort(); return { cover: 'cover://late.jpg' } }
+  await assert.rejects(f.service.page({ query: 'Moon' }, controller.signal), { name: 'AbortError' })
+  f.options.artwork = async () => { f.networkChanged(); return { cover: 'cover://late.jpg' } }
+  await assert.rejects(f.service.page({ query: 'Moon' }), { code: 'STALE_REVISION' })
+})
 async function fixture(t: test.TestContext, json = false) {
   const database = new LibraryDatabase(':memory:')
   const state = new CoreStateDatabase(':memory:')

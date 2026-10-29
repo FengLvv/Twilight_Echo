@@ -16,7 +16,7 @@ test('dark cover backgrounds dither the final composite without affecting other 
     const source = await readFile(new URL('./PlayingMusic.vue', import.meta.url), 'utf8')
     const { descriptor } = parse(source)
     const template = descriptor.template!.content.match(
-      /<div v-if="!visualizerMounted" class="backdrop"[\s\S]*?\n        <\/div>/
+      /^([ \t]*)<div v-if="!visualizerMounted \|\| commentsVisible" class="backdrop"[\s\S]*?\n\1<\/div>/m
     )?.[0]
     assert.ok(template, 'fixture must render the production backdrop template')
     const compiled = compileStyle({
@@ -70,7 +70,7 @@ function fixtureHtml(template: string, css: string): string {
   createApp({
     __scopeId: 'data-v-backdrop-test',
     components: { CoverImg: { props: ['cover', 'coverSource', 'identity'], template: '<img :src="cover">' } },
-    setup: () => ({ mode, currentTrack, visualizerMounted, hasSwitchedPlaybackView: true,
+    setup: () => ({ mode, currentTrack, visualizerMounted, commentsVisible: false, hasSwitchedPlaybackView: true,
       isBlurBackground: computed(() => mode.value === 'blur'),
       isFluidBackground: computed(() => mode.value === 'fluid'),
       isSolidBackground: computed(() => mode.value === 'solid'),

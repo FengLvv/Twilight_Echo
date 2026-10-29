@@ -1807,6 +1807,19 @@ function getOfficialPlaybackUrl(data, streamItem) {
   return normalizePlaybackStreamUrl(streamItem?.url)
 }
 
+function isTrialStream(item) {
+  const trial = item?.freeTrialInfo
+  if (trial == null || trial === false || trial === '') return false
+  if (typeof trial === 'string' && ['null', 'false'].includes(trial.trim().toLowerCase()))
+    return false
+  return true
+}
+
+function playbackRightsDenied(data, item) {
+  const code = Number(item?.code ?? data?.code)
+  return [-110, -105].includes(code) || (Number(item?.fee) > 0 && [401, 403, 404].includes(code))
+}
+
 function getUnblockedPlaybackUrl(data) {
   const topCode = Number(data?.code ?? data?.body?.code)
   if (!Number.isFinite(topCode) || topCode !== 200) return null
@@ -1926,6 +1939,8 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
 
   let lastFailureMessage = ''
   let riskControlMessage = ''
+  let trialSeen = false
+  let rightsDenied = false
   const requestPaths = getPlaybackUrlRequestPaths(songId, quality)
   for (let attempt = 0; attempt < requestPaths.length; attempt += 1) {
     // 回退阶梯步间退避（250ms 起步、封顶 500ms）：连续失败的连打既放大风控
@@ -1938,22 +1953,26 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
       const data = await requestAuthed(path, requestContext)
       const streamItems = getPlaybackStreamItems(data)
       const streamItem = streamItems[0] ?? {}
+      rightsDenied ||= playbackRightsDenied(data, streamItem)
       // Only use a URL explicitly authorized by the signed-in account's official endpoint.
       const url = getOfficialPlaybackUrl(data, streamItem)
       if (url) {
-        rememberStreamAudioMeta(songId, streamItem)
-        if (!streamItem.freeTrialInfo) {
-          const entry = rememberStreamUrl(
-            cacheKey,
-            url,
-            songId,
-            track?.fileName,
-            streamItem,
-            options?._twilightAutoMixPrepare === true
-          )
-          return prepareStreamEntry(entry, songId, track?.fileName, options, requestContext)
+        // A higher tier may only offer a preview while a lower tier grants the
+        // whole recording. Exhaust official options before accepting a result.
+        if (isTrialStream(streamItem)) {
+          trialSeen = true
+          continue
         }
-        return playbackIdentityResult(url, url, streamItem, options, null)
+        rememberStreamAudioMeta(songId, streamItem)
+        const entry = rememberStreamUrl(
+          cacheKey,
+          url,
+          songId,
+          track?.fileName,
+          streamItem,
+          options?._twilightAutoMixPrepare === true
+        )
+        return prepareStreamEntry(entry, songId, track?.fileName, options, requestContext)
       }
       lastFailureMessage = getPlaybackFailureMessage(data, streamItem) || lastFailureMessage
     } catch (error) {
@@ -1965,6 +1984,17 @@ async function getPlaybackUrl(track, options = {}, requestContext) {
       riskControlMessage = lastFailureMessage
       break
     }
+  }
+
+  if (!riskControlMessage && trialSeen) {
+    throw new Error(
+      '[NCM_PLAYBACK_TRIAL_ONLY] 网易云当前仅提供此发行版本的试听，未取得完整版。请确认购买账号和版本，或刷新登录后重试。'
+    )
+  }
+  if (!riskControlMessage && rightsDenied) {
+    throw new Error(
+      '[NCM_PLAYBACK_AUTH_REQUIRED] 当前网易云会话未获得此发行版本的完整播放授权。请确认单曲／数字专辑版本和购买账号，或刷新登录后重试。'
+    )
   }
 
   // 风控命中后连灰色解锁也不再试——它同样是上游请求，会把风控窗口越拉越长。

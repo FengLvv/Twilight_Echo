@@ -412,11 +412,19 @@ function setPressOrigin(event: PointerEvent): void {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Navigation scrolls without revealing the global auto-hide scrollbar. */
+  scrollbar-width: none !important;
   overscroll-behavior: contain;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.menu-nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .menu-group {

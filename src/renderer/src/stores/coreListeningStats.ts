@@ -3,6 +3,13 @@ import type { CoreSnapshot } from '../../../shared/coreProtocol.ts'
 import type { CoreStatisticsOverview, CoreStatisticsPage, CoreStatisticsQuery, CoreStatisticsTrackView } from '../../../shared/coreStatistics.ts'
 import type { ListeningStatsClearRange } from '../../../shared/listeningStatsHistory.ts'
 
+/** Every renderer history consumer gets artwork on both the ranking row and
+ * its display track; taking only displayTrack must not discard the image. */
+export function projectListeningDisplayStat(stat: CoreStatisticsTrackView) {
+  const { track, ...metadata } = stat
+  return { ...metadata, coverSource: null, displayTrack: track ? { ...track, cover: metadata.cover } : null }
+}
+
 /** Bounded ranking windows are views; totals, artists and clearing use the full Core repository. */
 export function createCoreListeningStats(options: {
   state: Readonly<ShallowRef<CoreSnapshot | null>>

@@ -4,6 +4,7 @@ import type { NetworkEntry } from '../../shared/networkSources.ts'
 import type {
   CoreMusicSearchQuery,
   CoreMusicSearchPage,
+  CoreSearchTrackView,
   CoreCollectionSearchQuery
 } from '../../shared/coreSearch.ts'
 import type { CoreRecordingVersions } from '../playlists/recordingVersions.ts'
@@ -21,6 +22,7 @@ import { projectCoreTrack, projectCoreError } from '../projections.ts'
 import { searchMusicCollections, type CollectionSearchOptions } from './collections.ts'
 
 interface Options {
+  artwork?: (track: TrackData, signal: AbortSignal) => Promise<{ cover: string | null }>
   database: Pick<LibraryDatabaseApi, 'queryTracks' | 'getMetadata' | 'queryCollections'>
   versions: Pick<CoreRecordingVersions, 'identity' | 'getRevision' | 'snapshot'>
   loadJsonLibrary?: () => Promise<{ revision: number; tracks: TrackData[] }>
@@ -89,32 +91,81 @@ export class CoreMusicSearchService {
     return work
   }
   async page(query: CoreMusicSearchQuery, signal?: AbortSignal): Promise<CoreMusicSearchPage> {
-    const result = await this.songs(query, signal)
-    const variant = (item: UnifiedSearchResult['logicalItems'][number]['variants'][number]) => ({
-      ...item,
-      track: projectCoreTrack(item.track)
-    })
-    return {
-      ...result,
-      items: result.items.map((item) => ({ ...item, track: projectCoreTrack(item.track) })),
-      logicalItems: result.logicalItems.map((item) => ({
-        ...item,
-        preferredTrack: projectCoreTrack(item.preferredTrack),
-        variants: item.variants.map(variant)
-      })),
-      health: Object.fromEntries(
-        Object.entries(result.health).map(([id, health]) => [
-          id,
-          {
-            ...health,
-            lastError: health.lastError ? projectCoreError(health.lastError) : null,
-            playbackUrlLastError: health.playbackUrlLastError
-              ? projectCoreError(health.playbackUrlLastError)
-              : null
-          }
+    return this.request(async (current) => {
+      const result: UnifiedSearchResult & { versionsRevision: number; networkRevision?: number } =
+        await this.run(query, current)
+      const projected = new Map<TrackData, Promise<CoreSearchTrackView>>()
+      const project = (track: TrackData): Promise<CoreSearchTrackView> => {
+        let work = projected.get(track)
+        if (!work) {
+          work = (async () => {
+            let cover =
+              track.cover && /^(?:cover:\/\/|twilight-media:\/\/image\/)/i.test(track.cover)
+                ? track.cover
+                : null
+            if (this.options.artwork) {
+              try {
+                cover = (await this.options.artwork(track, current)).cover
+              } catch {
+                current.throwIfAborted()
+              }
+            }
+            current.throwIfAborted()
+            return { ...projectCoreTrack(track), cover }
+          })()
+          projected.set(track, work)
+        }
+        return work
+      }
+      const tracks = [
+        ...result.items.map((item) => item.track),
+        ...result.logicalItems.flatMap((item) => [
+          item.preferredTrack,
+          ...item.variants.map((variant) => variant.track)
         ])
+      ]
+      const views = new Map(
+        await Promise.all(tracks.map(async (track) => [track, await project(track)] as const))
       )
-    }
+      current.throwIfAborted()
+      if (
+        result.versionsRevision !== this.options.versions.getRevision() ||
+        (result.networkRevision !== undefined &&
+          result.networkRevision !== this.options.network.revision()) ||
+        (result.libraryRevision !== undefined &&
+          result.libraryRevision !==
+            (this.options.loadJsonLibrary
+              ? (await this.options.loadJsonLibrary()).revision
+              : (await this.options.database.getMetadata()).revision))
+      )
+        throw stale('音源或曲库在读取封面期间发生变化，请重新搜索')
+      current.throwIfAborted()
+      const variant = (item: UnifiedSearchResult['logicalItems'][number]['variants'][number]) => ({
+        ...item,
+        track: views.get(item.track)!
+      })
+      return {
+        ...result,
+        items: result.items.map((item) => ({ ...item, track: views.get(item.track)! })),
+        logicalItems: result.logicalItems.map((item) => ({
+          ...item,
+          preferredTrack: views.get(item.preferredTrack)!,
+          variants: item.variants.map(variant)
+        })),
+        health: Object.fromEntries(
+          Object.entries(result.health).map(([id, health]) => [
+            id,
+            {
+              ...health,
+              lastError: health.lastError ? projectCoreError(health.lastError) : null,
+              playbackUrlLastError: health.playbackUrlLastError
+                ? projectCoreError(health.playbackUrlLastError)
+                : null
+            }
+          ])
+        )
+      }
+    }, signal)
   }
   private async run(query: CoreMusicSearchQuery, signal: AbortSignal) {
     signal.throwIfAborted()

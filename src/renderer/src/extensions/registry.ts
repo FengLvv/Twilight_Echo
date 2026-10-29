@@ -87,6 +87,8 @@ export async function syncExtensions(): Promise<void> {
     experienceContributions.value = experiences as InstalledExperience[]
     const nextUi: UiContribution[] = []
     for (const experience of experiences) {
+      // This former extension is now a native player feature.
+      if (experience.pluginId === 'com.twilightecho.tool.ncm-comments') continue
       // Panel experiences are opened from their plugin's titlebar button in a
       // flyout; they intentionally stay out of sidebar navigation.
       if (experience.launch === 'panel') continue
@@ -101,6 +103,7 @@ export async function syncExtensions(): Promise<void> {
     }
     const nextThemes: ThemeContribution[] = []
     for (const entry of entries as PluginExtensionContribution[]) {
+      if (entry.pluginId === 'com.twilightecho.tool.ncm-comments') continue
       nextUi.push(
         ...entry.ui.map((contribution) => ({
           ...contribution,

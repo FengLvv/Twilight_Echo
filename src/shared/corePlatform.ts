@@ -114,6 +114,14 @@ export interface CorePlatformOperations extends CoreModelPackPlatformOperations 
     input: { cover: string | null; coverSource: string | null; imageExpiresAt?: number; retainMetadata?: boolean }
     output: Pick<CorePlayerPresentation, 'cover' | 'coverSource'>
   }
+  'artwork.restoreSources': {
+    input: { keys: string[] }
+    output: Array<{ cover: string | null; coverSource?: string | null } | null>
+  }
+  'artwork.rememberSources': {
+    input: { items: Array<{ key: string; source: { cover: string | null; coverSource?: string | null } }> }
+    output: void
+  }
   'media.resolveAudio': { input: { handle: string }; output: { source: string } }
   'media.protectProviderResult': {
     input: { value: unknown; method: TwilightMediaProviderMethod }
@@ -182,6 +190,19 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
               cover.startsWith('twilight-media://image/') ||
               /^data:image\/(?:png|jpe?g|webp);base64,/i.test(cover))))
       )
+    }
+    case 'artwork.restoreSources': {
+      const value = payload as CorePlatformOperations['artwork.restoreSources']['input']
+      return Object.keys(payload).length === 1 && Array.isArray(value.keys) && value.keys.length <= 50 &&
+        value.keys.every(key => typeof key === 'string' && key.length > 0 && key.length <= 1024 && !key.includes('\0'))
+    }
+    case 'artwork.rememberSources': {
+      const value = payload as CorePlatformOperations['artwork.rememberSources']['input']
+      return Object.keys(payload).length === 1 && Array.isArray(value.items) && value.items.length <= 50 &&
+        value.items.every(item => item && typeof item === 'object' && Object.keys(item).length === 2 &&
+          typeof item.key === 'string' && item.key.length > 0 && item.key.length <= 1024 && !item.key.includes('\0') &&
+          item.source && typeof item.source === 'object' && Object.keys(item.source).every(k => ['cover','coverSource'].includes(k)) &&
+          [item.source.cover, item.source.coverSource ?? null].every(field => field === null || (typeof field === 'string' && field.length <= 8192 && !field.includes('\0'))))
     }
     case 'artwork.present': {
       const value = payload as CorePlatformOperations['artwork.present']['input']

@@ -11,7 +11,11 @@ export interface CoreMusicSearchQuery {
   versionsRevision?: number
   networkRevision?: number
 }
-export type CoreSearchTrackItem = Omit<UnifiedSearchTrackItem, 'track'> & { track: CoreTrackView }
+/** Search pages may carry display artwork, never durable provider origins. */
+export type CoreSearchTrackView = CoreTrackView & { cover?: string | null }
+export type CoreSearchTrackItem = Omit<UnifiedSearchTrackItem, 'track'> & {
+  track: CoreSearchTrackView
+}
 export interface CoreMusicSearchPage extends Omit<UnifiedSearchResult, 'items' | 'logicalItems'> {
   items: CoreSearchTrackItem[]
   logicalItems: Array<{
@@ -19,7 +23,7 @@ export interface CoreMusicSearchPage extends Omit<UnifiedSearchResult, 'items' |
     title: string
     artist: string
     album: string
-    preferredTrack: CoreTrackView
+    preferredTrack: CoreSearchTrackView
     variants: Array<Omit<CoreSearchTrackItem, 'kind'>>
     preferenceUnavailable?: boolean
   }>

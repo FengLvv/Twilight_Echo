@@ -39,10 +39,10 @@ test('now playing lyrics have no page-entry animation', () => {
   assert.doesNotMatch(source, /te-playing-lyrics-arrive/)
 })
 
-test('visualizer mode does not keep the heavy blurred backdrop mounted', () => {
+test('visualizer avoids the blurred backdrop until comments become visible', () => {
   const source = readFileSync(new URL('./PlayingMusic.vue', import.meta.url), 'utf8')
 
-  assert.match(source, /<div v-if="!visualizerMounted" class="backdrop"/)
+  assert.match(source, /<div v-if="!visualizerMounted \|\| commentsVisible" class="backdrop"/)
 })
 
 test('active lyrics keep their size while auxiliary layers render smaller and compact', () => {

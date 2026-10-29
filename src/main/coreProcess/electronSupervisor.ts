@@ -59,7 +59,7 @@ import {
   migrateBase64Cover
 } from '../library/coverCache.ts'
 import { createArtworkProjection } from './artworkProjection.ts'
-import { mediaCoverCache, metadataArtworkCache } from '../cache/mediaCoverCache.ts'
+import { mediaCoverCache, metadataArtworkCache, artworkSourceCache } from '../cache/mediaCoverCache.ts'
 import { clearProtocolAssetCache } from '../cache/protocolAssetCache.ts'
 import { createPlatformCacheMaintenance } from '../cache/platformCacheMaintenance.ts'
 import { createPluginManagerPlatform } from '../plugins/platform.ts'
@@ -285,6 +285,25 @@ export function createElectronCoreSupervisor(
       'paths.authorizeLibraryDirectory': ({ path }) => resolveAuthorizedLibraryDirectory(path),
       'artwork.normalizeCachedCover': ({ handle }) => normalizeCachedCoverHandle(handle),
       'artwork.remotePreview': ({ cover }, signal) => resolveRemoteArtwork(cover, signal),
+      'artwork.restoreSources': async ({ keys }, signal) => {
+        const result = await Promise.all(keys.map(key => artworkSourceCache.read(key)))
+        signal.throwIfAborted()
+        return result
+      },
+      'artwork.rememberSources': async ({ items }, signal) => {
+        for (const { key, source } of items) {
+          signal.throwIfAborted()
+          let origin = source.coverSource || source.cover
+          if (source.cover?.startsWith('twilight-media://image/')) {
+            try {
+              const grant = remoteMediaGrants.resolve(source.cover, 'image')
+              if (grant.expiresAt !== undefined) continue
+              origin = grant.source
+            } catch { continue }
+          }
+          if (origin && /^https?:\/\//i.test(origin)) await artworkSourceCache.write(key, origin).catch(() => {})
+        }
+      },
       'artwork.present': createArtworkProjection({
         retainMetadata: (source, signal) => metadataArtworkCache.retain(source, signal),
         normalizeCachedCover: normalizeCachedCoverHandle,

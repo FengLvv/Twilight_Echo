@@ -2,6 +2,11 @@ import { runtime } from '../core/runtime'
 import { getCoverCacheDir, resizeCoverImageBytes } from '../library/coverCache.ts'
 import { createRemoteCoverCache } from './remoteCoverCache.ts'
 import { createMetadataArtworkCache } from './metadataArtworkCache.ts'
+import { createArtworkSourceCache } from './artworkSourceCache.ts'
+
+export const artworkSourceCache = createArtworkSourceCache(
+  () => (runtime.appSettings.cachePolicy.cover ? getCoverCacheDir() : null)
+)
 
 /** Protocol requests and Core maintenance must use the same writer lifetime. */
 const transient = createRemoteCoverCache(
@@ -21,5 +26,5 @@ export const mediaCoverCache = {
   read: async (source: string) =>
     (await metadataArtworkCache.read(source)) ?? transient.read(source),
   maintain: <T>(action: () => Promise<T>) =>
-    transient.maintain(() => metadataArtworkCache.maintain(action))
+    transient.maintain(() => metadataArtworkCache.maintain(() => artworkSourceCache.maintain(action)))
 }

@@ -64,7 +64,7 @@ async function reloadCover(): Promise<void> {
   retriedCover = false
   // Never keep another identity's bitmap, but reuse this cover's resolved src
   // immediately when a virtualized card returns to the viewport.
-  displayCover.value = props.coreTrackId ? null : readCachedCover(props.cover, props.coverSource)
+  displayCover.value = readCachedCover(props.cover, props.coverSource)
 
   const cover = typeof props.cover === 'string' ? props.cover.trim() : ''
   const source = typeof props.coverSource === 'string' ? props.coverSource.trim() : ''
@@ -74,8 +74,8 @@ async function reloadCover(): Promise<void> {
   }
 
   try {
-    const handle = props.coreTrackId ? await readCoreArtwork(props.coreTrackId) : cover || null
-    const next = await resolveCover(handle, props.coreTrackId ? null : source || null)
+    const handle = cover || source ? cover || null : props.coreTrackId ? await readCoreArtwork(props.coreTrackId) : null
+    const next = await resolveCover(handle, source || null)
     if (id !== requestId) return
     displayCover.value = next
     if (!next) recordCoverDiagnostic('resolve.empty', cover, source, {}, 'warn')
@@ -124,7 +124,7 @@ async function onImageError(event: Event): Promise<void> {
         const handle = await readCoreArtwork(props.coreTrackId, true)
         const next = await resolveCover(handle, null)
         if (id !== requestId) return
-        if (next && next !== displayCover.value) {
+        if (next) {
           displayCover.value = next
           remountNonce.value += 1
           return
@@ -138,7 +138,7 @@ async function onImageError(event: Event): Promise<void> {
           sameHandle: next === displayCover.value,
           available: Boolean(next)
         })
-        if (next && next !== displayCover.value) {
+        if (next) {
           displayCover.value = next
           remountNonce.value += 1
           return

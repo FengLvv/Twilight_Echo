@@ -183,7 +183,7 @@ export function createRemoteMediaRequestHandler(
           }
         } catch (error) {
           record('cache.read.failed', { error }, 'warn')
-          throw error
+          request.signal.throwIfAborted()
         }
       }
 
@@ -246,12 +246,20 @@ export function createRemoteMediaRequestHandler(
         try {
           const bytes = new Uint8Array(await response.arrayBuffer())
           request.signal.throwIfAborted()
+          try {
           await options.imageCache.write(
             grant.source,
             upstream.headers.get('content-type') ?? '',
             bytes,
             cacheGeneration
           )
+          const stored = await options.imageCache.read(grant.source)
+          request.signal.throwIfAborted()
+          if (stored) return stored
+          } catch (error) {
+            request.signal.throwIfAborted()
+            record('cache.write.failed', { error }, 'warn')
+          }
           record('response.ready', {
             status: response.status,
             fromCache: false,

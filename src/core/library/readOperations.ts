@@ -38,8 +38,14 @@ export async function executeLibraryArtwork(
   const items: Array<{ id: string; cover: string | null }> = []
   for (const record of page.tracks) {
     signal.throwIfAborted()
-    const artwork = await present(libraryTrack(record), signal)
-    items.push({ id: record.id, cover: artwork.cover })
+    let cover: string | null = null
+    try {
+      cover = (await present(libraryTrack(record), signal)).cover
+      signal.throwIfAborted()
+    } catch {
+      signal.throwIfAborted()
+    }
+    items.push({ id: record.id, cover })
   }
   return { revision: page.revision, items }
 }

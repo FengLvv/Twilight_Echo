@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { useCoreConnection } from './coreConnection.ts'
-import { createCoreListeningStats } from './coreListeningStats.ts'
-import type { ListeningStats, ListeningTrackStatWithId } from '../../../shared/listeningStats.ts'
+import { createCoreListeningStats, projectListeningDisplayStat } from './coreListeningStats.ts'
+import type { ListeningStats } from '../../../shared/listeningStats.ts'
 import type { CoreStatisticsTrackView } from '../../../shared/coreStatistics.ts'
 import type { ListeningStatsClearRange } from '../../../shared/listeningStatsHistory.ts'
 export type { ListeningStats, ListeningTrackStat, ListeningTrackSourceId, ListeningArtistStat, ListeningTrackStatWithId } from '../../../shared/listeningStats.ts'
@@ -17,10 +17,9 @@ function projection() {
     clear: (range, revision) => core.command('statistics.clear', { range, revision })
   })
 }
-export type ListeningDisplayStat = Omit<ListeningTrackStatWithId, 'track'> & { displayTrack: CoreStatisticsTrackView['track'] }
+export type ListeningDisplayStat = ReturnType<typeof projectListeningDisplayStat>
 function display(stat: CoreStatisticsTrackView): ListeningDisplayStat {
-  const { track, ...metadata } = stat
-  return { ...metadata, displayTrack: track }
+  return projectListeningDisplayStat(stat)
 }
 /** Compatibility shape contains only the loaded ranking windows, never an all-history dataset. */
 const listeningStats = computed<ListeningStats>(() => {

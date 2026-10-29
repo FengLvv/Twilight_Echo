@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { shallowRef } from 'vue'
-import { createCoreListeningStats } from './coreListeningStats.ts'
+import { createCoreListeningStats, projectListeningDisplayStat } from './coreListeningStats.ts'
 import type { CoreSnapshot } from '../../../shared/coreProtocol.ts'
 import type { CoreStatisticsOverview } from '../../../shared/coreStatistics.ts'
 import { isCoreRequest } from '../../../shared/coreProtocol.ts'
@@ -26,6 +26,17 @@ const summary = (revision = 3): CoreStatisticsOverview => ({
   artists: [], history: { mode: 'sqlite', ready: true, pending: false, revision: 1, error: '' }
 })
 const tick = () => new Promise<void>((done) => setImmediate(done))
+
+test('all ranking adapters retain artwork when a page consumes only displayTrack', () => {
+  const row = { ...rows[0], cover: 'twilight-media://image/song', track: {
+    id: 'ncm:42', source: 'ncm', title: 'Song', artist: 'Artist', album: 'Album', duration: 180, size: 0
+  } }
+  const display = projectListeningDisplayStat(row)
+  assert.equal(display.displayTrack?.cover, row.cover)
+  assert.equal(display.cover, row.cover)
+  assert.equal(projectListeningDisplayStat({ ...row, track: null }).displayTrack, null)
+  assert.equal('cover' in row.track, false, 'the immutable Core DTO is not mutated')
+})
 
 test('statistics projection uses bounded ranking pages and exact all-history totals; snapshots are immutable', async () => {
   const state = shallowRef<CoreSnapshot | null>(stateAt())
