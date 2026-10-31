@@ -26,6 +26,7 @@ import { getCoreSettingsBridge } from '../coreProcess/settingsBridge.ts'
 import { getCoreSystemPlayer } from '../coreProcess/systemPlayerBridge.ts'
 import { getCoreApplication } from '../app/coreApplication.ts'
 import { CORE_WINDOW_POLICIES } from '../coreProcess/windowBridge.ts'
+import { validStudyPayload } from '../../shared/musicStudy.ts'
 
 let destroyingWindow = false
 let resumeBound = false
@@ -676,6 +677,17 @@ export function setupDesktopLyricsIpc(): void {
       session: runtime.latestDesktopLyricsSession,
       clock: runtime.latestDesktopLyricsClock
     }
+  })
+  ipcMain.handle('desktopLyrics:setAnalysis', async (event, sessionId: unknown, patch: unknown) => {
+    assertTrustedIpcSender(event, 'desktop lyrics analysis IPC')
+    if (!isDesktopLyricsSender(event)) throw new Error('desktop lyrics analysis rejected')
+    const session = runtime.latestDesktopLyricsSession
+    if (typeof sessionId !== 'string' || session?.sessionId !== sessionId ||
+      !validStudyPayload('study.setLyricsDisplay', patch) || (patch as {songId:string}).songId !== session.track?.id)
+      throw new Error('当前歌曲已变化，请重试')
+    const core = getCoreApplication()
+    if (!core) throw new Error('Music Core 尚未就绪')
+    return core.request('study.setLyricsDisplay', patch as import('../../shared/musicStudy.ts').StudyLyricDisplayPatch)
   })
 
   ipcMain.handle('desktopLyrics:updateQuickSettings', (event, patch: unknown) => {

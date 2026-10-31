@@ -1,4 +1,7 @@
 import type { DynamicIslandConfig } from './dynamicIsland.ts'
+import type { StudyPlatformOperations } from './musicStudy.ts'
+import { validStudyPayload, validStudyTrack, STUDY_OPERATIONS } from './musicStudy.ts'
+const isBoundedStudyJson = (value: unknown) => { try { return JSON.stringify(value).length <= 16*1024*1024 } catch { return false } }
 import type { ThemeAssetReference, ThemeAssetType, ThemeProfileV2 } from './theme.ts'
 import { normalizeThemeProfile } from './theme.ts'
 import type { CoreModelPackPlatformOperations } from './coreModelPack.ts'
@@ -20,7 +23,7 @@ import type { CorePlayerPresentation } from './coreSystemPlayer.ts'
 import type { CorePlatformId } from './audioEngineTypes.ts'
 import { PERSONAL_MUSIC_ARTWORK_MAX_BYTES } from './personalMusicArtwork.ts'
 /** Platform capabilities, not a generic main-process method invocation surface. */
-export interface CorePlatformOperations extends CoreModelPackPlatformOperations {
+export interface CorePlatformOperations extends CoreModelPackPlatformOperations, StudyPlatformOperations {
   'audio.confirmWindowsRestart': { input: Record<string, never>; output: boolean }
   'audio.restartWindowsServices': { input: Record<string, never>; output: void }
   'remote.confirmDevice': {
@@ -169,6 +172,24 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
   )
     return false
   const payload = request.payload
+  if (request.name.startsWith('study.')) {
+    const p=payload as Record<string, unknown>
+    if (!isBoundedStudyJson(p)) return false
+    if (['study.environment','study.choosePack'].includes(request.name)) return Object.keys(p).length===0
+    if (typeof p.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(p.id)) return false
+    if(request.name==='study.validateCache')return Object.keys(p).every(k=>['id','source'].includes(k))&&(p.source===undefined||typeof p.source==='string'&&p.source.length<32768&&!p.source.includes('\0'))
+    if(request.name==='study.captureLocal')return Object.keys(p).length===2&&typeof p.path==='string'&&p.path.length<32768&&!p.path.includes('\0')
+    if (request.name==='study.startWorker') return typeof p.source==='string' && p.source.length<32768 && !p.source.includes('\0') &&
+      typeof p.leadBacking==='boolean' && typeof p.twoSingers==='boolean' &&
+      (p.lyrics===undefined || typeof p.lyrics==='string' && p.lyrics.length<=1024*1024 && !p.lyrics.includes('\0')) &&
+      (p.operation===undefined || STUDY_OPERATIONS.some(operation => operation === p.operation)) &&
+      (p.start===undefined || (typeof p.start==='number' && Number.isFinite(p.start) && p.start>=0)) &&
+      (p.end===undefined || (typeof p.end==='number' && Number.isFinite(p.end) && p.end>Number(p.start??0)))
+    if (request.name==='study.exportFiles') return validStudyPayload('study.export',{id:p.id,audioFormat:p.audioFormat,chordFormat:p.chordFormat,stems:p.stems}) && !!p.chords
+    if (request.name==='study.writeMix') return !!p.gains && typeof p.gains==='object' && Number.isSafeInteger(p.frames) && Number(p.frames)>0 && Number(p.frames)<=44100*14400 &&
+      Object.entries(p.gains).every(([key,value])=>validStudyTrack(key) && typeof value==='number' && Number.isFinite(value) && value>=0 && value<=4)
+    return ['study.workerStatus','study.cancelWorker','study.removeFiles','study.hasSource','study.chooseSource'].includes(request.name) && Object.keys(p).length===1
+  }
   const themeId = (value: unknown) =>
     typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value)
   switch (request.name) {

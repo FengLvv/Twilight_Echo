@@ -107,6 +107,7 @@ export class CorePlatformClient {
           reject(new Error(`${name} timed out; outcome may be unknown`))
         },
         name === 'audio.confirmWindowsRestart' ||
+          name === 'study.environment' || name === 'study.choosePack' || name === 'study.chooseSource' || name === 'study.captureLocal' || name === 'study.exportFiles' ||
           name === 'remote.confirmDevice' ||
           name === 'ncm.officialLogin' ||
           name === 'ncm.chooseUploadFiles' ||

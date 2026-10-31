@@ -401,7 +401,8 @@ export class PlaybackController {
   async play(
     source: string,
     startTime = 0,
-    requested?: () => boolean
+    requested?: () => boolean,
+    initiallyPaused = false
   ): Promise<AudioEnginePlayResult> {
     if (!source) throw audioEngineError('audio.source_empty', 'playback source is empty')
     const revision = ++this.transportRevision
@@ -431,7 +432,7 @@ export class PlaybackController {
       '播放',
       source,
       boundedStartTime,
-      firstErrorContext.output !== 'asio'
+      firstErrorContext.output !== 'asio', initiallyPaused
     )
     if (!isCurrent()) return superseded
     let nativeFallbackReason = ''
@@ -446,7 +447,7 @@ export class PlaybackController {
       this.nativeOutputRouteSynced = fallbackRoute.synced
       if (fallbackRoute.synced) {
         if (!isRequested()) return superseded
-        nativeStarted = await this.tryNativePlay('WASAPI 兜底播放', source, boundedStartTime)
+        nativeStarted = await this.tryNativePlay('WASAPI 兜底播放', source, boundedStartTime,true,initiallyPaused)
         if (!isCurrent()) return superseded
       } else {
         this.lastNativeError = fallbackRoute.errors.join('\n') || this.lastNativeError
@@ -477,7 +478,7 @@ export class PlaybackController {
           `ALSA 兜底播放 ${candidate}`,
           source,
           boundedStartTime,
-          false
+          false, initiallyPaused
         )
         if (!isCurrent()) return superseded
         if (nativeStarted) {
@@ -527,7 +528,7 @@ export class PlaybackController {
     this.playbackInfo = {
       ...this.playbackInfo,
       ...nativeInfo,
-      state: 'playing',
+      state: initiallyPaused ? 'paused' : 'playing',
       position: boundedStartTime,
       duration:
         nativeInfo?.source === source && nativeInfo.duration > 0 ? nativeInfo.duration : duration,
@@ -2102,7 +2103,8 @@ export class PlaybackController {
     context: string,
     source: string,
     startTime: number,
-    logFailure = true
+    logFailure = true,
+    initiallyPaused = false
   ): Promise<boolean> {
     if (!this.native) {
       this.lastNativeError = '未加载 twilight_audio_node.node'
@@ -2110,7 +2112,7 @@ export class PlaybackController {
     }
     if (typeof this.native.callAsync === 'function') {
       try {
-        await this.native.callAsync('Play', [source, startTime])
+        await this.native.callAsync('Play', initiallyPaused ? [source,startTime,true] : [source,startTime])
         this.lastNativeError = ''
         return true
       } catch (err) {
@@ -2124,7 +2126,7 @@ export class PlaybackController {
         return false
       }
     }
-    return this.tryNative(context, (native) => native.Play(source, startTime), logFailure)
+    return this.tryNative(context, (native) => native.Play(source, startTime, initiallyPaused), logFailure)
   }
 
   publishProperty(name: string, data: unknown): void {

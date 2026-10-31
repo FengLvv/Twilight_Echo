@@ -71,6 +71,7 @@ import { createNetworkCorePlatform } from '../network/corePlatform.ts'
 import { resolveAuthorizationBatch } from '../security/authorizationBatch.ts'
 import { createDspCorePlatform } from '../dsp/corePlatform.ts'
 import { createAutoMixCorePlatform } from '../audio/autoMixCorePlatform.ts'
+import { createMusicStudyPlatform } from '../audio/musicStudyPlatform.ts'
 import { createAudioRecoveryCorePlatform } from '../audio/recoveryCorePlatform.ts'
 import { projectCoreSettings } from './settingsProjection.ts'
 import type { CoreSettingsState } from '../../shared/coreSettings.ts'
@@ -88,6 +89,7 @@ export function createElectronCoreSupervisor(
       : chromecastStopReceiver(target.host, target.port, target.receiverSessionId)
   )
   const autoMixProcesses = createAutoMixCorePlatform(configuration.root)
+  const musicStudyProcesses = createMusicStudyPlatform(configuration.root)
   let musicCacheRoot = configuration.musicCachePath || join(configuration.root, 'music-cache')
   let projectedLaunchSettings = false
   let developerMode = configuration.plugins?.developerMode === true
@@ -147,7 +149,7 @@ export function createElectronCoreSupervisor(
           : join(app.getAppPath(), 'resources', 'remote'))
     },
     stopOutputs: async () => {
-      await Promise.all([castOutput.stop(), autoMixProcesses.idle()])
+      await Promise.all([castOutput.stop(), autoMixProcesses.idle(), musicStudyProcesses.idle()])
     },
     platform: {
       ...createAudioRecoveryCorePlatform(),
@@ -212,6 +214,7 @@ export function createElectronCoreSupervisor(
       },
       ...createDspCorePlatform(),
       ...autoMixProcesses.operations,
+      ...musicStudyProcesses.operations,
       'cache.authorizeRoot': authorizeCacheRoot,
       'cache.clearPlatform': (_payload, signal) => clearPlatformCaches(signal),
       'downloads.authorizedRoots': async ({ libraryFolders, downloadFolder }) => ({

@@ -14,6 +14,7 @@ import DesktopLyricSlot from './components/DesktopLyricSlot.vue'
 import DesktopLyricsToolbar from './components/DesktopLyricsToolbar.vue'
 import { createDesktopLyricsClock } from './desktopLyricsClock.ts'
 import './desktopLyrics.css'
+import type { StudyLyricDisplayPatch } from '../../../shared/musicStudy.ts'
 
 type SlotInstance = InstanceType<typeof DesktopLyricSlot>
 
@@ -26,6 +27,9 @@ const currentClock = shallowRef<DesktopLyricsClockSnapshot | null>(null)
 const activeIndex = ref(-1)
 const hovering = ref(false)
 const toolbarVisible = ref(false)
+const analysisMenuOpen = ref(false)
+const analysisFailure = ref('')
+let annotationFrame = 0
 const lockedHovering = ref(false)
 const unlockAffordanceVisible = ref(false)
 const dragging = ref(false)
@@ -130,11 +134,13 @@ function scheduleToolbarShow(): void {
 }
 
 function hideToolbar(): void {
+  if (analysisMenuOpen.value) return
   clearToolbarTimer()
   toolbarVisible.value = false
 }
 
 function clearHoverUi(): void {
+  analysisMenuOpen.value = false
   hovering.value = false
   hideToolbar()
 }
@@ -187,7 +193,8 @@ function restoreHoverAfterUnlock(): void {
 function schedulePauseHide(): void {
   clearPauseTimer()
   setPausedHidden(false)
-  if (!settings.value.hideWhenPaused || playing.value || hovering.value) return
+  if (!settings.value.hideWhenPaused || playing.value || hovering.value || analysisMenuOpen.value)
+    return
   pauseTimer = setTimeout(() => {
     pauseTimer = null
     setPausedHidden(true)
@@ -226,7 +233,7 @@ function scheduleActiveLineUpdate(): void {
       activeLineTimer = null
       syncPosition()
     },
-    Math.max(16, Math.ceil(nextLine.startMs - position) + 1)
+    Math.max(16, Math.ceil((nextLine.startMs - position) / (currentClock.value?.rate ?? 1)) + 1)
   )
 }
 
@@ -242,16 +249,58 @@ function syncPosition(hard = false): void {
   slotOne.value?.syncKaraoke(position, isPlaying, hard || changed)
   scheduleActiveLineUpdate()
 }
+function stopAnnotationClock() {
+  cancelAnimationFrame(annotationFrame)
+  annotationFrame = 0
+}
+function startAnnotationClock() {
+  stopAnnotationClock()
+  if (
+    !playing.value ||
+    document.hidden ||
+    !session.value?.analysis ||
+    (!session.value.analysis.display.notationVisible &&
+      !session.value.analysis.display.chordsVisible)
+  )
+    return
+  const tick = () => {
+    const position = positionNow()
+    slotZero.value?.syncAnnotations(position)
+    slotOne.value?.syncAnnotations(position)
+    annotationFrame = requestAnimationFrame(tick)
+  }
+  annotationFrame = requestAnimationFrame(tick)
+}
+async function setAnalysis(patch: Omit<StudyLyricDisplayPatch, 'songId'>) {
+  const current = session.value
+  if (!current?.track) return
+  analysisFailure.value = ''
+  try {
+    await api.setAnalysis(current.sessionId, { ...patch, songId: current.track.id })
+  } catch (error) {
+    if (session.value?.sessionId === current.sessionId)
+      analysisFailure.value = error instanceof Error ? error.message : String(error)
+  }
+}
+function analysisInteraction(active: boolean) {
+  analysisMenuOpen.value = active
+  if (!active && !rootElement.value?.matches(':hover')) hideToolbar()
+}
 
 function applySession(next: DesktopLyricsSession): void {
   const changed = session.value?.sessionId !== next.sessionId
   session.value = next
   if (changed) {
+    analysisFailure.value = ''
+    stopAnnotationClock()
     clock.reset()
     currentClock.value = null
     activeIndex.value = -1
   }
-  void nextTick(() => syncPosition(true))
+  void nextTick(() => {
+    syncPosition(true)
+    startAnnotationClock()
+  })
 }
 
 function applyClock(next: DesktopLyricsClockSnapshot): void {
@@ -261,6 +310,7 @@ function applyClock(next: DesktopLyricsClockSnapshot): void {
   currentClock.value = next
   schedulePauseHide()
   syncPosition(hard)
+  startAnnotationClock()
 }
 
 async function patchSettings(patch: Partial<DesktopLyricsSettingsV3>): Promise<void> {
@@ -305,6 +355,7 @@ function onPointerEnter(event: PointerEvent): void {
 }
 
 function onPointerLeave(): void {
+  if (analysisMenuOpen.value) return
   if (settings.value.locked) {
     setLockedInteractionActive(false)
     return
@@ -398,11 +449,13 @@ function endDrag(): void {
 
 function onVisibilityChange(): void {
   if (document.hidden) {
+    stopAnnotationClock()
     clock.freeze()
     clearActiveLineTimer()
     return
   }
   syncPosition(true)
+  startAnnotationClock()
 }
 
 onMounted(async () => {
@@ -417,6 +470,7 @@ onMounted(async () => {
   document.addEventListener('pointerup', endDrag)
   document.addEventListener('pointercancel', endDrag)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('blur', clearHoverUi)
   disposers.push(
     api.onSessionChanged(applySession),
     api.onClockChanged(applyClock),
@@ -435,6 +489,7 @@ onMounted(async () => {
       syncPosition(true)
     }),
     api.onFreezeClock(() => {
+      stopAnnotationClock()
       clock.freeze()
       clearActiveLineTimer()
     }),
@@ -475,6 +530,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  stopAnnotationClock()
   clearPauseTimer()
   setPausedHidden(false)
   clearToolbarTimer()
@@ -486,6 +542,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerup', endDrag)
   document.removeEventListener('pointercancel', endDrag)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('blur', clearHoverUi)
   for (const dispose of disposers) dispose()
 })
 </script>
@@ -499,6 +556,8 @@ onBeforeUnmount(() => {
       'is-hovering': hovering,
       'is-dragging': dragging,
       'is-hidden': pausedHidden,
+      'has-annotations':
+        session?.analysis?.display.notationVisible || session?.analysis?.display.chordsVisible,
       'is-vertical': settings.writingMode === 'vertical'
     }"
     :data-motion="motionMode"
@@ -527,6 +586,10 @@ onBeforeUnmount(() => {
           :writing-mode="settings.writingMode"
           :translation-visible="settings.translationVisible"
           :romanization-visible="settings.romanizationVisible"
+          :analysis="session?.analysis"
+          :lyric-offset-ms="session?.lyricOffsetMs ?? 0"
+          :playback-rate="currentClock?.rate ?? 1"
+          :compact="settings.placement === 'taskbar'"
         />
         <DesktopLyricSlot
           v-if="settings.displayMode === 'double'"
@@ -537,6 +600,10 @@ onBeforeUnmount(() => {
           :writing-mode="settings.writingMode"
           :translation-visible="settings.translationVisible"
           :romanization-visible="settings.romanizationVisible"
+          :analysis="session?.analysis"
+          :lyric-offset-ms="session?.lyricOffsetMs ?? 0"
+          :playback-rate="currentClock?.rate ?? 1"
+          :compact="settings.placement === 'taskbar'"
         />
       </div>
     </div>
@@ -561,12 +628,18 @@ onBeforeUnmount(() => {
         <DesktopLyricsToolbar
           :settings="settings"
           :playing="playing"
+          :available="!!session?.track"
+          :analysis="session?.analysis"
+          :error="analysisFailure"
+          @analysis="setAnalysis"
+          @interaction="analysisInteraction"
           @transport="transport"
           @patch="patchSettings"
           @lock="lock"
           @close="api.close()"
         />
         <p v-if="songLabel" class="dl-song-label" :title="songLabel">{{ songLabel }}</p>
+        <p v-if="analysisFailure" class="dl-action-error" role="alert">{{ analysisFailure }}</p>
       </div>
     </Transition>
   </main>

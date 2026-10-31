@@ -24,6 +24,15 @@ const impulseResponseGrants = new CanonicalPathGrantSet()
 const vst3SearchPathGrants = new CanonicalPathGrantSet()
 const downloadRootGrants = new CanonicalPathGrantSet()
 const completedDownloadGrants = new CanonicalPathGrantSet()
+const agentAudioGrants = new CanonicalPathGrantSet()
+
+/** Explicit authenticated local-CLI selection grants the named audio file only. */
+export async function grantAgentSelectedAudioFile(filePath: string): Promise<string> {
+  const canonicalPath = await resolveCanonicalExistingPath(filePath, 'file')
+  assertSupportedAudioExtension(canonicalPath)
+  agentAudioGrants.grantCanonicalFile(canonicalPath)
+  return canonicalPath
+}
 
 /** Main-process download results grant only the completed audio file, never its directory. */
 export async function grantCompletedDownloadAudioFile(filePath: string): Promise<string> {
@@ -211,6 +220,7 @@ export async function resolveAuthorizedAudioFile(filePath: string): Promise<stri
   const canonicalPath = await resolveCanonicalExistingPath(filePath, 'file')
   assertSupportedAudioExtension(canonicalPath)
   if (completedDownloadGrants.hasCanonicalFile(canonicalPath)) return canonicalPath
+  if (agentAudioGrants.hasCanonicalFile(canonicalPath)) return canonicalPath
   let inLibrary = libraryGrants.isCanonicalWithinRoots(canonicalPath)
   let inManagedCache = audioCacheGrants.isCanonicalWithinRoots(canonicalPath)
   if (!inLibrary && !inManagedCache) {

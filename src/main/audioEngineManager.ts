@@ -1339,10 +1339,11 @@ export class AudioEngineManager extends EventEmitter {
   async play(
     source: string,
     startTime = 0,
-    requested?: () => boolean
+    requested?: () => boolean,
+    initiallyPaused = false
   ): Promise<AudioEnginePlayResult> {
     this.autoMixCoordinator?.invalidate('playback_changed')
-    return this.playback.play(source, startTime, requested)
+    return this.playback.play(source, startTime, requested, initiallyPaused)
   }
 
   async togglePause(): Promise<void> {
@@ -1385,6 +1386,9 @@ export class AudioEngineManager extends EventEmitter {
   async setLoopRangeConfirmed(start: number, end: number): Promise<boolean> {
     this.autoMixCoordinator?.invalidate('loop_changed')
     return this.playback.setLoopRangeConfirmed(start, end)
+  }
+  async setStudyMixGains(gains: Partial<Record<import('../shared/musicStudy.ts').StudyTrack,number>>): Promise<void> {
+    if (!await this.callNativeMaybeAsync('分轨混音','SetStudyMixGains',JSON.stringify(gains))) throw new Error(this.lastNativeError||'无法更新分轨混音')
   }
   seekConfirmed(position: number): Promise<void> {
     this.autoMixCoordinator?.invalidate('seek')

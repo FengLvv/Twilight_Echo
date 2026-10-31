@@ -14,6 +14,7 @@ import { createCorePlayerPersonal } from './corePlayerPersonal.ts'
 import { createCorePlayerClock, type CorePlayerClockOptions } from './corePlayerClock.ts'
 import { createCorePlayerVisualization } from './corePlayerVisualization.ts'
 import { createCorePlayerQueue } from './corePlayerQueue.ts'
+import { isRequestCancelled } from '../../../../shared/cancellation.ts'
 import { createCorePlayerResource } from './corePlayerResource.ts'
 import type { CoreCommandName, CoreCommands } from '../../../../shared/coreProtocol.ts'
 import type { PlayMode } from '../../../../shared/audioEngineTypes.ts'
@@ -41,6 +42,7 @@ export function createCorePlayerStore(
   const store = scope.run(() => {
     const commandError = shallowRef<Error | null>(null)
     const failed = (error: unknown) => {
+      if (isRequestCancelled(error)) return
       commandError.value = error instanceof Error ? error : new Error(String(error))
     }
     async function command<K extends CoreCommandName>(name: K, payload: CoreCommands[K]) {
@@ -54,6 +56,10 @@ export function createCorePlayerStore(
       }
     }
     const client: CorePlayerClient = { ...core, command }
+    async function transport(name: 'playback.play' | 'playback.pause' | 'playback.stop' | 'playback.next' | 'playback.previous') {
+      try { await command(name, {}) }
+      catch (error) { if (!isRequestCancelled(error)) throw error }
+    }
     const personal = createCorePlayerPersonal(client, failed)
     const audio = createCorePlayerAudio(client, failed)
     const clock = createCorePlayerClock(client, options)
@@ -65,7 +71,7 @@ export function createCorePlayerStore(
           ? `${state.epoch}:${state.presentationRevision}:${state.queue?.occurrenceId}`
           : ''
       },
-      () => core.query('player.presentation', {}),
+      (signal) => core.query('player.presentation', {}, signal),
       failed
     )
     const visible = ref(typeof document === 'undefined' || !document.hidden)
@@ -224,10 +230,10 @@ export function createCorePlayerStore(
       dominantColor: computed(() =>
         (options.useCoverTheme?.() ?? true) ? coverThemeColor.value : '#7c4dff'
       ),
-      togglePlay: () => command(isPlaying.value ? 'playback.pause' : 'playback.play', {}).then(() => {}),
-      stopPlayback: () => command('playback.stop', {}),
-      next: () => command('playback.next', {}),
-      prev: () => command('playback.previous', {}),
+      togglePlay: () => transport(isPlaying.value ? 'playback.pause' : 'playback.play'),
+      stopPlayback: () => transport('playback.stop'),
+      next: () => transport('playback.next'),
+      prev: () => transport('playback.previous'),
       seek: (position: number) => command('playback.seek', { position }),
       setVolume: (volume: number) => command('playback.volume', { volume }),
       setUnityVolume: () => command('playback.volume', { volume: 1 }),

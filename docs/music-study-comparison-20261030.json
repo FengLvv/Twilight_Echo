@@ -1,0 +1,886 @@
+{
+  "date": "2026-10-30",
+  "device": "NVIDIA RTX 5080, Torch 2.8.0+cu128",
+  "chosen": "sheetsage2-mert2-chord-full-paper-v1",
+  "cohorts": {
+    "dev60": {
+      "configuration": {
+        "model": "SheetSage2 b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+        "parent": "MERT d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+        "adapter": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+        "parentSha": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+        "source": {
+          "audio_sheetsage2.py": "ecce56e7bb8a08cbca9eb27a74d9aeff17f55e80efcc7c48f7436440f610ccc1",
+          "chord_spelling_sheetsage2.py": "5a673e3c8caa6d0a4cda19227ce5587c611a2bf85343f6bc623e3d66d99ed8b1",
+          "configuration_mert2.py": "77b53ec9d7ee31a599d744fb006e812c7eeaf7390deb46e2f460cf8c17b00bd6",
+          "configuration_sheetsage2.py": "36d174331b3721d984608252830179bf3516d77b7225f413acc85bdf5efb3bec",
+          "durations_sheetsage2.py": "abbc297b70b63a86f8509b1db74d0e85d7b46dcb83867cf33741c43f9d49db83",
+          "exports_sheetsage2.py": "11782cff50f96dac1bf1eedefed86b3cd60222e31b8456bee366eeb373b6a7e5",
+          "generation_sheetsage2.py": "b58dbbfaebfba2a441a79b8c36183f0e4956acdd3aaf7c655c559933b4c20afd",
+          "infer.py": "20e6b23c910bfdecf012a8ee8d45efcb31cb6cb21351da5921d95fb877e70de6",
+          "io_sheetsage2.py": "afb5b4d4a52b513b11cfdad40e7b9d2286dd4ff6585b89688dbb31b3d5376da6",
+          "labels_sheetsage2.py": "4a80870695dd91da6070e7d8d0ce6b50f3bf71c3f629417a86cf12f4ef4f97e0",
+          "midi_sheetsage2.py": "32f80d13592c669e56683ebb4c415f13bf8278c8ad1fe43afa500347bed35099",
+          "modeling_mert2.py": "b1a3174e5649c4b26b0c90d8626f0adacfbbba111a58ed3bb72ad651945a2f5c",
+          "modeling_sheetsage2.py": "f1c45346dd76329fcbeadc5c721312836509326310c034634bc12d75263688bb",
+          "notation_sheetsage2.py": "f75f0e8b268cd9e9c622d791d3fd77d2e68ad355a4e67018c7e15aeb2bc05af7",
+          "pipeline_sheetsage2.py": "0ae572554ca375323e2aa4ea1fb25ba27e7f4d520c0ba5b101d74930c0a66c33",
+          "processing_sheetsage2.py": "ec5ef34ad61455437c750dd5ffb92142f7309638559e74114c639b57da56263c",
+          "render.py": "446b18e0ba7250c8584c14bda241f8d063083cd10b1432de82c3cf56736af9de",
+          "rendering_sheetsage2.py": "ddbcaf314139d67727cb5df6840d7d60d671d5c67f6b185a26b840df1e2d9288",
+          "schema_sheetsage2.py": "3ee069f0d4dcfb8080f730c43676318d471ab6b3cfef86c6c225aa63a9db182f",
+          "setup_render.py": "8ee1004067f8e50443005a761d86435337f6ee71eeabf447d543eb5f3ad5561d",
+          "tensors_sheetsage2.py": "51f72b51ed5a22c751d5adf915198490b1a95ec8959fcf9a38ee71b4444fc8b3",
+          "tokenization_sheetsage2.py": "2ad9f7734e3d9f750fe575f22fd9ec03a9a4ab52497a6314e76f53ed9024fa75",
+          "__init__.py": "19539a965cabf22d08231688efc15547d005e6345745f48684c2f02d010f82fd"
+        },
+        "prompts": [
+          "timestamp",
+          "downbeat_meter",
+          "chord_full"
+        ],
+        "preset": "paper",
+        "dtype": "fp32 weights + bf16 autocast",
+        "sampleRate": 24000,
+        "split": "dev",
+        "count": 60
+      },
+      "summary": {
+        "baseline": {
+          "root": 0.8140560356769334,
+          "majmin": 0.8682750611326143,
+          "triads": 0.5892053467932925,
+          "sevenths": 0.7607468229728777,
+          "majmin_inv": 0.6570213431570012,
+          "sevenths_inv": 0.5646668018435742,
+          "mirex": 0.818537699687526,
+          "common_exact": 0.7280438577613941
+        },
+        "mini-fused": {
+          "root": 0.828921448191294,
+          "majmin": 0.8758692120378915,
+          "triads": 0.5933939328370744,
+          "sevenths": 0.7943614692725846,
+          "majmin_inv": 0.657678251434154,
+          "sevenths_inv": 0.5903686139238784,
+          "mirex": 0.8365910417221916,
+          "common_exact": 0.7644641064204093
+        },
+        "mini-btc": {
+          "root": 0.8343821742919705,
+          "majmin": 0.8807530672917198,
+          "triads": 0.597055504148937,
+          "sevenths": 0.7886686317054197,
+          "majmin_inv": 0.674837931444127,
+          "sevenths_inv": 0.5976380319499457,
+          "mirex": 0.8419874033301957,
+          "common_exact": 0.7594259243982656
+        },
+        "mini-2e1d": {
+          "root": 0.7481429489199519,
+          "majmin": 0.7957728873720259,
+          "triads": 0.5350104640710557,
+          "sevenths": 0.7320814104385266,
+          "majmin_inv": 0.6283800737565733,
+          "sevenths_inv": 0.5770807267407165,
+          "mirex": 0.7573259253302381,
+          "common_exact": 0.7013365976488042
+        },
+        "sheetsage2": {
+          "root": 0.9329050800238665,
+          "majmin": 0.9749386351844743,
+          "triads": 0.6745709234838086,
+          "sevenths": 0.9427993033644048,
+          "majmin_inv": 0.7523317490271393,
+          "sevenths_inv": 0.7284293223194246,
+          "mirex": 0.9262105626957676,
+          "common_exact": 0.9199997268122785
+        }
+      },
+      "validSeconds": {
+        "baseline": {
+          "root": 1758.6770058956924,
+          "majmin": 1182.3858490361852,
+          "triads": 1758.6770058956924,
+          "sevenths": 1153.5800537574846,
+          "majmin_inv": 1182.3858490361852,
+          "sevenths_inv": 1153.5800537574846,
+          "mirex": 1539.2057958758558,
+          "common_exact": 1266.2223611074614
+        },
+        "mini-fused": {
+          "root": 1758.6770058956924,
+          "majmin": 1182.3858490361852,
+          "triads": 1758.6770058956924,
+          "sevenths": 1153.5800537574846,
+          "majmin_inv": 1182.3858490361852,
+          "sevenths_inv": 1153.5800537574846,
+          "mirex": 1539.2057958758558,
+          "common_exact": 1266.2223611074614
+        },
+        "mini-btc": {
+          "root": 1758.677005895693,
+          "majmin": 1182.3858490361852,
+          "triads": 1758.677005895693,
+          "sevenths": 1153.5800537574846,
+          "majmin_inv": 1182.3858490361852,
+          "sevenths_inv": 1153.5800537574846,
+          "mirex": 1539.2057958758558,
+          "common_exact": 1266.2223611074614
+        },
+        "mini-2e1d": {
+          "root": 1758.677005895693,
+          "majmin": 1182.3858490361852,
+          "triads": 1758.677005895693,
+          "sevenths": 1153.5800537574846,
+          "majmin_inv": 1182.3858490361852,
+          "sevenths_inv": 1153.5800537574846,
+          "mirex": 1539.2057958758558,
+          "common_exact": 1266.2223611074614
+        },
+        "sheetsage2": {
+          "root": 1758.677005895692,
+          "majmin": 1182.3858490361852,
+          "triads": 1758.677005895692,
+          "sevenths": 1153.5800537574846,
+          "majmin_inv": 1182.3858490361852,
+          "sevenths_inv": 1153.5800537574846,
+          "mirex": 1539.2057958758558,
+          "common_exact": 1266.2223611074614
+        }
+      },
+      "fileCount": 60,
+      "audioSeconds": 1758.6770975056697
+    },
+    "holdout30": {
+      "configuration": {
+        "model": "SheetSage2 b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+        "parent": "MERT d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+        "adapter": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+        "parentSha": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+        "source": {
+          "audio_sheetsage2.py": "ecce56e7bb8a08cbca9eb27a74d9aeff17f55e80efcc7c48f7436440f610ccc1",
+          "chord_spelling_sheetsage2.py": "5a673e3c8caa6d0a4cda19227ce5587c611a2bf85343f6bc623e3d66d99ed8b1",
+          "configuration_mert2.py": "77b53ec9d7ee31a599d744fb006e812c7eeaf7390deb46e2f460cf8c17b00bd6",
+          "configuration_sheetsage2.py": "36d174331b3721d984608252830179bf3516d77b7225f413acc85bdf5efb3bec",
+          "durations_sheetsage2.py": "abbc297b70b63a86f8509b1db74d0e85d7b46dcb83867cf33741c43f9d49db83",
+          "exports_sheetsage2.py": "11782cff50f96dac1bf1eedefed86b3cd60222e31b8456bee366eeb373b6a7e5",
+          "generation_sheetsage2.py": "b58dbbfaebfba2a441a79b8c36183f0e4956acdd3aaf7c655c559933b4c20afd",
+          "infer.py": "20e6b23c910bfdecf012a8ee8d45efcb31cb6cb21351da5921d95fb877e70de6",
+          "io_sheetsage2.py": "afb5b4d4a52b513b11cfdad40e7b9d2286dd4ff6585b89688dbb31b3d5376da6",
+          "labels_sheetsage2.py": "4a80870695dd91da6070e7d8d0ce6b50f3bf71c3f629417a86cf12f4ef4f97e0",
+          "midi_sheetsage2.py": "32f80d13592c669e56683ebb4c415f13bf8278c8ad1fe43afa500347bed35099",
+          "modeling_mert2.py": "b1a3174e5649c4b26b0c90d8626f0adacfbbba111a58ed3bb72ad651945a2f5c",
+          "modeling_sheetsage2.py": "f1c45346dd76329fcbeadc5c721312836509326310c034634bc12d75263688bb",
+          "notation_sheetsage2.py": "f75f0e8b268cd9e9c622d791d3fd77d2e68ad355a4e67018c7e15aeb2bc05af7",
+          "pipeline_sheetsage2.py": "0ae572554ca375323e2aa4ea1fb25ba27e7f4d520c0ba5b101d74930c0a66c33",
+          "processing_sheetsage2.py": "ec5ef34ad61455437c750dd5ffb92142f7309638559e74114c639b57da56263c",
+          "render.py": "446b18e0ba7250c8584c14bda241f8d063083cd10b1432de82c3cf56736af9de",
+          "rendering_sheetsage2.py": "ddbcaf314139d67727cb5df6840d7d60d671d5c67f6b185a26b840df1e2d9288",
+          "schema_sheetsage2.py": "3ee069f0d4dcfb8080f730c43676318d471ab6b3cfef86c6c225aa63a9db182f",
+          "setup_render.py": "8ee1004067f8e50443005a761d86435337f6ee71eeabf447d543eb5f3ad5561d",
+          "tensors_sheetsage2.py": "51f72b51ed5a22c751d5adf915198490b1a95ec8959fcf9a38ee71b4444fc8b3",
+          "tokenization_sheetsage2.py": "2ad9f7734e3d9f750fe575f22fd9ec03a9a4ab52497a6314e76f53ed9024fa75",
+          "__init__.py": "19539a965cabf22d08231688efc15547d005e6345745f48684c2f02d010f82fd"
+        },
+        "prompts": [
+          "timestamp",
+          "downbeat_meter",
+          "chord_full"
+        ],
+        "preset": "paper",
+        "dtype": "fp32 weights + bf16 autocast",
+        "sampleRate": 24000,
+        "split": "holdout",
+        "count": 30
+      },
+      "summary": {
+        "baseline": {
+          "root": 0.6798932902113735,
+          "majmin": 0.7711293760298368,
+          "triads": 0.5065174167022906,
+          "sevenths": 0.7324931772471176,
+          "majmin_inv": 0.6229062053285251,
+          "sevenths_inv": 0.6036679275997237,
+          "mirex": 0.7094200506723768,
+          "common_exact": 0.7029637840793866
+        },
+        "mini-fused": {
+          "root": 0.6948527501388087,
+          "majmin": 0.7812468243658421,
+          "triads": 0.5088763377051422,
+          "sevenths": 0.770837124149176,
+          "majmin_inv": 0.6379260896148317,
+          "sevenths_inv": 0.6406160986926386,
+          "mirex": 0.7430410647604486,
+          "common_exact": 0.7314553776107074
+        },
+        "mini-btc": {
+          "root": 0.697192514884532,
+          "majmin": 0.7803848558682134,
+          "triads": 0.508039039140252,
+          "sevenths": 0.7626106850204897,
+          "majmin_inv": 0.633331470410429,
+          "sevenths_inv": 0.6228474199766078,
+          "mirex": 0.7460966612981378,
+          "common_exact": 0.7221624451057508
+        },
+        "mini-2e1d": {
+          "root": 0.6278497242168438,
+          "majmin": 0.7315947195008267,
+          "triads": 0.4692424573433101,
+          "sevenths": 0.7307828712972286,
+          "majmin_inv": 0.5941348476875807,
+          "sevenths_inv": 0.6000481978727331,
+          "mirex": 0.6670852825427164,
+          "common_exact": 0.6765458890654138
+        },
+        "sheetsage2": {
+          "root": 0.8368385401186456,
+          "majmin": 0.8756383646636519,
+          "triads": 0.5980830986514516,
+          "sevenths": 0.9063883506575077,
+          "majmin_inv": 0.7170825491927713,
+          "sevenths_inv": 0.741573299206846,
+          "mirex": 0.9085746040338236,
+          "common_exact": 0.8882665884872389
+        }
+      },
+      "validSeconds": {
+        "baseline": {
+          "root": 914.0363102040818,
+          "majmin": 586.2598961810726,
+          "triads": 914.0363102040818,
+          "sevenths": 521.2394647092764,
+          "majmin_inv": 586.2598961810726,
+          "sevenths_inv": 521.2394647092764,
+          "mirex": 899.8671686014947,
+          "common_exact": 594.310337766952
+        },
+        "mini-fused": {
+          "root": 914.0363102040818,
+          "majmin": 586.2598961810725,
+          "triads": 914.0363102040818,
+          "sevenths": 521.2394647092764,
+          "majmin_inv": 586.2598961810725,
+          "sevenths_inv": 521.2394647092764,
+          "mirex": 899.8671686014947,
+          "common_exact": 594.310337766952
+        },
+        "mini-btc": {
+          "root": 914.0363102040816,
+          "majmin": 586.2598961810726,
+          "triads": 914.0363102040816,
+          "sevenths": 521.2394647092764,
+          "majmin_inv": 586.2598961810726,
+          "sevenths_inv": 521.2394647092764,
+          "mirex": 899.8671686014947,
+          "common_exact": 594.310337766952
+        },
+        "mini-2e1d": {
+          "root": 914.0363102040818,
+          "majmin": 586.2598961810725,
+          "triads": 914.0363102040818,
+          "sevenths": 521.2394647092763,
+          "majmin_inv": 586.2598961810725,
+          "sevenths_inv": 521.2394647092763,
+          "mirex": 899.8671686014947,
+          "common_exact": 594.310337766952
+        },
+        "sheetsage2": {
+          "root": 914.0363102040818,
+          "majmin": 586.2598961810726,
+          "triads": 914.0363102040818,
+          "sevenths": 521.2394647092764,
+          "majmin_inv": 586.2598961810726,
+          "sevenths_inv": 521.2394647092764,
+          "mirex": 899.8671686014947,
+          "common_exact": 594.310337766952
+        }
+      },
+      "fileCount": 30,
+      "audioSeconds": 914.0363492063491
+    },
+    "idmt": {
+      "configuration": {
+        "model": "SheetSage2 b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+        "parent": "MERT d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+        "adapter": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+        "parentSha": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+        "source": {
+          "audio_sheetsage2.py": "ecce56e7bb8a08cbca9eb27a74d9aeff17f55e80efcc7c48f7436440f610ccc1",
+          "chord_spelling_sheetsage2.py": "5a673e3c8caa6d0a4cda19227ce5587c611a2bf85343f6bc623e3d66d99ed8b1",
+          "configuration_mert2.py": "77b53ec9d7ee31a599d744fb006e812c7eeaf7390deb46e2f460cf8c17b00bd6",
+          "configuration_sheetsage2.py": "36d174331b3721d984608252830179bf3516d77b7225f413acc85bdf5efb3bec",
+          "durations_sheetsage2.py": "abbc297b70b63a86f8509b1db74d0e85d7b46dcb83867cf33741c43f9d49db83",
+          "exports_sheetsage2.py": "11782cff50f96dac1bf1eedefed86b3cd60222e31b8456bee366eeb373b6a7e5",
+          "generation_sheetsage2.py": "b58dbbfaebfba2a441a79b8c36183f0e4956acdd3aaf7c655c559933b4c20afd",
+          "infer.py": "20e6b23c910bfdecf012a8ee8d45efcb31cb6cb21351da5921d95fb877e70de6",
+          "io_sheetsage2.py": "afb5b4d4a52b513b11cfdad40e7b9d2286dd4ff6585b89688dbb31b3d5376da6",
+          "labels_sheetsage2.py": "4a80870695dd91da6070e7d8d0ce6b50f3bf71c3f629417a86cf12f4ef4f97e0",
+          "midi_sheetsage2.py": "32f80d13592c669e56683ebb4c415f13bf8278c8ad1fe43afa500347bed35099",
+          "modeling_mert2.py": "b1a3174e5649c4b26b0c90d8626f0adacfbbba111a58ed3bb72ad651945a2f5c",
+          "modeling_sheetsage2.py": "f1c45346dd76329fcbeadc5c721312836509326310c034634bc12d75263688bb",
+          "notation_sheetsage2.py": "f75f0e8b268cd9e9c622d791d3fd77d2e68ad355a4e67018c7e15aeb2bc05af7",
+          "pipeline_sheetsage2.py": "0ae572554ca375323e2aa4ea1fb25ba27e7f4d520c0ba5b101d74930c0a66c33",
+          "processing_sheetsage2.py": "ec5ef34ad61455437c750dd5ffb92142f7309638559e74114c639b57da56263c",
+          "render.py": "446b18e0ba7250c8584c14bda241f8d063083cd10b1432de82c3cf56736af9de",
+          "rendering_sheetsage2.py": "ddbcaf314139d67727cb5df6840d7d60d671d5c67f6b185a26b840df1e2d9288",
+          "schema_sheetsage2.py": "3ee069f0d4dcfb8080f730c43676318d471ab6b3cfef86c6c225aa63a9db182f",
+          "setup_render.py": "8ee1004067f8e50443005a761d86435337f6ee71eeabf447d543eb5f3ad5561d",
+          "tensors_sheetsage2.py": "51f72b51ed5a22c751d5adf915198490b1a95ec8959fcf9a38ee71b4444fc8b3",
+          "tokenization_sheetsage2.py": "2ad9f7734e3d9f750fe575f22fd9ec03a9a4ab52497a6314e76f53ed9024fa75",
+          "__init__.py": "19539a965cabf22d08231688efc15547d005e6345745f48684c2f02d010f82fd"
+        },
+        "prompts": [
+          "timestamp",
+          "downbeat_meter",
+          "chord_full"
+        ],
+        "preset": "paper",
+        "dtype": "fp32 weights + bf16 autocast",
+        "sampleRate": 24000,
+        "dataset": "idmt",
+        "split": "dev",
+        "count": 3
+      },
+      "summary": {
+        "baseline": {
+          "root": 0.7838003898635479,
+          "majmin": 0.9402026898263237,
+          "triads": 0.7225072204320325,
+          "sevenths": 0.720863690770611,
+          "majmin_inv": 0.4173138994344985,
+          "sevenths_inv": 0.31737620953323115,
+          "mirex": 0.9581361598903126,
+          "common_exact": 0.6143866828385103
+        },
+        "mini-fused": {
+          "root": 0.8074476986116087,
+          "majmin": 0.9604075208931541,
+          "triads": 0.7430499423161079,
+          "sevenths": 0.7744385560330521,
+          "majmin_inv": 0.4185700367650997,
+          "sevenths_inv": 0.33509917155404845,
+          "mirex": 0.9659486368190685,
+          "common_exact": 0.6618912619311292
+        },
+        "mini-btc": {
+          "root": 0.7520357083184153,
+          "majmin": 0.9264291174449008,
+          "triads": 0.7026467120181407,
+          "sevenths": 0.7413414871771813,
+          "majmin_inv": 0.3900195067010122,
+          "sevenths_inv": 0.30796965433954515,
+          "mirex": 0.9256120515389621,
+          "common_exact": 0.6184143155970397
+        },
+        "mini-2e1d": {
+          "root": 0.7616439193221148,
+          "majmin": 0.9498365591121559,
+          "triads": 0.7084759517842222,
+          "sevenths": 0.7790000835083796,
+          "majmin_inv": 0.39204589106653037,
+          "sevenths_inv": 0.3282824039278915,
+          "mirex": 0.9438967814515985,
+          "common_exact": 0.6395047197173441
+        },
+        "sheetsage2": {
+          "root": 0.9117719298245628,
+          "majmin": 0.9951274787535425,
+          "triads": 0.8271157894736854,
+          "sevenths": 0.8811331444759217,
+          "majmin_inv": 0.4051463644948069,
+          "sevenths_inv": 0.35239376770538283,
+          "mirex": 0.9871782945736448,
+          "common_exact": 0.820093023255815
+        }
+      },
+      "validSeconds": {
+        "baseline": {
+          "root": 2850.0,
+          "majmin": 2118.0,
+          "triads": 2850.0,
+          "sevenths": 2118.0,
+          "majmin_inv": 2118.0,
+          "sevenths_inv": 2118.0,
+          "mirex": 2580.0,
+          "common_exact": 2580.0
+        },
+        "mini-fused": {
+          "root": 2850.0,
+          "majmin": 2118.0,
+          "triads": 2850.0,
+          "sevenths": 2118.0,
+          "majmin_inv": 2118.0,
+          "sevenths_inv": 2118.0,
+          "mirex": 2580.0,
+          "common_exact": 2580.0
+        },
+        "mini-btc": {
+          "root": 2850.0,
+          "majmin": 2118.0,
+          "triads": 2850.0,
+          "sevenths": 2118.0,
+          "majmin_inv": 2118.0,
+          "sevenths_inv": 2118.0,
+          "mirex": 2580.0,
+          "common_exact": 2580.0
+        },
+        "mini-2e1d": {
+          "root": 2850.0,
+          "majmin": 2118.0,
+          "triads": 2850.0,
+          "sevenths": 2118.0,
+          "majmin_inv": 2118.0,
+          "sevenths_inv": 2118.0,
+          "mirex": 2580.0,
+          "common_exact": 2580.0
+        },
+        "sheetsage2": {
+          "root": 2850.0,
+          "majmin": 2118.0,
+          "triads": 2850.0,
+          "sevenths": 2118.0,
+          "majmin_inv": 2118.0,
+          "sevenths_inv": 2118.0,
+          "mirex": 2580.0,
+          "common_exact": 2580.0
+        }
+      },
+      "fileCount": 3,
+      "audioSeconds": 2850.0
+    },
+    "mirex": {
+      "configuration": {
+        "model": "SheetSage2 b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+        "parent": "MERT d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+        "adapter": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+        "parentSha": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+        "source": {
+          "audio_sheetsage2.py": "ecce56e7bb8a08cbca9eb27a74d9aeff17f55e80efcc7c48f7436440f610ccc1",
+          "chord_spelling_sheetsage2.py": "5a673e3c8caa6d0a4cda19227ce5587c611a2bf85343f6bc623e3d66d99ed8b1",
+          "configuration_mert2.py": "77b53ec9d7ee31a599d744fb006e812c7eeaf7390deb46e2f460cf8c17b00bd6",
+          "configuration_sheetsage2.py": "36d174331b3721d984608252830179bf3516d77b7225f413acc85bdf5efb3bec",
+          "durations_sheetsage2.py": "abbc297b70b63a86f8509b1db74d0e85d7b46dcb83867cf33741c43f9d49db83",
+          "exports_sheetsage2.py": "11782cff50f96dac1bf1eedefed86b3cd60222e31b8456bee366eeb373b6a7e5",
+          "generation_sheetsage2.py": "b58dbbfaebfba2a441a79b8c36183f0e4956acdd3aaf7c655c559933b4c20afd",
+          "infer.py": "20e6b23c910bfdecf012a8ee8d45efcb31cb6cb21351da5921d95fb877e70de6",
+          "io_sheetsage2.py": "afb5b4d4a52b513b11cfdad40e7b9d2286dd4ff6585b89688dbb31b3d5376da6",
+          "labels_sheetsage2.py": "4a80870695dd91da6070e7d8d0ce6b50f3bf71c3f629417a86cf12f4ef4f97e0",
+          "midi_sheetsage2.py": "32f80d13592c669e56683ebb4c415f13bf8278c8ad1fe43afa500347bed35099",
+          "modeling_mert2.py": "b1a3174e5649c4b26b0c90d8626f0adacfbbba111a58ed3bb72ad651945a2f5c",
+          "modeling_sheetsage2.py": "f1c45346dd76329fcbeadc5c721312836509326310c034634bc12d75263688bb",
+          "notation_sheetsage2.py": "f75f0e8b268cd9e9c622d791d3fd77d2e68ad355a4e67018c7e15aeb2bc05af7",
+          "pipeline_sheetsage2.py": "0ae572554ca375323e2aa4ea1fb25ba27e7f4d520c0ba5b101d74930c0a66c33",
+          "processing_sheetsage2.py": "ec5ef34ad61455437c750dd5ffb92142f7309638559e74114c639b57da56263c",
+          "render.py": "446b18e0ba7250c8584c14bda241f8d063083cd10b1432de82c3cf56736af9de",
+          "rendering_sheetsage2.py": "ddbcaf314139d67727cb5df6840d7d60d671d5c67f6b185a26b840df1e2d9288",
+          "schema_sheetsage2.py": "3ee069f0d4dcfb8080f730c43676318d471ab6b3cfef86c6c225aa63a9db182f",
+          "setup_render.py": "8ee1004067f8e50443005a761d86435337f6ee71eeabf447d543eb5f3ad5561d",
+          "tensors_sheetsage2.py": "51f72b51ed5a22c751d5adf915198490b1a95ec8959fcf9a38ee71b4444fc8b3",
+          "tokenization_sheetsage2.py": "2ad9f7734e3d9f750fe575f22fd9ec03a9a4ab52497a6314e76f53ed9024fa75",
+          "__init__.py": "19539a965cabf22d08231688efc15547d005e6345745f48684c2f02d010f82fd"
+        },
+        "prompts": [
+          "timestamp",
+          "downbeat_meter",
+          "chord_full"
+        ],
+        "preset": "paper",
+        "dtype": "fp32 weights + bf16 autocast",
+        "sampleRate": 24000,
+        "dataset": "mirex",
+        "split": "dev",
+        "count": 2
+      },
+      "summary": {
+        "baseline": {
+          "root": 0.7142684349426203,
+          "majmin": 0.6953102405386835,
+          "triads": 0.6742224440243628,
+          "sevenths": 0.40449791408244207,
+          "majmin_inv": 0.6874951817316706,
+          "sevenths_inv": 0.39839827738128286,
+          "mirex": 0.8448304932004339,
+          "common_exact": 0.40233464785177014
+        },
+        "mini-fused": {
+          "root": 0.7350884059333873,
+          "majmin": 0.7197245498492104,
+          "triads": 0.6978963011500072,
+          "sevenths": 0.4770495841510816,
+          "majmin_inv": 0.7111855055147045,
+          "sevenths_inv": 0.47041149211928907,
+          "mirex": 0.8671157875166373,
+          "common_exact": 0.47263842065735356
+        },
+        "mini-btc": {
+          "root": 0.737737349664474,
+          "majmin": 0.728196540747722,
+          "triads": 0.7061113482992069,
+          "sevenths": 0.47722750375662426,
+          "majmin_inv": 0.7120438278116811,
+          "sevenths_inv": 0.46153007103555715,
+          "mirex": 0.8823666827556611,
+          "common_exact": 0.47281082770896093
+        },
+        "mini-2e1d": {
+          "root": 0.7409874478722346,
+          "majmin": 0.7238180663260403,
+          "triads": 0.7018656669420658,
+          "sevenths": 0.42491146875413166,
+          "majmin_inv": 0.708486662190307,
+          "sevenths_inv": 0.412420189593574,
+          "mirex": 0.9041104921928125,
+          "common_exact": 0.42211572123622926
+        },
+        "published:Chordino": {
+          "root": 0.7273277015289571,
+          "majmin": 0.7068439779194183,
+          "triads": 0.6909563026458339,
+          "sevenths": 0.45444553934101506,
+          "majmin_inv": 0.7064179928048213,
+          "sevenths_inv": 0.45444553934101506,
+          "mirex": 0.8676562855809234,
+          "common_exact": 0.4558286364168521
+        },
+        "published:ChordFormer": {
+          "root": 0.8586032513837424,
+          "majmin": 0.85191784704981,
+          "triads": 0.8411596281001301,
+          "sevenths": 0.41757124944414803,
+          "majmin_inv": 0.8466602005441828,
+          "sevenths_inv": 0.4148859870346469,
+          "mirex": 0.9297506427578591,
+          "common_exact": 0.4336766402970347
+        },
+        "published:ChordyV-ACE": {
+          "root": 0.654257531679782,
+          "majmin": 0.5506977063280202,
+          "triads": 0.5339958076720313,
+          "sevenths": 0.41618115409473766,
+          "majmin_inv": 0.4634341233326487,
+          "sevenths_inv": 0.372086963706044,
+          "mirex": 0.5780509472102773,
+          "common_exact": 0.3762506062785367
+        },
+        "published:MuQ-BTC": {
+          "root": 0.7943852357649467,
+          "majmin": 0.7955242444533785,
+          "triads": 0.7713970960077513,
+          "sevenths": 0.7030475405412878,
+          "majmin_inv": 0.7745544893080044,
+          "sevenths_inv": 0.6869269910460182,
+          "mirex": 0.9054426921257942,
+          "common_exact": 0.686349116087706
+        },
+        "published:SLASH": {
+          "root": 0.8293693176179615,
+          "majmin": 0.8199358444219281,
+          "triads": 0.7950683259620079,
+          "sevenths": 0.5684709841145893,
+          "majmin_inv": 0.7541442092576044,
+          "sevenths_inv": 0.5355733265557419,
+          "mirex": 0.8932304681733847,
+          "common_exact": 0.5612272750079442
+        },
+        "sheetsage2": {
+          "root": 0.9843605144017179,
+          "majmin": 0.9887716200393676,
+          "triads": 0.9587835463611039,
+          "sevenths": 0.7962925067784395,
+          "majmin_inv": 0.9887716200393676,
+          "sevenths_inv": 0.7962925067784395,
+          "mirex": 0.9840164296298712,
+          "common_exact": 0.7717377336611417
+        }
+      },
+      "validSeconds": {
+        "baseline": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "mini-fused": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "mini-btc": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "mini-2e1d": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "published:Chordino": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "published:ChordFormer": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "published:ChordyV-ACE": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "published:MuQ-BTC": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "published:SLASH": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        },
+        "sheetsage2": {
+          "root": 610.314716553288,
+          "majmin": 591.804716553288,
+          "triads": 610.314716553288,
+          "sevenths": 579.384716553288,
+          "majmin_inv": 591.804716553288,
+          "sevenths_inv": 579.384716553288,
+          "mirex": 610.314716553288,
+          "common_exact": 597.9100000000001
+        }
+      },
+      "fileCount": 2,
+      "audioSeconds": 610.314716553288
+    }
+  },
+  "guitarset90": {
+    "baseline": {
+      "root": 0.7681739651632353,
+      "majmin": 0.83607380239168,
+      "triads": 0.5609270536955935,
+      "sevenths": 0.751953687347337,
+      "majmin_inv": 0.6457130655012808,
+      "sevenths_inv": 0.5768047818993625,
+      "mirex": 0.7782800315924041,
+      "common_exact": 0.7200325247328526
+    },
+    "mini-fused": {
+      "root": 0.7830715407793821,
+      "majmin": 0.8445043605276155,
+      "triads": 0.5644899159579106,
+      "sevenths": 0.7870401926069132,
+      "majmin_inv": 0.6511309253973477,
+      "sevenths_inv": 0.6060067001624678,
+      "mirex": 0.8020768824012803,
+      "common_exact": 0.7539201214745819
+    },
+    "mini-btc": {
+      "root": 0.7874649350476517,
+      "majmin": 0.8474836251956166,
+      "triads": 0.5666129270368201,
+      "sevenths": 0.7805588443332794,
+      "majmin_inv": 0.6610796230874298,
+      "sevenths_inv": 0.6054837298151671,
+      "mirex": 0.8066096463773714,
+      "common_exact": 0.7475228436418219
+    },
+    "mini-2e1d": {
+      "root": 0.7070040902971984,
+      "majmin": 0.7744995000161884,
+      "triads": 0.512518584438178,
+      "sevenths": 0.7316772774322825,
+      "majmin_inv": 0.6170286752449179,
+      "sevenths_inv": 0.5842286923731792,
+      "mirex": 0.7240327057748376,
+      "common_exact": 0.6934176965724671
+    },
+    "sheetsage2": {
+      "root": 0.9000514607673209,
+      "majmin": 0.9420231876203051,
+      "triads": 0.6484129929776945,
+      "sevenths": 0.9314674402655843,
+      "majmin_inv": 0.740647559419783,
+      "sevenths_inv": 0.7325200075553016,
+      "mirex": 0.9197039840005717,
+      "common_exact": 0.9098632039939646
+    }
+  },
+  "modelFiles": {
+    "UVR_MDXNET_KARA_2.onnx": "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+    "duet.safetensors": "5c6a131b85fa995d5d75a09f89479bcc2fa939e42365ad6176f73cf103d34238",
+    "torch/hub/checkpoints/5c90dfd2-34c22ccb.th": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+    "speaker/embedding_model.ckpt": "0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2",
+    "btc.safetensors": "468289d56a0d9932bf28f81278ad736ed881611494c019a088e94f134bf4e778",
+    "sheetsage2/model.safetensors": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+    "sheetsage2/config.json": "a986e63f5d831ecb823c11d19cfb371d763f25ae2e614ec9acd714c0b8bb87fd",
+    "mert2/model.safetensors": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+    "mert2/config.json": "f2e194895f58be3ddba327255db129ff0e3bee550cc0ecf08e4d22d79ce3bca3"
+  },
+  "netease": [
+    {
+      "genre": "jazz",
+      "title": "Take Five — Dave Brubeck",
+      "id": 2097976450,
+      "seconds": 325.17224489795916,
+      "stems": 6,
+      "sameClockFrames": 14340096,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "rock-live",
+      "title": "Hotel California (Live, 1994) — Eagles",
+      "id": 2698479305,
+      "seconds": 339.8472562358277,
+      "stems": 8,
+      "sameClockFrames": 14987264,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "electronic-pop",
+      "title": "Something Just Like This — The Chainsmokers / Coldplay",
+      "id": 461347998,
+      "seconds": 247.62666666666667,
+      "stems": 8,
+      "sameClockFrames": 10920336,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "chinese-folk-pop",
+      "title": "最炫民族风 — 凤凰传奇",
+      "id": 354738,
+      "seconds": 283.99818594104306,
+      "stems": 8,
+      "sameClockFrames": 12524320,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "classical-violin",
+      "title": "梁祝（小提琴版）— 西崎崇子爱乐乐队",
+      "id": 2020775778,
+      "seconds": 376.34825396825397,
+      "stems": 6,
+      "sameClockFrames": 16596958,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "hip-hop",
+      "title": "Lose Yourself — Eminem",
+      "id": 26936683,
+      "seconds": 265.58666666666664,
+      "stems": 8,
+      "sameClockFrames": 11712372,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "chinese-pop-cover",
+      "title": "青花瓷 — 刘芳（翻唱）",
+      "id": 259138,
+      "seconds": 268.8783673469388,
+      "stems": 8,
+      "sameClockFrames": 11857536,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "piano-instrumental",
+      "title": "稻香（钢琴版）— 纪钧瀚",
+      "id": 1945895725,
+      "seconds": 196.09444444444443,
+      "stems": 6,
+      "sameClockFrames": 8647765,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    },
+    {
+      "genre": "male-female-duet",
+      "title": "因为爱情 — 陈奕迅 / 王菲",
+      "id": 25640795,
+      "seconds": 216.89333333333335,
+      "stems": 10,
+      "sameClockFrames": 9564996,
+      "cacheReused": true,
+      "offlineReanalysis": true,
+      "nativeSeekPausePassed": true,
+      "flacJsonExportPassed": true
+    }
+  ],
+  "limits": [
+    "No ground-truth stems or chord annotations for NetEase songs; pipeline success is not recognition accuracy.",
+    "GuitarSet and IDMT use original audio, not separated stems.",
+    "MIREX demo references are organizer-provided, annotation independence is unverified; published predictions are not local executions.",
+    "Public pretrained checkpoints may overlap evaluation audio in undisclosed pretraining; our holdout is not proof of pretraining independence.",
+    "common_exact ignores bass and excludes unsupported reference qualities; see denominators; inversion accuracy remains weak on IDMT.",
+    "SheetSage2 / MERT-v2 are CC-BY-NC-4.0; personal noncommercial build only."
+  ]
+}

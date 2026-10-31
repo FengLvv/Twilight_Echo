@@ -41,6 +41,8 @@ const activeStates = [
   'installing'
 ]
 const labels: Record<string, string> = {
+  queued:'排队中',
+  interrupted:'等待继续',
   idle: '待命',
   enriching: '信息补全中',
   running: '进行中',
@@ -208,7 +210,7 @@ function matches(state: string) {
     props.filter === 'all' ||
     (props.filter === 'active'
       ? activeStates.includes(state)
-      : ['failed', 'error', 'ready'].includes(state))
+      : ['failed', 'error', 'ready','interrupted'].includes(state))
   )
 }
 async function run(id: string, action: () => Promise<unknown>) {

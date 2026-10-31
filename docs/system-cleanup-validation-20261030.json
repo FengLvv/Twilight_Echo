@@ -1,0 +1,125 @@
+{
+  "validatedAt": "2026-10-30T05:45:54.507Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\system-cleanup\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "2257faef9e5708c87faa84dd06a8648f5846007c04338c19a1416d37843eb910",
+  "scope": [
+    "Removed centralized NetEase import and enrichment service",
+    "Removed liked-song classification UI and client metadata scan",
+    "Retired obsolete tables and orphaned automatic identification demands",
+    "Bounded database admission and reserved playback command capacity",
+    "Cancelled superseded read and playback requests without unhandled errors",
+    "Batched metadata claim candidates"
+  ],
+  "typechecks": [
+    "tsconfig.core.json",
+    "tsconfig.node.json",
+    "tsconfig.web.json"
+  ],
+  "regressionLogs": [
+    ".local/system-cleanup-final-transport.tap",
+    ".local/system-cleanup-metadata.tap",
+    ".local/system-cleanup-provider.tap",
+    ".local/system-cleanup-packaged.tap"
+  ],
+  "liveUi": {
+    "profile": "isolated copy of actual user profile",
+    "originalDataPreserved": true,
+    "obsoleteCalls": 0,
+    "rapidSelection": {
+      "attempts": 5,
+      "lastSelectionWon": true,
+      "nativePlaybackAdvanced": true,
+      "unhandledErrors": []
+    },
+    "evidence": ".local/system-cleanup-final-evidence"
+  },
+  "obsoleteTablesRetired": [
+    {
+      "table": "ncm_library_state",
+      "rows": 1
+    },
+    {
+      "table": "ncm_library_imports",
+      "rows": 13893
+    },
+    {
+      "table": "ncm_library_likes",
+      "rows": 686
+    },
+    {
+      "table": "ncm_library_collections",
+      "rows": 186
+    },
+    {
+      "table": "ncm_library_origins",
+      "rows": 15059
+    },
+    {
+      "table": "ncm_library_stage",
+      "rows": 0
+    },
+    {
+      "table": "ncm_recording_metadata",
+      "rows": 47
+    },
+    {
+      "table": "ncm_recording_bindings",
+      "rows": 47
+    },
+    {
+      "table": "ncm_metadata_queue",
+      "rows": 13893
+    }
+  ],
+  "postRetirementJobStates": [
+    {
+      "state": "cancelled",
+      "count": 58400
+    },
+    {
+      "state": "completed",
+      "count": 5842
+    }
+  ],
+  "packageParity": {
+    "index.mjs": true,
+    "plugin.json": true,
+    "request-scheduler.mjs": true,
+    "mainAndPreloadEntries": 31,
+    "rendererIndex": true
+  },
+  "qaCredentialsRemoved": true,
+  "existingExecutablesUnchanged": true,
+  "deployment": "Separate artifact; running user app and normal profile have not been replaced or upgraded. Retirement runs on the next startup of this artifact.",
+  "packagedPlaylistClickFollowup": {
+    "startedAt": "2026-10-30T06:09:07.515Z",
+    "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\system-cleanup\\win-unpacked\\TwilightEcho.exe",
+    "playlist": "蜂率的2025年度歌单",
+    "selections": [
+      {
+        "title": "年 (Live)",
+        "elapsedMs": 673,
+        "nativePlaybackAdvanced": true
+      },
+      {
+        "title": "evermore (feat. Bon Iver)",
+        "elapsedMs": 361,
+        "nativePlaybackAdvanced": true
+      }
+    ],
+    "errors": [],
+    "queueSubmissionVerified": true,
+    "obsoleteTables": 0,
+    "jobStates": [
+      {
+        "state": "cancelled",
+        "count": 58400
+      },
+      {
+        "state": "completed",
+        "count": 5842
+      }
+    ],
+    "completedAt": "2026-10-30T06:09:15.073Z"
+  }
+}

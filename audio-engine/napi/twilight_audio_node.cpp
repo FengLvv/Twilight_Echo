@@ -401,8 +401,8 @@ napi_value readJson(napi_env env, TAE_Result (*fn)(TAE_EngineHandle, char*, size
 napi_value Play(napi_env env, napi_callback_info info) {
   ensureEngine();
   clearLastError();
-  size_t argc = 2;
-  napi_value argv[2];
+  size_t argc = 3;
+  napi_value argv[3];
   napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
   if (argc < 1) {
     napi_throw_type_error(env, nullptr, "播放需要音频地址");
@@ -410,7 +410,7 @@ napi_value Play(napi_env env, napi_callback_info info) {
   }
   const std::string source = getStringArg(env, argv[0]);
   const double start = argc > 1 ? getNumberArg(env, argv[1], 0.0) : 0.0;
-  return throwOnError(env, TAE_Play(g_engine, source.c_str(), start));
+  return throwOnError(env, TAE_PlayWithState(g_engine, source.c_str(), start,argc>2&&getBoolArg(env,argv[2],false)));
 }
 
 napi_value Pause(napi_env env, napi_callback_info) {
@@ -432,6 +432,13 @@ napi_value Seek(napi_env env, napi_callback_info info) {
   napi_value argv[1];
   napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
   return throwOnError(env, TAE_Seek(g_engine, argc > 0 ? getNumberArg(env, argv[0], 0.0) : 0.0));
+}
+
+napi_value SetStudyMixGains(napi_env env, napi_callback_info info) {
+  ensureEngine(); clearLastError();
+  size_t argc=1; napi_value argv[1]; napi_get_cb_info(env,info,&argc,argv,nullptr,nullptr);
+  const auto gains=argc?getStringArg(env,argv[0]):"";
+  return throwOnError(env,TAE_SetStudyMixGains(g_engine,gains.c_str()));
 }
 
 napi_value SetVolume(napi_env env, napi_callback_info info) {
@@ -1050,6 +1057,7 @@ napi_value Init(napi_env env, napi_value exports) {
   define(env, exports, "Stop", Stop);
   define(env, exports, "Seek", Seek);
   define(env, exports, "SetVolume", SetVolume);
+  define(env, exports, "SetStudyMixGains", SetStudyMixGains);
   define(env, exports, "SetPlaybackRate", SetPlaybackRate);
   define(env, exports, "SetLoopRange", SetLoopRange);
   define(env, exports, "SetOutputDevice", SetOutputDevice);

@@ -1,4 +1,5 @@
 import { onScopeDispose, shallowReadonly, shallowRef, watch } from 'vue'
+import { isRequestCancelled } from '../../../../shared/cancellation.ts'
 
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -11,13 +12,17 @@ function freeze<T>(value: T): T {
 /** Query results are disposable projections fenced by the state that requested them. */
 export function createCorePlayerResource<T>(
   key: () => string,
-  query: () => Promise<T>,
+  query: (signal: AbortSignal) => Promise<T>,
   failed: (error: unknown) => void
 ) {
   const value = shallowRef<T | null>(null)
   const loading = shallowRef(false)
   let generation = 0
+  let controller: AbortController | null = null
   async function refresh(): Promise<void> {
+    controller?.abort()
+    const requestController = new AbortController()
+    controller = requestController
     const expected = key(),
       request = ++generation
     if (!expected) {
@@ -27,9 +32,10 @@ export function createCorePlayerResource<T>(
     }
     loading.value = true
     try {
-      const result = await query()
+      const result = await query(requestController.signal)
       if (request === generation && expected === key()) value.value = freeze(result)
     } catch (error) {
+      if (requestController.signal.aborted || isRequestCancelled(error)) return
       if (request === generation) failed(error)
       throw error
     } finally {
@@ -45,6 +51,7 @@ export function createCorePlayerResource<T>(
   )
   onScopeDispose(() => {
     generation++
+    controller?.abort()
   })
   return { value: shallowReadonly(value), loading: shallowReadonly(loading), refresh }
 }

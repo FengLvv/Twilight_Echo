@@ -387,7 +387,12 @@ struct WasapiSharedBackend::Impl {
         }
       }
     }
-    if (audioClient) audioClient->Stop();
+    if (audioClient) {
+      audioClient->Stop();
+      // A warm restart prefills the complete buffer again. Release stopped
+      // padding without recreating the endpoint or IAudioClient.
+      audioClient->Reset();
+    }
   }
 
   void close() {

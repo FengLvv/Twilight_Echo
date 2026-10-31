@@ -10,6 +10,7 @@ import {
   type LibraryQueueSeedItem
 } from '../../shared/libraryQueueBuild.ts'
 import type { CorePlaybackSession } from './session.ts'
+import type { CoreQueueReference } from '../../shared/coreProtocol.ts'
 
 interface Submission {
   id: string
@@ -23,6 +24,7 @@ interface Submission {
   work: Promise<void>
   busy: boolean
   committing: boolean
+  queue?: CoreQueueReference
   cancelTimer(): void
 }
 interface Options {
@@ -137,7 +139,11 @@ export class CoreQueueSubmission {
           ready()
           await complete
         },
-        { selectedIndex: command.selectedIndex, position: command.position, play: command.play },
+        { selectedIndex: command.selectedIndex, position: command.position, play: command.play,
+          onAdopt: () => {
+            const queue = this.options.playback.snapshot().queue
+            if (queue) submission.queue = structuredClone(queue)
+          } },
         controller.signal
       )
       .finally(() => {
@@ -156,7 +162,11 @@ export class CoreQueueSubmission {
     submission: Submission,
     state: CoreQueueSubmitReply['state']
   ): CoreQueueSubmitReply {
-    return { id: submission.id, state, sequence: submission.sequence, total: submission.total }
+    const current = state === 'committed' ? this.options.playback.snapshot().queue : null
+    const queue = current?.id === submission.queue?.id && current?.revision === submission.queue?.revision
+      ? submission.queue : null
+    return { id: submission.id, state, sequence: submission.sequence, total: submission.total,
+      ...(queue ? { queue: structuredClone(queue) } : {}) }
   }
   private arm(submission: Submission): void {
     submission.cancelTimer = this.options.schedule(() => {

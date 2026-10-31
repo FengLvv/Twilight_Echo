@@ -134,7 +134,7 @@ test('locked desktop lyrics show a central unlock affordance after hover or imme
   assert.doesNotMatch(reveal, /setLockedInteractionActive\(true\)/)
   assert.match(
     app,
-    /function onPointerLeave\(\): void \{[\s\S]*if \(settings\.value\.locked\) \{[\s\S]*setLockedInteractionActive\(false\)/
+    /function onPointerLeave\([^)]*\): void \{[\s\S]*if \(settings\.value\.locked\) \{[\s\S]*setLockedInteractionActive\(false\)/
   )
 })
 

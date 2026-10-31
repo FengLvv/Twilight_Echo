@@ -166,6 +166,49 @@ test('system state and lyrics are produced from Core without a renderer or playb
   assert.equal(f.states.at(-1)?.isLoading, true)
 })
 
+test('analysis changes refresh desktop annotations independently of lyric text, without any playback mutation', async () => {
+  let visible = true,
+    reads = 0
+  const f = fixture({
+    lyrics: async () => (
+      reads++,
+      {
+        ...lyrics(),
+        analysis: {
+          display: {
+            notationVisible: visible,
+            chordsVisible: false,
+            mode: 'degrees',
+            key: '0:major'
+          },
+          melodyBusy: false,
+          chordsBusy: false,
+          chords: [],
+          melody: {
+            algorithm: 'vocal2midi-tifa-game-medium-rhythm-v1',
+            source: 'vocals',
+            key: { tonic: 0, mode: 'major' },
+            notes: [{ start: 1, end: 1.5, midi: 60, lineId: 0 }],
+            scores: [
+              { lineId: 0, text: 'Hello', svg: '<svg><g data-note="0"><text>1</text></g></svg>' }
+            ]
+          }
+        }
+      }
+    )
+  })
+  f.bridge.update(snapshot({ studyRevision: 1 }))
+  await turn()
+  assert(f.sessions.at(-1)?.lines[0].score)
+  assert.equal(reads, 1)
+  visible = false
+  f.bridge.update(snapshot({ sequence: 2, studyRevision: 2 }))
+  await turn()
+  assert.equal(f.sessions.at(-1)?.lines[0].score, undefined)
+  assert.equal(reads, 2)
+  assert.deepEqual(f.commands, [])
+})
+
 test('asynchronous presentation revisions refresh cover/favorite without rereading unchanged lyrics', async () => {
   const f = fixture()
   f.bridge.update(snapshot())

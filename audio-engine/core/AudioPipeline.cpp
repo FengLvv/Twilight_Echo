@@ -6,6 +6,7 @@
 #include "../dsp/ChannelRouter.h"
 #include "../dsp/DsdDownrateProcessor.h"
 #include "../decoder/DopPackerUtils.h"
+#include "../decoder/StudyMixInput.h"
 #include "../decoder/SacdIsoProbe.h"
 #include "../output/OutputBackendFactory.h"
 #include "../utils/JsonUtils.h"
@@ -838,6 +839,12 @@ struct AudioPipeline::DecodeStream {
   int targetDsdRate = 0;
   int actualDsdSampleRate = 0;
   AudioBuffer buffer;
+  std::vector<std::string> studyPaths, studyNames;
+  std::vector<std::shared_ptr<DecodeStream>> studyChildren;
+  std::array<std::atomic<float>,11> studyTargets{};
+  std::array<float,11> studyCurrent{};
+  std::atomic<uint64_t> studyGainRevision{0};
+  std::vector<float> studyScratch;
   std::vector<uint8_t> floatReadScratch;
   std::atomic<bool> running{false};
   // Independent from running: open/probe happens before the worker starts.
@@ -873,6 +880,7 @@ struct AudioPipeline::DecodeStream {
 
   bool openSource(const QueueItem& queueItem, std::string* error, const ta_am_cancel* cancel = nullptr) {
     stop();
+    studyChildren.clear(); studyPaths.clear(); studyNames.clear();
     stopRequested.store(false, std::memory_order_release);
     externalCancel = cancel;
     dsdReader.reset();
@@ -888,7 +896,27 @@ struct AudioPipeline::DecodeStream {
       return stream->stopRequested.load(std::memory_order_acquire) ||
           ta_am_cancelled(stream->externalCancel);
     }, this);
-    if (!decoder->open(item.source, error)) {
+    std::string decodeSource = item.source;
+    if (std::filesystem::u8path(item.source).extension()==".temix") {
+      try {
+        StudyMixInput descriptor(item.source);
+        studyPaths=descriptor.paths();
+        const auto gains=descriptor.gains();
+        for(size_t i=0;i<studyPaths.size();++i) {
+          studyNames.push_back(std::filesystem::u8path(studyPaths[i]).stem().string());
+          studyTargets[i].store(gains[i]); studyCurrent[i]=gains[i];
+          if(i) {
+            auto child=std::make_shared<DecodeStream>();
+            child->inputFactory=inputFactory;
+            QueueItem part=queueItem; part.source=studyPaths[i];
+            if(!child->openSource(part,error,cancel))return false;
+            studyChildren.push_back(std::move(child));
+          }
+        }
+        decodeSource=studyPaths.front();
+      } catch(const std::exception& exception) { if(error)*error=exception.what(); return false; }
+    }
+    if (!decoder->open(decodeSource, error)) {
       decoder.reset();
       return false;
     }
@@ -899,7 +927,8 @@ struct AudioPipeline::DecodeStream {
     // Local CUE segments share an absolute output-frame grid with prepared
     // lanes. A packet-boundary seek can start early and shift every later
     // logical position, even when its timestamp is labelled as the cue start.
-    precisePcmSeek = sourceStampKnown && hasCueRange();
+    precisePcmSeek = !studyPaths.empty() || sourceStampKnown && hasCueRange();
+    for(auto& child:studyChildren)child->precisePcmSeek=true;
     stream.source = item.source;
     if (hasCueRange()) {
       stream.durationSeconds = cueLogicalDurationSeconds();
@@ -1026,7 +1055,7 @@ struct AudioPipeline::DecodeStream {
     }
 
     decodeFormat = outputFormat;
-    typedPassthrough = useTypedPassthrough;
+    typedPassthrough = useTypedPassthrough && studyPaths.empty();
     if (!typedPassthrough) {
       decodeFormat.bitDepth = 32;
       decodeFormat.sampleFormat = AudioSampleFormat::Float32Interleaved;
@@ -1067,6 +1096,11 @@ struct AudioPipeline::DecodeStream {
 
     eof = remainingVirtualPregapFrames == 0 && remainingSegmentFrames && *remainingSegmentFrames == 0;
     buffer.reset(decodeFormat, static_cast<size_t>(std::max(decodeFormat.sampleRate * 2, 8192)));
+    for(auto& child:studyChildren) {
+      child->setResamplerQuality(actualResamplerQuality);
+      child->setResamplerPhase(actualResamplerPhase);
+      if(!child->configure(outputFormat,startTimeSeconds,error,false))return false;
+    }
     return true;
   }
 
@@ -1176,6 +1210,7 @@ struct AudioPipeline::DecodeStream {
 
   void start() {
     if ((!decoder && !dsdReader) || running.load() || eof.load()) return;
+    for(auto& child:studyChildren)child->start();
     stopRequested.store(false, std::memory_order_release);
     running = true;
     decodeThread = std::thread([this] {
@@ -1186,6 +1221,7 @@ struct AudioPipeline::DecodeStream {
   }
 
   void requestStop(const char* reason = "transport_stop") {
+    for(auto& child:studyChildren)child->requestStop(reason);
     const bool alreadyStopped = stopRequested.exchange(true, std::memory_order_acq_rel);
     running = false;
     buffer.notifyAll();
@@ -1200,6 +1236,7 @@ struct AudioPipeline::DecodeStream {
 
   void stop() {
     requestStop();
+    for(auto& child:studyChildren)child->stop();
     // This path is control/reaper-only. No host/JNI call runs on the render thread.
     const bool cancelledInput = decoder && decoder->cancelInput();
     if (decodeThread.joinable()) decodeThread.join();
@@ -1215,7 +1252,7 @@ struct AudioPipeline::DecodeStream {
     const double logicalSeconds = clampLogicalSegmentPosition(seconds);
     const double sourceSeconds = sourcePositionForLogicalPosition(logicalSeconds);
     if (mode == Mode::Pcm && decoderNeedsReopen) {
-      const bool opened = decoder->open(item.source, error);
+      const bool opened = decoder->open(studyPaths.empty()?item.source:studyPaths.front(), error);
       if (opened) {
         setResamplerQuality(actualResamplerQuality);
         setResamplerPhase(actualResamplerPhase);
@@ -1256,6 +1293,7 @@ struct AudioPipeline::DecodeStream {
     }
     eof = remainingVirtualPregapFrames == 0 && remainingSegmentFrames && *remainingSegmentFrames == 0;
     routingSourceToken.store(nextRoutingSourceToken(), std::memory_order_release);
+    for(auto& child:studyChildren)if(!child->seek(seconds,error))return false;
     start();
     return true;
   }
@@ -1271,10 +1309,48 @@ struct AudioPipeline::DecodeStream {
   }
 
   size_t read(float* output, size_t frameCount) {
-    return buffer.read(output, frameCount);
+    if(studyPaths.empty())return buffer.read(output,frameCount);
+    size_t available=std::min(frameCount,buffer.availableFrames());
+    for(const auto& child:studyChildren) {
+      available=std::min(available,child->buffer.availableFrames());
+      if(child->readFailed.load()){readFailed.store(true);return 0;}
+    }
+    const size_t channels=static_cast<size_t>(std::max(1,decodeFormat.channelCount));
+    const size_t capacity=studyScratch.size()/channels;
+    if(!capacity)return 0;
+    std::array<float,11> targets=studyCurrent;
+    const auto before=studyGainRevision.load(std::memory_order_acquire);
+    if(!(before&1)) {
+      for(size_t i=0;i<studyPaths.size();++i)targets[i]=studyTargets[i].load(std::memory_order_relaxed);
+      if(before!=studyGainRevision.load(std::memory_order_acquire))targets=studyCurrent;
+    }
+    size_t done=0;
+    while(done<available) {
+      const size_t count=std::min(capacity,available-done);
+      const size_t got=buffer.read(output+done*channels,count);
+      if(got!=count)return done;
+      for(size_t f=0;f<count;++f)for(size_t c=0;c<channels;++c)output[(done+f)*channels+c]*=studyCurrent[0]+(targets[0]-studyCurrent[0])*float(f+1)/float(count);
+      for(size_t i=0;i<studyChildren.size();++i) {
+        if(studyChildren[i]->buffer.read(studyScratch.data(),count)!=count)return done;
+        for(size_t f=0;f<count;++f)for(size_t c=0;c<channels;++c)output[(done+f)*channels+c]+=studyScratch[f*channels+c]*(studyCurrent[i+1]+(targets[i+1]-studyCurrent[i+1])*float(f+1)/float(count));
+      }
+      studyCurrent=targets;done+=count;
+    }
+    return done;
+  }
+
+  bool setStudyGains(const std::string& json) {
+    if(studyPaths.empty()||json.size()>4096)return false;
+    std::array<float,11> values{};
+    for(size_t i=0;i<studyNames.size();++i){const auto value=json_utils::fieldNumber(json,studyNames[i]);if(!value||!std::isfinite(*value)||*value<0||*value>4)return false;values[i]=float(*value);}
+    studyGainRevision.fetch_add(1,std::memory_order_acq_rel);
+    for(size_t i=0;i<studyNames.size();++i)studyTargets[i].store(values[i],std::memory_order_relaxed);
+    studyGainRevision.fetch_add(1,std::memory_order_release);
+    return true;
   }
 
   void prepareFloatReadScratch(size_t maxFrames) {
+    if(!studyPaths.empty())studyScratch.resize(std::max<size_t>(1,maxFrames)*static_cast<size_t>(std::max(1,decodeFormat.channelCount)));
     const AudioFormat bufferFormat = buffer.format();
     if (bufferFormat.sampleFormat == AudioSampleFormat::Float32Interleaved) {
       floatReadScratch.clear();
@@ -1292,7 +1368,7 @@ struct AudioPipeline::DecodeStream {
     if (!output || frameCount == 0) return 0;
     const AudioFormat bufferFormat = buffer.format();
     if (bufferFormat.sampleFormat == AudioSampleFormat::Float32Interleaved) {
-      return buffer.read(output, frameCount);
+      return read(output, frameCount);
     }
 
     const size_t bytesPerFrame = audioFormatBytesPerFrame(bufferFormat);
@@ -1318,6 +1394,7 @@ struct AudioPipeline::DecodeStream {
   }
 
   size_t read(PcmBlock& output) {
+    if(!studyPaths.empty()&&output.format.sampleFormat==AudioSampleFormat::Float32Interleaved)return read(reinterpret_cast<float*>(output.data),output.frames);
     return buffer.read(output);
   }
 
@@ -1334,6 +1411,8 @@ struct AudioPipeline::DecodeStream {
   }
 
   bool waitForPreroll(size_t targetFrames, std::chrono::milliseconds timeout) const {
+    const auto deadline=std::chrono::steady_clock::now()+timeout;
+    for(const auto& child:studyChildren){const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now());if(remaining.count()<=0||!child->waitForPreroll(targetFrames,remaining))return false;}
     return buffer.waitForAvailableFrames(targetFrames, timeout, running, eof) > 0 || eof.load();
   }
 
@@ -2595,6 +2674,153 @@ TAE_Result AudioPipeline::play(
       error, initiallyPaused);
 }
 
+bool AudioPipeline::trySwitchStudyStream(
+    const QueueItem& item, double startTimeSeconds, const std::string& backendId,
+    const std::string& deviceId, bool initiallyPaused) {
+  const auto started = std::chrono::steady_clock::now();
+  AudioFormat format;
+  AudioStreamInfo previousInfo;
+  OutputConfig config;
+  DspConfig dspConfig;
+  DspResamplerQuality quality;
+  DspResamplerPhase phase;
+  std::string graphJson;
+  uint32_t blockFrames = 0;
+  double start = startTimeSeconds;
+  bool followClock = false;
+  {
+    std::lock_guard lock(mutex_);
+    synchronizeRenderPromotionLocked();
+    const auto isMix = [](const std::string& source) {
+      return std::filesystem::u8path(source).extension() == ".temix";
+    };
+    if (!output_ || !activeStream_ || (!isMix(item.source) && !isMix(currentItem_.source)) ||
+        dopPathActive_ || nativeDsdPathActive_ || pcmToDsdPathActive_ ||
+        (backendId == "wasapi-shared" ? "wasapi" : backendId) != backendId_ || deviceId != deviceId_ ||
+        (state_ != PipelineState::Playing && state_ != PipelineState::Paused)) return false;
+    format = outputFormat_;
+    previousInfo = stream_;
+    config = outputConfig_;
+    dspConfig = dspConfig_;
+    quality = activeStream_->actualResamplerQuality;
+    phase = activeStream_->actualResamplerPhase;
+    graphJson = dspGraphJson_;
+    blockFrames = outputInfo_.bufferSizeFrames;
+    const int rate = positionSampleRateForStream(stream_, outputFormat_);
+    const double position = rate > 0 ? double(renderedFrames_.load()) / rate : 0;
+    followClock = !initiallyPaused && state_ == PipelineState::Playing && std::abs(start - position) < .25;
+    if (followClock) start = position;
+  }
+  auto candidate = makeDecodeStream(std::atomic_load(&inputFactory_));
+  std::string error;
+  if (!candidate->openSource(item, &error) || candidate->stream.isDsd ||
+      candidate->stream.sourceFormat.sampleRate != previousInfo.sourceFormat.sampleRate ||
+      candidate->stream.sourceFormat.channelCount != previousInfo.sourceFormat.channelCount) return false;
+  // Keep the original representation when it can still reach the current device exactly.
+  // Different source rates / DSD continue through the regular device negotiation path.
+  const bool requiresPcm = dspConfigProcessingRequiresPcm(dspConfig, config,
+      loadAtomicDouble(requestedVolumeBits_, std::memory_order_acquire),
+      loadAtomicDouble(requestedPlaybackRateBits_, std::memory_order_acquire),
+      graphStateProcessingActive(graphJson));
+  const bool raw = candidate->studyPaths.empty() && !config.continuityFirst && !requiresPcm &&
+      requestedAutoMixMode_.load() == TA_AM_OFF && backendCanTypedPassthrough(backendId) &&
+      formatCanTypedPassthrough(candidate->stream.sourceFormat) &&
+      pcmFormatsPreserveSource(candidate->stream.sourceFormat, format);
+  candidate->precisePcmSeek = true;
+  candidate->setResamplerQuality(quality);
+  candidate->setResamplerPhase(phase);
+  if (config.routingMode != ChannelRoutingMode::Auto)
+    format.channelCount = std::max(1, candidate->stream.sourceFormat.channelCount);
+  if (!candidate->configure(format, start, &error, raw)) return false;
+  const size_t frames = blockFrames ? blockFrames : std::max(1, format.sampleRate / 100);
+  candidate->prepareFloatReadScratch(frames);
+  candidate->start();
+  if (!candidate->waitForPreroll(frames * 2, std::chrono::milliseconds(500))) return false;
+  const auto currentPosition = [&] {
+    return double(renderedFrames_.load(std::memory_order_acquire)) /
+        std::max(1, positionSampleRateForStream(previousInfo, outputFormat_));
+  };
+  const int sampleRate = candidate->bufferFormat().sampleRate;
+  std::vector<float> discard(frames * std::max(1, candidate->bufferFormat().channelCount));
+  uint64_t discarded = 0;
+  const auto catchUp = [&](double position) {
+    const uint64_t target = uint64_t(std::llround(std::max(0.0, position - start) * sampleRate));
+    while (discarded < target) {
+      const size_t count = size_t(std::min<uint64_t>(frames, target - discarded));
+      if (!candidate->waitForPreroll(count, std::chrono::milliseconds(100))) return false;
+      const size_t read = candidate->readFloat(discard.data(), count);
+      if (!read) return false;
+      discarded += read;
+    }
+    return true;
+  };
+  if (followClock && !catchUp(currentPosition())) return false;
+  std::unique_ptr<DspChain> activeGraph, spareGraph;
+  {
+    std::lock_guard lock(mutex_);
+    activeGraph = makeRenderDspGraphLocked({candidate->stream, item}, &error);
+    spareGraph = makeRenderDspGraphLocked({candidate->stream, item}, &error);
+    if (!activeGraph || !spareGraph) return false;
+  }
+  const auto pausedAt = std::chrono::steady_clock::now();
+  // Stop callbacks only for the pointer publication; keep the device open.
+  output_->stop();
+  const double position = followClock ? currentPosition() : start;
+  if (followClock && !catchUp(position)) return false;
+  candidate->waitForPreroll(frames, std::chrono::milliseconds(100));
+  std::shared_ptr<DecodeStream> oldActive, oldPreload;
+  {
+    std::lock_guard lock(mutex_);
+    cancelAutoMixLocked("study_source_switch");
+    oldActive = std::move(activeStream_);
+    oldPreload = std::move(preloadStream_);
+    activeStream_ = candidate;
+    stream_ = candidate->stream;
+    currentItem_ = item;
+    decodeFormat_ = candidate->bufferFormat();
+    typedPassthroughActive_ = candidate->typedPassthrough;
+    activeUsesPreloadDspChain_ = false;
+    dspChain_->setTrackContext({stream_, item});
+    dspStatus_ = dspChain_->status();
+    renderState_.store(PipelineState::Stopped, std::memory_order_release);
+    std::string status = activeGraph->graphStatusJson();
+    commitPreparedRenderDspGraphsLocked(0, std::move(activeGraph), std::move(spareGraph), std::move(status));
+    renderActiveStream_.store(candidate.get(), std::memory_order_release);
+    renderPreloadStream_.store(nullptr, std::memory_order_release);
+    renderDecodeFormat_ = decodeFormat_;
+    renderTypedPassthroughActive_.store(typedPassthroughActive_, std::memory_order_release);
+    renderActiveUsesPreloadDspChain_.store(false, std::memory_order_release);
+    renderPromotionPending_.store(false, std::memory_order_release);
+    renderCrossfadeResetRequested_.store(true, std::memory_order_release);
+    renderedFrames_ = uint64_t(std::llround(position * positionSampleRateForStream(stream_, outputFormat_)));
+    resetRateResampler();
+    pauseFade_.clear();
+    ended_ = false;
+    trackStarted_ = false;
+    recomputeDspActiveLocked();
+    updatePerfectLocked();
+    state_ = initiallyPaused ? PipelineState::Paused : PipelineState::Playing;
+    renderState_.store(state_, std::memory_order_release);
+    publishStatusLocked();
+  }
+  const bool ready = output_->startTyped([this](PcmBlock& block) { return renderTyped(block); },
+      [this](float* data, size_t count) { return render(data, count); },
+      [this](OutputBackendEvent event, const std::string& message) {
+        std::lock_guard lock(mutex_); outputEventMessage_ = message;
+        if (event == OutputBackendEvent::DeviceInvalidated) deviceInvalidated_ = true;
+        else renderError_ = true;
+        state_ = PipelineState::Stopped; renderState_.store(state_, std::memory_order_release);
+      }, &error);
+  const auto restartedAt = std::chrono::steady_clock::now();
+  oldActive.reset(); oldPreload.reset();
+  const auto ended = std::chrono::steady_clock::now();
+  DiagnosticLog::instance().append(DiagLevel::Info, "study.source_switch", "reused PCM output device",
+      "{\"ready\":" + std::string(ready ? "true" : "false") +
+      ",\"devicePauseMs\":" + std::to_string(std::chrono::duration<double, std::milli>(restartedAt - pausedAt).count()) +
+      ",\"totalMs\":" + std::to_string(std::chrono::duration<double, std::milli>(ended - started).count()) + "}");
+  return ready;
+}
+
 TAE_Result AudioPipeline::playInternal(
     const QueueItem& item,
     const std::optional<QueueItem>& upcomingItem,
@@ -2610,6 +2836,11 @@ TAE_Result AudioPipeline::playInternal(
     const std::optional<NativeDsdRuntimeFacts>& forcedNativeDsdFallbackFacts,
     std::string* error, bool initiallyPaused) {
   std::lock_guard<std::recursive_mutex> transportLock(transportMutex_);
+  if (trySwitchStudyStream(item, startTimeSeconds, backendId, deviceId, initiallyPaused)) {
+    std::string preloadError;
+    if (gaplessEnabled && upcomingItem) preloadNext(upcomingItem, &preloadError);
+    return TAE_RESULT_OK;
+  }
   {
     std::lock_guard lock(mutex_);
     synchronizeRenderPromotionLocked();
@@ -3854,6 +4085,12 @@ TAE_Result AudioPipeline::seek(double seconds, std::string* error) {
     publishStatusLocked();
   }
   return TAE_RESULT_OK;
+}
+
+bool AudioPipeline::setStudyMixGains(const std::string& gainsJson) {
+  std::lock_guard<std::recursive_mutex> transportLock(transportMutex_);
+  std::lock_guard lock(mutex_);
+  return activeStream_ && activeStream_->setStudyGains(gainsJson);
 }
 
 void AudioPipeline::setVolume(double volume) {
@@ -5444,6 +5681,12 @@ bool AudioPipeline::updatePerfectLocked() {
     outputPerfect_ = false;
   }
   perfectReason_ = outputInfo_.perfectReason;
+  if(activeStream_&&!activeStream_->studyPaths.empty()){
+    outputPerfect_=outputInfo_.outputPerfect=false;
+    outputInfo_.sourceExact=false;outputInfo_.pcmPassthrough=false;
+    outputInfo_.perfectReasonCode="processing_active";
+    perfectReason_=outputInfo_.perfectReason="Song stem mixing";
+  }
   if (autoMixProcessing_.load(std::memory_order_acquire)) {
     outputPerfect_ = outputInfo_.outputPerfect = false;
     outputInfo_.sourceExact = false;

@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-31",
+  "coreOperations": 387,
+  "domains": 52,
+  "pythonTests": 51,
+  "sourceTests": 84,
+  "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\agent-cli\\win-unpacked\\TwilightEcho.exe",
+  "sha256": "44d3ea4cc3237d8a8323c4c9db61d73943f991799b5288c391da9143c175f776",
+  "typescriptChecks": [
+    "core",
+    "node",
+    "web"
+  ],
+  "realBackend": [
+    "playback",
+    "queue",
+    "lyrics",
+    "DSP",
+    "settings",
+    "catalog",
+    "providers/plugins introspection",
+    "fresh separation",
+    "fresh vocal-score/chord pipeline",
+    "native SVG/PDF/MIDI/MusicXML",
+    "preview bundle"
+  ],
+  "limits": [
+    "native pickers require visible UI",
+    "all Core routes covered; not every mutation runtime tested",
+    "private-account writes not tested",
+    "Windows only"
+  ]
+}

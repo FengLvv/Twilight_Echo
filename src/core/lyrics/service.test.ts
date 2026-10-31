@@ -105,6 +105,18 @@ async function fixture(
   await service.initialize()
   return { root, file, repository, service, failures, writes: () => writes }
 }
+test('background lyric loading does not replace playing content or queue occurrence',async t=>{
+  const f=await fixture(t,{sources:{resolveProviderLyrics:async value=>({lyrics:'[00:00.00]'+value.id,translatedLyrics:null})}})
+  const playing=track('fixture:playing')
+  f.service.observe(playing)
+  const before=f.service.content()
+  const other=track('fixture:background')
+  const loaded=await f.service.forTrack(other)
+  assert.equal(loaded.current?.trackId,other.id)
+  assert.match(String(loaded.effective?.original),/fixture:background/)
+  assert.deepEqual(f.service.content(),before)
+  assert.equal(f.writes(),0)
+})
 
 test('legacy manual layers, preferences and offsets attach without changing automatic content or playback', async (t) => {
   const legacy: LyricsManagementDocument = {

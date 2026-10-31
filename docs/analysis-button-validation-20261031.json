@@ -1,0 +1,61 @@
+{
+  "completedAt": "2026-10-31T03:36:34.841Z",
+  "exe": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\analysis-button\\win-unpacked\\TwilightEcho.exe",
+  "sha256": "1b015aeb148a7444f23f91a27eb3416642f3b2ab6bdb6092445e80417f18df0b",
+  "change": {
+    "location": "Right of the top-left visualization button",
+    "icon": "pi-sitemap",
+    "iconOnly": true,
+    "oldMetadataButtonRemoved": true
+  },
+  "checks": {
+    "webTypes": true,
+    "productionBuild": true,
+    "rendererBudgets": true,
+    "existingPlayerTests": {
+      "passed": 29,
+      "failed": 0
+    },
+    "packageDependencyClosure": 254
+  },
+  "ui": {
+    "startedAt": "2026-10-31T03:35:44.697Z",
+    "wide": {
+      "native": {
+        "x": 42,
+        "y": 56,
+        "width": 40,
+        "height": 40
+      },
+      "analysis": {
+        "x": 94,
+        "y": 56,
+        "width": 40,
+        "height": 40
+      }
+    },
+    "lyricsStationary": true,
+    "toggleWorks": true,
+    "narrow": {
+      "native": {
+        "x": 42,
+        "y": 56,
+        "width": 40,
+        "height": 40
+      },
+      "analysis": {
+        "x": 94,
+        "y": 56,
+        "width": 40,
+        "height": 40
+      }
+    },
+    "visualizerWorks": true,
+    "runtimeErrors": [],
+    "success": true,
+    "shutdownErrors": [],
+    "completedAt": "2026-10-31T03:36:02.032Z"
+  },
+  "evidence": ".local/analysis-button-evidence",
+  "designAudit": "Only existing spring easing advisories; incumbent motion retained."
+}

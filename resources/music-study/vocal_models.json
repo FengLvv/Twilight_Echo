@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "pipeline": "Vocal2Midi f589c183ec9a4b25ea234459b8a4b72ba993af50",
+  "files": {
+    "vocal2midi/beat_this-final0.ckpt": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+    "vocal2midi/game/bd2dur.onnx": "6672d56b00f27a20e9bfaa92801c15e394bb520e49031d3ed2515b0a6cf27402",
+    "vocal2midi/game/config.json": "4d62b6d058a820e981184ea6f04605d37659c4331ee01979eb14a14be08af890",
+    "vocal2midi/game/dur2bd.onnx": "49d10d1ea186e43c51fd2c51cedb01a3852d363f1c7056ae77df50f7e8dd0996",
+    "vocal2midi/game/encoder.onnx": "fb00295abf8156806a3bf2477ccadc9dd6a8f464fa4ee1a65c85100ce17e36fe",
+    "vocal2midi/game/estimator.onnx": "2662a01e24548dc3b9f8ebc081b26947873c01eeaa573c9d0a87e7bf2a43642b",
+    "vocal2midi/game/segmenter.onnx": "49c20f890d02f8877be4b092fae3913ec969e9236cf0a91e661e8bf52465ffda",
+    "vocal2midi/tifa/assets/LstmG2p-Eng/char.json": "99db14a8dfeb313f7190b80098693c02d5b7530af282ef6fe81c4da0cd982138",
+    "vocal2midi/tifa/assets/LstmG2p-Eng/config.json": "72357a005ff51874041086583a2ad2537842b4b0635fe8e6df31d090d54bb77a",
+    "vocal2midi/tifa/assets/LstmG2p-Eng/decoder.onnx": "b5c7e48bd08b4b1d4e1449fdf37e6e07d468f3bea6b5ff6752d470e6f91b2f99",
+    "vocal2midi/tifa/assets/LstmG2p-Eng/encoder.onnx": "00c6475b6a4c28389f236ca9985157c9b59fe2eabddb4f44d562c999194d7645",
+    "vocal2midi/tifa/assets/LstmG2p-Eng/phonemes.json": "4c2e4f50744a88993cda3e7a8f208f5d0e9198995163a1cf5ea71258278b6a85",
+    "vocal2midi/tifa/config.json": "3380e63d13754364808ca92c9090e6a489b733864a99f07188ed6e5f457b2549",
+    "vocal2midi/tifa/dictionaries/ds-zh-pinyin-lite.txt": "1d52f8c9c7821edf46bac484229c0695e93a37a9644c6ff6cfc5bc3b09a245ae",
+    "vocal2midi/tifa/dictionaries/ds_cmudict-07b.txt": "6604680f94ad57fcdbdc359d867e9f8d2267965f8793bcdbfbbc135c54c49903",
+    "vocal2midi/tifa/dictionaries/japanese_dict_full.txt": "96812fcac957d4d393f5ca2d605f04773824a71d1b51175f5b5eda10281298db",
+    "vocal2midi/tifa/dictionaries/jyutping_dict.txt": "21f6e62320b454a3fec292d227af14e2ba6ec81fe51f1894138227703975475a",
+    "vocal2midi/tifa/model.onnx": "b3f2b67b5d459a61c5f35e2e0501c763cf877fefc42261216273a207e7694237",
+    "vocal2midi/tifa/prepare.onnx": "f55667ed220ba3208d1b121bfc228cd04ef2d10c4e49eabcee72c1f7e08af7ed",
+    "vocal2midi/tifa/score.onnx": "c3730cd8e4c91069b7565a720cb9d02fca42852188373f6266666bca6e18dadf",
+    "vocal2midi/tifa/select.onnx": "abfab83229bf3a8e188c137553ed04edefcc59500435e4aba7e6ddc77f71d9d5",
+    "vocal2midi/tifa/spectrogram.onnx": "2fe85f8507d1acd998fa854869fda75f3a2fa1d316f1e56ef4ea29df8b2a51a4",
+    "vocal2midi/tifa/vocabulary.json": "b1e471955bcfcacc5552f586cff4adbd4bd7e0069ab59935f08a2bc29a485d35"
+  },
+  "sources": [
+    {
+      "id": "lilypond",
+      "url": "https://gitlab.com/lilypond/lilypond/-/releases/v2.24.4/downloads/lilypond-2.24.4-mingw-x86_64.zip",
+      "sha256": "e238f5a33ebde7466fe03d0fbcaa155a44536ca582951972482e0b00ceb0fbf1"
+    },
+    {
+      "id": "tifa",
+      "url": "https://github.com/openvpi/TIFA/releases/download/v1.0.0/TIFA-1.0.zip",
+      "sha256": "36595b2746f0d1183346fd448c7b99df9d7c51fd403bc45025438c3ebf439396"
+    },
+    {
+      "id": "game-medium-onnx",
+      "url": "https://github.com/openvpi/GAME/releases/download/v1.0.3/GAME-1.0.3-medium-onnx.zip",
+      "sha256": "5b7a21e64c6310efac399f5d12838fffa70565be162436b5a4a65f290721e7d8"
+    }
+  ]
+}

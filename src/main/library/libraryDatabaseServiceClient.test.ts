@@ -15,6 +15,7 @@ import {
 import type { LibraryDatabaseWorkerRequest } from './libraryDatabaseProtocol.ts'
 import { getLibraryDatabasePath, LibraryDatabase } from './libraryDatabase.ts'
 import { versionSourceKey } from '../../shared/trackSourceIdentity.ts'
+import { withDatabaseQuery, databaseQuerySignal } from './databaseQueryContext.ts'
 import { PlatformIdentificationProvider } from '../../core/library/musicIdentificationProvider.ts'
 import type { MusicAlbum } from '../../shared/rhineMusic.ts'
 import { listeningSourceIdentity } from '../../shared/listeningSourceIdentity.ts'
@@ -31,6 +32,40 @@ class ManualProcess extends EventEmitter {
   }
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
+
+test('a read burst waits within the worker budget and cancelled queued queries never reach SQLite',async t=>{
+  const child=new ManualProcess()
+  const client=new LibraryDatabaseServiceClient({serviceEntry:'worker.js',maxPendingRequests:2,maxQueuedRequests:8,fork:()=>child})
+  t.after(()=>client.destroy())
+  const first=client.getMetadata(),second=client.getMetadata()
+  const controller=new AbortController()
+  const cancelled=withDatabaseQuery(controller.signal,()=>client.getMetadata())
+  const rejected=assert.rejects(cancelled,{code:'CANCELLED'})
+  controller.abort();await rejected
+  const third=client.getMetadata(),fourth=client.getMetadata()
+  child.emit('message',{kind:'ready'});await tick();child.emit('message',{kind:'opened'});await tick()
+  const calls=()=>child.messages.filter(m=>m.kind==='call')
+  assert.equal(calls().length,2)
+  for(let i=0;i<4;i++){
+    const call=calls()[i]!
+    child.emit('message',{kind:'response',requestId:call.requestId,ok:true,value:{revision:i}})
+    await tick()
+    assert(calls().length-i-1<=2)
+  }
+  assert.deepEqual(await Promise.all([first,second,third,fourth]),[{revision:0},{revision:1},{revision:2},{revision:3}])
+  assert.equal(calls().length,4)
+})
+
+test('finished read contexts cannot cancel later background work',async()=>{
+  const controller=new AbortController()
+  let later!:Promise<AbortSignal|undefined>
+  await withDatabaseQuery(controller.signal,async()=>{
+    assert.equal(databaseQuerySignal(),controller.signal)
+    later=new Promise(resolve=>setImmediate(()=>resolve(databaseQuerySignal())))
+  })
+  controller.abort()
+  assert.equal(await later,undefined)
+})
 
 test('personal metadata images, source choices and legacy provenance survive the real worker transport and replacement', async t => {
   const root = mkdtempSync(join(tmpdir(), 'metadata-personal-worker-')), json = join(root, 'library.json')
@@ -1332,6 +1367,7 @@ test('transport is lazy, waits for database open, and bounds pending requests in
     serviceEntry: 'worker.js',
     libraryFilePath: 'library.json',
     maxPendingRequests: 2,
+    maxQueuedRequests: 0,
     fork: () => {
       forks++
       return child

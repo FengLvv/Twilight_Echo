@@ -330,6 +330,15 @@ function fixture(
   return { application, playback, scan, calls, messages, connect, request }
 }
 
+test('abort errors retain cancellation identity across the Core response boundary',async t=>{
+  const f=fixture(t)
+  await f.application.initialize();f.connect('desktop')
+  f.playback.play=async()=>{throw new DOMException('request aborted','AbortError')}
+  const reply=await f.request('desktop','playback.play')
+  assert.equal(reply.ok,false)
+  if(!reply.ok)assert.equal(reply.error.code,'CANCELLED')
+})
+
 test('comments account and publish use the real provider permission boundary', async (t) => {
   const calls: string[] = []
   const f = fixture(t, true, undefined, undefined, undefined, undefined, undefined, { comments: {

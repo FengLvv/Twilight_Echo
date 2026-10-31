@@ -223,6 +223,44 @@ test('queue submission streams bounded identity-only batches and keeps selected 
   f.player.dispose()
 })
 
+test('superseded play and skip intents complete quietly while genuine errors still reject',async()=>{
+  const f=fixture()
+  try {
+    f.setHandler(async()=>{throw Object.assign(new Error('Playback request superseded'),{code:'CANCELLED'})})
+    await f.player.playTrack(track())
+    await f.player.next()
+    await f.player.prev()
+    assert.equal(f.player.audioEngineError.value,null)
+    f.setHandler(async()=>{throw new Error('Audio device failed')})
+    await assert.rejects(f.player.playTrack(track()),/Audio device failed/)
+    assert.equal(f.player.audioEngineError.value,'Audio device failed')
+  } finally { f.player.dispose() }
+})
+
+test('playback position ticks do not re-enumerate diagnostic devices',async()=>{
+  const f=fixture({...snapshot(),audioRevision:1,playback:{state:'playing',position:0} as CorePlaybackView})
+  let diagnostics=0
+  f.setQuery(async name=>{if(name==='playback.diagnostics')diagnostics++;return null})
+  try {
+    await tick();const initial=diagnostics
+    for(let i=1;i<10;i++){f.state.value={...f.state.value,playback:{...f.state.value.playback!,position:i}};await tick()}
+    assert.equal(diagnostics,initial)
+    f.state.value={...f.state.value,audioRevision:2};await tick()
+    assert.equal(diagnostics,initial+1)
+  } finally {f.player.dispose()}
+})
+
+test('resource replacement and disposal cancel their obsolete reads without reporting an error',async()=>{
+  const scope=effectScope(),key=ref('first'),signals:AbortSignal[]=[],errors:unknown[]=[]
+  scope.run(()=>createCorePlayerResource(()=>key.value,signal=>{
+    signals.push(signal)
+    return new Promise<void>((_,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(new Error('cancelled'),{code:'CANCELLED'})),{once:true}))
+  },error=>errors.push(error)))
+  key.value='second';await tick();assert.equal(signals[0].aborted,true)
+  scope.stop();await tick();assert.equal(signals[1].aborted,true)
+  assert.deepEqual(errors,[])
+})
+
 test('provider playback strips resolved URLs and unknown commit outcomes are never replayed', async () => {
   const f = fixture()
   f.setHandler(async (_name, payload) => {
@@ -352,6 +390,66 @@ test('FFT starts only with a consumer, reconnects subscriptions and stops at zer
 
 const queueReference = (revision = 4) => ({
   id: 'queue', revision, index: 0, total: 901, occurrenceId: 'entry:0', canUndo: false, undoLabel: ''
+})
+
+test('clicking the same submitted playlist reuses SQL occurrences, including duplicate songs, without uploading it again', async () => {
+  const f = fixture(), tracks = [track('duplicate'), track('other'), track('duplicate')]
+  f.setQuery(async (name, payload) => {
+    if(name === 'queue.page' && (payload as {limit:number}).limit === 1) {
+      assert.deepEqual(payload,{id:'built',revision:10,offset:2,limit:1})
+      return {items:[{position:2,queueEntryId:'entry:2',track:tracks[2]}]}
+    }
+    return null
+  })
+  f.setHandler(async (name, payload) => {
+    if(name === 'queue.select') {
+      assert.deepEqual(payload,{id:'built',revision:10,index:2,occurrenceId:'entry:2'})
+      f.state.value = {...f.state.value,queue:{...f.state.value.queue!,revision:11,index:2,occurrenceId:'entry:2'}}
+      return
+    }
+    const command=payload as CoreQueueSubmitCommand
+    if(command.kind === 'commit') {
+      const queue={id:'built',revision:10,index:0,total:3,occurrenceId:'entry:0'}
+      f.state.value={...f.state.value,queue}
+      return {id:'upload',state:'committed',sequence:2,total:3,queue}
+    }
+    return {id:'upload',state:'building',sequence:command.kind === 'append' ? 1:0,total:0}
+  })
+  try {
+    await f.player.playTrack(tracks[0],tracks)
+    f.requests.length=0
+    await f.player.playTrack(tracks[2],tracks)
+    assert.deepEqual(f.requests.map(r=>r.name),['queue.select'])
+    assert.equal(f.state.value.queue?.occurrenceId,'entry:2')
+  } finally { f.player.dispose() }
+})
+
+test('changed playlist order, external queue revisions and Core reconnects invalidate the reuse receipt', async t => {
+  for(const change of ['order','revision','epoch','library','metadata'] as const) await t.test(change,async()=>{
+    const f=fixture(),tracks=[track('one'),track('two')]
+    let revision=10
+    f.setHandler(async (name,payload)=>{
+      assert.equal(name,'queue.submit')
+      const command=payload as CoreQueueSubmitCommand
+      if(command.kind === 'commit') {
+        const queue={id:'built',revision:revision++,index:0,total:2,occurrenceId:'entry:0'}
+        f.state.value={...f.state.value,queue}
+        return {id:'upload',state:'committed',sequence:2,total:2,queue}
+      }
+      return {id:'upload',state:'building',sequence:command.kind === 'append'?1:0,total:0}
+    })
+    try {
+      await f.player.playTrack(tracks[0],tracks)
+      f.requests.length=0
+      if(change==='order')tracks.reverse()
+      if(change==='revision')f.state.value={...f.state.value,queue:{...f.state.value.queue!,revision:90}}
+      if(change==='epoch')f.state.value={...f.state.value,epoch:'new-core'}
+      if(change==='library')f.state.value={...f.state.value,libraryRevision:90}
+      if(change==='metadata')tracks[0]={...tracks[0],title:'Edited title'}
+      await f.player.playTrack(tracks[0],tracks)
+      assert.deepEqual(f.requests.map(r=>(r.payload as CoreQueueSubmitCommand).kind),['begin','append','commit'])
+    } finally { f.player.dispose() }
+  })
 })
 
 test('selecting an occurrence outside the display window locates its absolute position', async () => {

@@ -15,6 +15,9 @@ import type {
 import type { DynamicIslandLyricsPayload } from '../../shared/dynamicIsland.ts'
 import { createLyricContentCache } from '../../shared/lyrics/lyricContentCache.ts'
 import { projectDesktopLyricsLines } from '../../shared/lyrics/desktopLyricsProjection.ts'
+import { projectDesktopAnalysis } from '../../shared/lyrics/lyricAnalysis.ts'
+import { findDesktopLyricsActiveIndex } from '../../shared/desktopLyrics.ts'
+import type { StudyLyricsProjection } from '../../shared/musicStudy.ts'
 
 export interface CoreSystemPlayerTransport {
   command(action: CoreSystemPlaybackAction): Promise<unknown>
@@ -47,6 +50,10 @@ export class CoreSystemPlayerBridge {
   private activation = 0
   private clockSequence = 0
   private readonly parse = createLyricContentCache()
+  private lyricBase: DesktopLyricsSession | null = null
+  private lyricAnalysis: StudyLyricsProjection | undefined
+  private lyricWindow = -2
+  private lyricIsland: DynamicIslandLyricsPayload = { trackId: null, lines: [] }
   private readonly transport: CoreSystemPlayerTransport
   private readonly output: CoreSystemPlayerOutput
 
@@ -109,6 +116,7 @@ export class CoreSystemPlayerBridge {
     let state: DesktopLyricsTransportState = 'paused'
     if (!snapshot?.track) state = 'idle'
     else if (playback?.state === 'playing') state = 'playing'
+    this.publishAnalysisWindow()
     this.output.clock({
       schemaVersion: 1,
       sessionId: this.sessionId(),
@@ -120,7 +128,20 @@ export class CoreSystemPlayerBridge {
       state
     })
   }
+  private publishAnalysisWindow(force = false) {
+    const base = this.lyricBase
+    if (!base) return
+    if (!force && !this.lyricAnalysis) return
+    const position = this.snapshot?.playback?.position ?? 0
+    const focus = findDesktopLyricsActiveIndex(base.lines, position * 1000 + base.lyricOffsetMs)
+    if (!force && focus === this.lyricWindow) return
+    this.lyricWindow = focus
+    this.output.lyrics(projectDesktopAnalysis(base, this.lyricAnalysis, position), this.lyricIsland)
+  }
   private emptyLyrics(): void {
+    this.lyricBase = null
+    this.lyricAnalysis = undefined
+    this.lyricWindow = -2
     const track = this.snapshot?.track
     this.output.lyrics(
       {
@@ -184,14 +205,14 @@ export class CoreSystemPlayerBridge {
           if (!request.signal.aborted) this.transport.failed(error)
         })
     }
-    const lyricsKey = `${current}:${snapshot.lyricsRevision}:${snapshot.lyricsContentRevision}`
+    const lyricsKey = `${current}:${snapshot.lyricsRevision}:${snapshot.lyricsContentRevision}:${snapshot.studyRevision ?? ''}`
     if (lyricsKey !== this.lyricsKey) {
       this.lyricsKey = lyricsKey
       this.lyricsRequest?.abort()
       const request = (this.lyricsRequest = new AbortController())
       void this.transport
         .lyrics(request.signal)
-        .then(({ state, content }) => {
+        .then(({ state, content, analysis }) => {
           if (request.signal.aborted || current !== this.currentKey()) return
           if (
             content.current?.trackId !== snapshot.track?.id ||
@@ -214,41 +235,41 @@ export class CoreSystemPlayerBridge {
             }
           )
           const desktop = projectDesktopLyricsLines(lines)
-          this.output.lyrics(
-            {
-              schemaVersion: 1,
-              sessionId: this.sessionId(),
-              contentRevision: content.contentRevision,
-              track: snapshot.track
-                ? {
-                    id: snapshot.track.id,
-                    title: snapshot.track.title,
-                    artist: snapshot.track.artist
-                  }
-                : null,
-              status:
-                state.loadState.status === 'failed'
-                  ? 'error'
-                  : state.loadState.status === 'loading'
-                    ? 'loading'
-                    : desktop.length
-                      ? 'ready'
-                      : 'empty',
-              lyricOffsetMs: Math.round(content.offsetSeconds * 1000),
-              lines: desktop
-            },
-            {
-              trackId: snapshot.track?.id ?? null,
-              lines: lines
-                .map((line) => ({
-                  time: line.time,
-                  original: line.text.trim(),
-                  translation: line.translation?.trim() ?? null,
-                  romanization: line.romanization?.trim() ?? null
-                }))
-                .filter((line) => line.original.length > 0)
-            }
-          )
+          this.lyricBase = {
+            schemaVersion: 1,
+            sessionId: this.sessionId(),
+            contentRevision: content.contentRevision,
+            track: snapshot.track
+              ? {
+                  id: snapshot.track.id,
+                  title: snapshot.track.title,
+                  artist: snapshot.track.artist
+                }
+              : null,
+            status:
+              state.loadState.status === 'failed'
+                ? 'error'
+                : state.loadState.status === 'loading'
+                  ? 'loading'
+                  : desktop.length
+                    ? 'ready'
+                    : 'empty',
+            lyricOffsetMs: Math.round(content.offsetSeconds * 1000),
+            lines: desktop
+          }
+          this.lyricAnalysis = analysis
+          this.lyricIsland = {
+            trackId: snapshot.track?.id ?? null,
+            lines: lines
+              .map((line) => ({
+                time: line.time,
+                original: line.text.trim(),
+                translation: line.translation?.trim() ?? null,
+                romanization: line.romanization?.trim() ?? null
+              }))
+              .filter((line) => line.original.length > 0)
+          }
+          this.publishAnalysisWindow(true)
         })
         .catch((error) => {
           if (!request.signal.aborted) this.transport.failed(error)

@@ -1,4 +1,5 @@
 import '../adapters-node/index.ts'
+import './agent/profile.ts'
 import './diagnostics/bootstrap.ts'
 import { relaunchWithX11BackendIfNeeded } from './imeBackend'
 

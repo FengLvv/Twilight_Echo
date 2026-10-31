@@ -227,24 +227,36 @@ test('page readers are admitted within Core capacity, queued cancellation and di
   const request = (n: number, signal?: AbortSignal) => connection.request({
     kind: 'query', name: 'state.snapshot', epoch: 'first', requestId: String(n), payload: {}
   }, signal)
-  const readers = Array.from({ length: 12 }, (_, i) => request(i))
+  const readers = Array.from({ length: 8 }, (_, i) => request(i))
   const cancelled = new AbortController()
   const aborted = request(12, cancelled.signal)
   const rejected = assert.rejects(aborted, { code: 'CANCELLED' })
   const queued = request(13)
-  assert.equal(f.requests.length, 12)
+  assert.equal(f.requests.length, 8)
   cancelled.abort()
   await rejected
   assert.deepEqual(f.cancellations, [])
   releases.shift()!()
   await tick()
   assert.equal(f.requests.at(-1)!.requestId, '13')
-  assert.equal(f.requests.length, 13)
+  assert.equal(f.requests.length, 9)
   const retired = request(14)
   const disposed = assert.rejects(retired, /disposed/)
   connection.dispose()
   await disposed
   for (const release of releases) release()
   await Promise.all([...readers, queued])
-  assert.equal(f.requests.length, 13)
+  assert.equal(f.requests.length, 9)
+})
+
+test('background readers leave transport capacity available for play and stop',async()=>{
+  const f=fixture(),connection=new CoreWindowConnection(f.api)
+  await connection.connect()
+  const release:Array<()=>void>=[]
+  f.api.request=async(_id,request)=>{f.requests.push(request);await new Promise<void>(r=>release.push(r));return{ok:true,value:null}}
+  const reads=Array.from({length:8},(_,i)=>connection.request({kind:'query',name:'state.snapshot',payload:{},epoch:'first',requestId:'read-'+i}))
+  const stop=connection.request({kind:'command',name:'playback.stop',payload:{},epoch:'first',requestId:'stop'})
+  assert.equal(f.requests.at(-1)?.name,'playback.stop')
+  for(const r of release)r()
+  await Promise.all([...reads,stop]);connection.dispose()
 })

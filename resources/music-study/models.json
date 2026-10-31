@@ -1,0 +1,55 @@
+{
+  "version": 3,
+  "files": {
+    "UVR_MDXNET_KARA_2.onnx": "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+    "duet.safetensors": "5c6a131b85fa995d5d75a09f89479bcc2fa939e42365ad6176f73cf103d34238",
+    "torch/hub/checkpoints/5c90dfd2-34c22ccb.th": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+    "speaker/embedding_model.ckpt": "0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2",
+    "btc.safetensors": "468289d56a0d9932bf28f81278ad736ed881611494c019a088e94f134bf4e778",
+    "sheetsage2/model.safetensors": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+    "sheetsage2/config.json": "a986e63f5d831ecb823c11d19cfb371d763f25ae2e614ec9acd714c0b8bb87fd",
+    "mert2/model.safetensors": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+    "mert2/config.json": "f2e194895f58be3ddba327255db129ff0e3bee550cc0ecf08e4d22d79ce3bca3"
+  },
+  "sources": {
+    "duet": {
+      "id": "1FpW13tb7BSFhW4DPs2Wv_U9zYCV5av6D",
+      "sha256": "58b54d8ba5a770988775bbfdca0816890b267a325305eee93c4d2c24ee6fc07b"
+    },
+    "btc": {
+      "url": "https://raw.githubusercontent.com/ptnghia-j/ChordMini/aa6e3a8d7b017f082fd2aaff9329d5c26af49c03/checkpoints/btc_model_best.pth",
+      "sha256": "e0a12ca6d881f81e01dfb459b4836ec7dac8d8f87b0170a412b5807256b3a1fc",
+      "project": "ChordMini BTC continual learning, DAFx 2026",
+      "revision": "aa6e3a8d7b017f082fd2aaff9329d5c26af49c03"
+    },
+    "btcTeacher": {
+      "url": "https://raw.githubusercontent.com/jayg996/BTC-ISMIR19/2682317be668032e6e4b269ded36adaa2ad57df0/test/btc_model_large_voca.pt",
+      "sha256": "1673d23f8f9a55ae7f9e8b80a51da616debb22675b8d8b67ea6ce0ef37b0ab51",
+      "inferenceSha256": "58c2cd899c03fae3aeb78fedd8cea0cd8133ff0ed200014187be9656c631e74c"
+    },
+    "sheetsage2/model.safetensors": {
+      "url": "https://huggingface.co/m-a-p/SheetSage2/resolve/b83c3d79a6d98bcffaf8f9ed112c90aa887887bc/model.safetensors",
+      "sha256": "b235f68091a5f5b644000f2b5acb57d1e70432aca2b34ab1b9cf27236e1f4274",
+      "revision": "b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+      "license": "CC-BY-NC-4.0"
+    },
+    "sheetsage2/config.json": {
+      "url": "https://huggingface.co/m-a-p/SheetSage2/resolve/b83c3d79a6d98bcffaf8f9ed112c90aa887887bc/config.json",
+      "sha256": "a986e63f5d831ecb823c11d19cfb371d763f25ae2e614ec9acd714c0b8bb87fd",
+      "revision": "b83c3d79a6d98bcffaf8f9ed112c90aa887887bc",
+      "license": "CC-BY-NC-4.0"
+    },
+    "mert2/model.safetensors": {
+      "url": "https://huggingface.co/m-a-p/MERT-v2-FullSong/resolve/d8ba1c745e733b3908ce6ad16ebeb17ac7600a42/model.safetensors",
+      "sha256": "e6dd2ab187d6dd62b6521cd7d8f932e237acf0c5757745a7232082e28391350d",
+      "revision": "d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+      "license": "CC-BY-NC-4.0"
+    },
+    "mert2/config.json": {
+      "url": "https://huggingface.co/m-a-p/MERT-v2-FullSong/resolve/d8ba1c745e733b3908ce6ad16ebeb17ac7600a42/config.json",
+      "sha256": "f2e194895f58be3ddba327255db129ff0e3bee550cc0ecf08e4d22d79ce3bca3",
+      "revision": "d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+      "license": "CC-BY-NC-4.0"
+    }
+  }
+}

@@ -751,8 +751,7 @@ export class LibraryDatabaseEntityMetadata {
       const turn = Number(this.sql.prepare("SELECT value FROM metadata_identification_schedule_state WHERE key='claim_turn'").get()?.value ?? 0)
       // A requested profile refresh must not sit behind a library-wide identity
       // backlog. Keep FIFO within updates and the existing fourth-turn fairness.
-      for (let checked = 0; checked < 100; checked++) {
-        const row = this.sql
+      const candidates = this.sql
           .prepare(
             `SELECT * FROM metadata_jobs j WHERE state IN ('queued','retry_wait') AND next_attempt<=?
             AND (json_extract(payload,'$.type')<>'legacy' OR EXISTS(SELECT 1 FROM metadata_legacy_batches b
@@ -767,10 +766,10 @@ export class LibraryDatabaseEntityMetadata {
                 WHEN json_extract(payload,'$.provider')='platform.ncm' THEN 1 ELSE 2 END,
               CASE WHEN EXISTS(SELECT 1 FROM metadata_demands d WHERE d.job_id=j.id AND NOT EXISTS(SELECT 1 FROM metadata_identification_schedule a WHERE a.demand_id=d.batch_id)) THEN 0
                 ELSE CASE coalesce(json_extract(payload,'$.entityKind'),(SELECT kind FROM catalog_entities e WHERE e.id=j.entity_id)) WHEN 'album_project' THEN 0 WHEN 'release' THEN 1 ELSE 2 END END,
-              next_attempt,rowid LIMIT 1`
+              next_attempt,rowid LIMIT 100`
           )
-          .get(now, turn, now) as Row | undefined
-        if (!row) return null
+          .all(now, turn, now) as Row[]
+      for (const row of candidates) {
         const previous = decode<EntityMetadataJob>(row)!
         if (previous.type === 'legacy' && !this.legacy.valid(String(row.input))) {
           this.save({ ...previous, state: 'cancelled', generation: previous.generation + 1, reason: 'input_changed', updatedAt: now })

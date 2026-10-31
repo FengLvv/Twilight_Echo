@@ -287,12 +287,6 @@ const detailTracks = shallowRef<Track[]>([])
 const playlistTrackPaging = usePlaylistTrackPaging(detailTracks, (error) =>
   friendlyStreamingError(error, '继续加载歌单失败')
 )
-const {
-  query: detailQuery,
-  sort: detailSort,
-  direction: detailSortDirection,
-  tracks: visibleDetailTracks
-} = useStreamingTrackView(detailTracks, () => currentDetail.value)
 const detailUsers = ref<NcmUserSummary[]>([])
 const artistAlbums = ref<MediaProviderAlbumSummary[]>([])
 const artistPlaylists = ref<MediaProviderPlaylistSummary[]>([])
@@ -406,6 +400,8 @@ const activeProvider = computed<string>(() => {
 })
 
 const isExternalActive = computed(() => activeProvider.value !== NCM_PROVIDER_ID)
+const { query: detailQuery, sort: detailSort, direction: detailSortDirection, tracks: visibleDetailTracks } =
+  useStreamingTrackView(detailTracks, () => currentDetail.value)
 const detailProviderId = computed(() =>
   currentDetail.value?.type === 'album' ? currentDetail.value.providerId : activeProvider.value
 )
@@ -1732,7 +1728,7 @@ async function openLikedTracks(force = false): Promise<void> {
     likedTracksTotal.value = page.total
     likedTracksNextOffset.value = page.nextOffset
     likedTracksHasMore.value = page.hasMore
-    syncLikedIds(page.tracks)
+    syncLikedIds(detailTracks.value)
     await nextTick()
     void ensureLikedTracksScrollable()
   } catch (error) {
@@ -1769,7 +1765,7 @@ async function loadMoreLikedTracks(): Promise<void> {
     likedTracksTotal.value = page.total
     likedTracksNextOffset.value = page.nextOffset
     likedTracksHasMore.value = page.hasMore
-    syncLikedIds(page.tracks)
+    syncLikedIds(detailTracks.value)
     await nextTick()
     void ensureLikedTracksScrollable()
   } catch (error) {
@@ -4031,7 +4027,8 @@ onMounted(async () => {
                 @load-all-liked="resolveDetailPlaybackQueue"
                 @load-more-liked="loadMoreDetailTracks"
                 @track-context-menu="onStreamingTrackContextMenu"
-              />
+              >
+              </StreamingDetailStage>
             </template>
 
             <!-- Artist / social / user playlists: editorial social stage -->

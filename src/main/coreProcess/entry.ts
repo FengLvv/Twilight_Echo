@@ -144,6 +144,10 @@ import { createQueueInputResolver } from '../../core/playback/queueInputResolver
 import { authorizeNativeSource } from '../../core/playback/sourceResolver.ts'
 import { CoreSleepTimer } from '../../core/playback/sleepService.ts'
 import { CoreAutoMixService } from '../../core/audio/autoMixService.ts'
+import { CoreMusicStudyService } from '../../core/audio/musicStudyService.ts'
+import { studyLyrics } from '../../core/audio/studyLyrics.ts'
+import { createStudyRepository } from '../audio/studyRepository.ts'
+import { withDatabaseQuery } from '../library/databaseQueryContext.ts'
 import { CoreModelPackService } from '../../core/audio/modelPackService.ts'
 import { OpraCatalog } from '../../core/audio/opraCatalog.ts'
 import { CoreVisualizationService } from '../../core/audio/visualizationService.ts'
@@ -899,6 +903,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     sleepTimer.boundary(boundary, occurredAt)
   )
   const playback = new CorePlaybackSession({
+    preparationTiming: ({ phase, ...details }) => writeDiagnostic('playback.prepare', phase, details),
     schedule: (callback, delay) => {
       const timer = setTimeout(callback, delay)
       return () => clearTimeout(timer)
@@ -1771,7 +1776,70 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
     changed: () => { application?.changed(); metadata.entities?.refreshIdentification(); genres?.invalidate() },
     failed: error => console.error('[core.catalog]', error)
   })
+  const studySourcePins=new Map<string,()=>void>()
   application = new CoreApplication({
+    queryContext: withDatabaseQuery,
+    musicStudy: new CoreMusicStudyService({
+      repository:createStudyRepository(join(config.root,'music-study')),
+      newId:randomUUID,now:Date.now,changed:()=>application?.changed(),schedule,
+      source:async(input,current,projectId)=>{
+        const signal=new AbortController().signal
+        if (!input && !current) {
+          const chosen=await platform!.call('study.chooseSource',{id:projectId!})
+          if(!chosen)return null
+          return {title:chosen.title,source:{path:chosen.path,identity:chosen.path}}
+        }
+        const track=input?(await createPlaylistInputResolver(resolveQueueInput,database!)([input],signal))[0]:playback.studySourceTrack()
+        if(!track)throw new Error('请先选择一首歌曲')
+        if(track.source==='radio')throw new Error('直播音源无法完整缓存，请选择歌曲或播客文件')
+        if(track.subTrack)throw new Error('请先将 SACD 子轨导出为完整音频文件')
+        const range=track.cueRange?{start:track.cueRange.startSeconds,end:track.cueRange.endSeconds,
+          virtualPregapSeconds:track.cueRange.virtualPregapSeconds??0,
+          duration:track.cueRange.endSeconds-track.cueRange.startSeconds+(track.cueRange.virtualPregapSeconds??0)}:{duration:track.duration}
+        if(!track.source||track.source==='local'){
+          return {title:track.title,source:{path:track.filePath,identity:track.id,...range}}
+        }
+        const stableInput:import('../../shared/coreQueueSubmission.ts').CoreQueueTrackInput =
+          track.source && track.source!=='local' ? (input?.kind==='network'||input?.kind==='stream'?input:
+            {kind:'provider',track:{id:track.id,title:track.title,artist:track.artist,album:track.album,duration:track.duration,source:track.source,ncmSongId:track.ncmSongId}}) :
+            {kind:'local',id:track.id,fallback:{filePath:track.filePath,title:track.title,artist:track.artist,album:track.album,duration:track.duration,...(track.cueRange?{cueRange:track.cueRange}:{})}}
+        return {title:track.title,source:{path:'',input:stableInput,identity:track.id,...range}}
+      },
+      environment:()=>platform!.call('study.environment',{}),
+      validate:(record,source)=>platform!.call('study.validateCache',{id:record.id,...(source.path?{source:source.path}:{})}),
+      choosePack:()=>platform!.call('study.choosePack',{}),
+      lyrics:async(songId,input)=>{
+        const track = input ? (await createPlaylistInputResolver(resolveQueueInput,database!)([input],new AbortController().signal))[0] : playback.studySourceTrack()
+        if (!track) throw new Error('无法解析歌词音源')
+        const content = await lyrics.forTrack(track)
+        return studyLyrics(content,songId,track.duration > 0 ? track.duration : undefined)
+      },
+      start:(record,launchSignal)=>sourceResources.use(async()=>{
+        const signal=launchSignal??new AbortController().signal
+        let source=record.source.path
+        const cached=await platform!.call('study.hasSource',{id:record.id},signal)
+        if(cached)source=''
+        else if(record.source.input){
+          const track=(await createPlaylistInputResolver(resolveQueueInput,database!)([record.source.input],signal))[0]
+          const resolved=await resolver.resolve(track,signal)
+          if(!resolved)throw new Error('音源已失效，请检查登录状态并重试')
+          source=await platform!.call('paths.authorizeAudio',{source:resolved.source},signal)
+        }
+        signal.throwIfAborted()
+        const release=sourceResources.pin([source]);studySourcePins.set(record.id,release)
+        try{await platform!.call('study.startWorker',{id:record.id,source,
+          start:record.source.start,end:record.source.end,expectedDuration:record.source.duration,virtualPregapSeconds:record.source.virtualPregapSeconds,leadBacking:false,twoSingers:false,operation:record.operation,harmonicStems:record.harmonicStems,lyrics:record.lyrics})}
+        catch(error){release();studySourcePins.delete(record.id);throw error}
+      }),
+      worker:async id=>{const status=await platform!.call('study.workerStatus',{id});if(!status.running){studySourcePins.get(id)?.();studySourcePins.delete(id)}return status},
+      cancel:async id=>{await platform!.call('study.cancelWorker',{id});studySourcePins.get(id)?.();studySourcePins.delete(id)},
+      removeFiles:id=>platform!.call('study.removeFiles',{id}),
+      writeMix:(id,gains,frames)=>platform!.call('study.writeMix',{id,gains,frames}),
+      export:(record,request)=>platform!.call('study.exportFiles',{...request,chords:record.result!.chords}),
+      audition:{begin:(source,binding)=>playback.beginStudyAudition(source,binding),replace:source=>playback.replaceStudyAudition(source),
+        update:gains=>playback.updateStudyMixGains(gains),
+        control:command=>playback.controlStudyAudition(command),state:()=>playback.studyAuditionState()}
+    }),
     catalog,
     genres,
     ratings,

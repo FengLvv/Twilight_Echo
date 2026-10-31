@@ -1,6 +1,8 @@
 import { computed } from 'vue'
+import { createHash } from '../../../../shared/portableCrypto.ts'
 import type { CorePlayerClient } from './corePlayerTypes.ts'
 import { createCorePlayerResource } from './corePlayerResource.ts'
+import { isRequestCancelled } from '../../../../shared/cancellation.ts'
 import type { TrackData } from '../../../../shared/track.ts'
 import type { CoreTrackView } from '../../../../shared/coreViews.ts'
 import type { CoreQueueReference } from '../../../../shared/coreProtocol.ts'
@@ -90,6 +92,11 @@ export function coreQueueTrackInput(
 
 export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: unknown) => void) {
   const reference = computed(() => core.state.value?.queue ?? null)
+  // A digest proves the submitted order, not a second in-memory queue. Any
+  // external queue edit, reconnect or library change invalidates this receipt.
+  let submitted: { digest: string; epoch: string; libraryRevision: number | null;
+    mode: string; queue: CoreQueueReference } | null = null
+  let submissionIntent = 0
   const pageKey = () => {
     const state = core.state.value,
       queue = state?.queue
@@ -99,14 +106,14 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
   }
   const page = createCorePlayerResource(
     pageKey,
-    () => {
+    (signal) => {
       const queue = reference.value!
       return core.query('queue.page', {
         id: queue.id,
         revision: queue.revision,
         offset: Math.floor(Math.max(0, queue.index) / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE,
         limit: LIBRARY_PAGE_SIZE
-      })
+      }, signal)
     },
     failed
   )
@@ -213,7 +220,9 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
       })
       check()
       committing = true
-      await core.command('queue.submit', { kind: 'commit', id: started.id, sequence: ++sequence })
+      return await core.command('queue.submit', {
+        kind: 'commit', id: started.id, sequence: ++sequence
+      }) as CoreQueueSubmitReply
     } catch (error) {
       // A commit with a lost reply may already own playback. Never abort or replay it.
       if (!committing)
@@ -227,7 +236,42 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
     position?: number,
     play = true
   ) {
-    await submitInputs(
+    const intent = ++submissionIntent
+    const check = () => {
+      if (intent !== submissionIntent)
+        throw Object.assign(new Error('Playback request superseded'), { code: 'CANCELLED' })
+    }
+    const epoch = core.state.value?.epoch ?? '', libraryRevision = core.state.value?.libraryRevision ?? null
+    const mode = core.state.value?.playback?.playMode ?? 'sequential'
+    const networkRevision = core.state.value?.network?.revision ?? null
+    const hash = createHash('sha256')
+    for (const track of tracks)
+      hash.update(JSON.stringify(coreQueueTrackInput(track, networkRevision))).update('\n')
+    const digest = hash.digest('hex')
+    check()
+    const queue = reference.value
+    if (play && (position === undefined || position === 0) && submitted && !['shuffle', 'heart'].includes(mode) &&
+      submitted.digest === digest && submitted.epoch === epoch &&
+      submitted.libraryRevision === libraryRevision && submitted.mode === mode &&
+      queue?.id === submitted.queue.id && queue.revision === submitted.queue.revision &&
+      queue.total === tracks.length) {
+      const entry = await entryAt(selectedIndex, { id: queue.id, revision: queue.revision })
+      check()
+      try {
+        await core.command('queue.select', { id: queue.id, revision: queue.revision,
+          index: selectedIndex, occurrenceId: entry.queueEntryId })
+      } catch (error) {
+        submitted = null
+        throw error
+      }
+      const selected = reference.value
+      const expectedRevision = queue.revision + (queue.occurrenceId === entry.queueEntryId ? 0 : 1)
+      submitted = selected?.id === queue.id && selected.revision === expectedRevision
+        ? { ...submitted, queue: { ...selected } } : null
+      return
+    }
+    submitted = null
+    const result = await submitInputs(
       async (append) => {
         for (let offset = 0; offset < tracks.length; offset += 200)
           await append(
@@ -240,8 +284,12 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
       },
       selectedIndex,
       position,
-      play
+      play,
+      check
     )
+    check()
+    if (result.queue?.total === tracks.length)
+      submitted = { digest, epoch, libraryRevision, mode, queue: result.queue }
   }
   async function appendLibraryQueuePages(
     produce: CoreQueueInputPageProducer,
@@ -285,6 +333,7 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
     tracks?: readonly QueueTrack[],
     context?: { heartModePlaylistId?: number | null }
   ) {
+    try {
     if (context?.heartModePlaylistId) {
       await core.command('liked.play', { selectedId: track.id, play: true })
       return
@@ -302,6 +351,9 @@ export function createCorePlayerQueue(core: CorePlayerClient, failed: (error: un
       occurrenceIndex >= 0 ? occurrenceIndex : input.findIndex((item) => item.id === track.id)
     if (selectedIndex < 0) throw new Error('所选曲目不在队列中')
     await submit(input, selectedIndex, position)
+    } catch (error) {
+      if (!isRequestCancelled(error)) throw error
+    }
   }
   const undoQueue = async (revision?: number) => {
     const queue = current()

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useMusicStudyProgress } from '../stores/musicStudy.ts'
 import { useBackStack } from '../app/useBackStack'
 import { useNcmStore } from '../stores/useNcmStore'
 import { useProviderStore } from '../stores/useProviderStore'
@@ -43,6 +44,9 @@ defineEmits<{
 }>()
 
 const { isLoggedIn, profile } = useNcmStore()
+const studyProgress = props.preview ? null : useMusicStudyProgress()
+const studyProgressOpen = ref(false)
+const StudyProgressPanel = defineAsyncComponent(()=>import('./StudyProgressPanel.vue'))
 const providerStore = useProviderStore({ listen: !props.preview })
 const loginProvider = computed(() => {
   if (props.preview) return undefined
@@ -192,6 +196,11 @@ function close(): void {
     <div class="title-bar-controls no-drag" @pointerdown="setPressOrigin">
       <div v-if="!closeOnly" class="title-bar-tools" role="group" aria-label="应用工具">
         <PageDock :actions="pageDockActions ?? []" />
+        <button v-if="!preview" type="button" class="settings-btn study-progress-btn" aria-label="分析进度" title="分析进度" :aria-expanded="studyProgressOpen" aria-controls="study-progress-panel" @click="studyProgressOpen=!studyProgressOpen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 9v6m4-10v14m4-11v8m4-13v18m4-12v6"/></svg>
+          <span v-if="studyProgress?.activeCount.value" class="study-progress-count">{{studyProgress.activeCount.value}}</span>
+        </button>
+        <StudyProgressPanel v-if="studyProgressOpen" @close="studyProgressOpen=false"/>
         <button
           v-for="contribution in pluginTitleButtons"
           :key="contribution.pluginId + ':' + contribution.id"
@@ -311,6 +320,7 @@ function close(): void {
 </template>
 
 <style scoped>
+.study-progress-btn{position:relative}.study-progress-count{position:absolute;top:1px;right:1px;min-width:12px;padding:1px 3px;border-radius:8px;font-size:9px;line-height:12px;background:var(--te-primary-500);color:white;text-align:center}
 .notification-btn {
   position: relative;
 }

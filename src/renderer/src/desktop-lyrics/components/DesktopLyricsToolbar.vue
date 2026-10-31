@@ -1,17 +1,28 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import ChordDisplayControl from '../../components/ChordDisplayControl.vue'
+import type { DesktopLyricsAnalysis } from '../../../../shared/desktopLyrics.ts'
+import type { StudyLyricDisplayPatch } from '../../../../shared/musicStudy.ts'
 import type {
   DesktopLyricsPalette,
   DesktopLyricsSettingsV3,
   DesktopLyricsTransportAction
 } from '../../../../shared/desktopLyrics.ts'
 
-defineProps<{ settings: DesktopLyricsSettingsV3; playing: boolean }>()
+defineProps<{
+  settings: DesktopLyricsSettingsV3
+  playing: boolean
+  analysis?: DesktopLyricsAnalysis
+  available?: boolean
+  error?: string
+}>()
 const emit = defineEmits<{
   transport: [action: DesktopLyricsTransportAction]
   patch: [patch: Partial<DesktopLyricsSettingsV3>]
   lock: []
   close: []
+  analysis: [patch: Omit<StudyLyricDisplayPatch, 'songId'>]
+  interaction: [active: boolean]
 }>()
 const paletteOpen = ref(false)
 const palettes: Array<{ id: DesktopLyricsPalette; label: string; color: string }> = [
@@ -49,6 +60,56 @@ function selectPalette(palette: DesktopLyricsPalette): void {
       <i class="ph ph-skip-forward"></i>
     </button>
     <span class="dl-toolbar-divider"></span>
+    <template v-if="available">
+      <button
+        type="button"
+        aria-label="显示和弦"
+        :title="error || analysis?.error || '和弦'"
+        :aria-pressed="analysis?.display.chordsVisible ?? false"
+        :aria-busy="!!analysis?.chordsBusy"
+        :class="{ 'is-selected': analysis?.display.chordsVisible }"
+        @click="emit('analysis', { chordsVisible: !analysis?.display.chordsVisible })"
+      >
+        <i
+          :class="
+            analysis?.chordsBusy && analysis?.display.chordsVisible
+              ? 'ph ph-spinner dl-analysis-spinning'
+              : 'ph ph-piano-keys'
+          "
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        :aria-label="analysis?.display.notationMode === 'staff' ? '人声五线谱' : '人声简谱'"
+        :title="error || analysis?.error || (analysis?.display.notationMode === 'staff' ? '五线谱' : '简谱')"
+        :aria-pressed="analysis?.display.notationVisible ?? false"
+        :aria-busy="!!analysis?.melodyBusy"
+        :class="{ 'is-selected': analysis?.display.notationVisible }"
+        @click="emit('analysis', { notationVisible: !analysis?.display.notationVisible })"
+      >
+        <i
+          :class="
+            analysis?.melodyBusy && analysis?.display.notationVisible
+              ? 'ph ph-spinner dl-analysis-spinning'
+              : 'ph ph-music-notes'
+          "
+          aria-hidden="true"
+        />
+      </button>
+      <ChordDisplayControl
+        :mode="analysis?.display.mode ?? 'names'"
+        :selected-key="analysis?.display.key ?? 'auto'"
+        :inferred="analysis?.inferred ?? null"
+        :notation-visible="analysis?.display.notationVisible"
+        :notation-mode="analysis?.display.notationMode"
+        @notation-mode="(value) => emit('analysis', { notationMode: value })"
+        @mode="(value) => emit('analysis', { mode: value })"
+        @key="(value) => emit('analysis', { key: value })"
+        @open="(value) => emit('interaction', value)"
+      />
+      <span class="dl-toolbar-divider"></span>
+    </template>
     <button
       type="button"
       title="减小字号"

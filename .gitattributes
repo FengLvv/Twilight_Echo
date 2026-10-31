@@ -4,3 +4,7 @@
 * text=auto eol=lf
 src/main/audioEngineManager.test.ts whitespace=cr-at-eol
 audio-engine/third_party/miniaudio/* whitespace=-trailing-space
+
+# Preserve pinned upstream source bytes, including original whitespace.
+resources/music-study/vendor/** -whitespace
+resources/music-study/btc/** -whitespace

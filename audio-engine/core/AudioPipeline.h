@@ -149,6 +149,7 @@ class AudioPipeline {
   TAE_Result stopUnlocked();
   TAE_Result seek(double seconds, std::string* error);
   void setVolume(double volume);
+  bool setStudyMixGains(const std::string& gainsJson);
   void setPlaybackRate(double rate);
   /** A-B loop; end <= start or non-finite clears. Enforced on control/status path. */
   void setLoopRange(double startSeconds, double endSeconds);
@@ -345,6 +346,8 @@ class AudioPipeline {
       const std::string& attemptedDopReason,
       bool dopModeRequested,
       std::optional<bool> graphProcessingActive = std::nullopt) const;
+  bool trySwitchStudyStream(const QueueItem& item, double startTimeSeconds,
+      const std::string& backendId, const std::string& deviceId, bool initiallyPaused);
   TAE_Result playInternal(
       const QueueItem& item,
       const std::optional<QueueItem>& upcomingItem,

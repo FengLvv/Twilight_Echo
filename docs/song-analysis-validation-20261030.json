@@ -1,0 +1,64 @@
+{
+  "validatedAt": "2026-10-30T08:44:32.339Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\song-analysis\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "591dcfe5aa50d6fa84e4d63184e57aa4caa8013de826c8c94882ea746504d56b",
+  "features": [
+    "Single in-song Analyze entry",
+    "Six stems activate at current position before accompaniment chords complete",
+    "Chord rows follow original lyric and playback clocks",
+    "Independent vocal subdivision requests reuse six stems",
+    "Native live gains, shared transport and ordinary queue",
+    "All-song progress with per-stage times, cancellation and retry",
+    "Validated partial caches, exports and manual chord edits"
+  ],
+  "regressions": {
+    "coreProtocolPlaybackLyricsAndCache": 218,
+    "supervisorAndPlatformClient": 31,
+    "python": 14,
+    "nativeLiveMix": true,
+    "httpOfflineExportsCancellationAndOptionalModels": true,
+    "packagedCoreColdAndZeroWindowPlayback": true
+  },
+  "packageParity": {
+    "compiledFiles": 731,
+    "workerAndAdapters": true,
+    "dependencyClosure": 254
+  },
+  "fullSongUi": {
+    "durationSeconds": 231.45650793650793,
+    "sixJoinedWhileChordsPending": true,
+    "timings": {
+      "six": {
+        "elapsedMs": 7447,
+        "cacheHit": false
+      },
+      "chords": {
+        "elapsedMs": 14053,
+        "cacheHit": false
+      }
+    },
+    "liveSliders": {
+      "nativePlayCalls": 0,
+      "nativeGainUpdates": 2
+    },
+    "evidence": ".local/song-analysis-evidence2"
+  },
+  "packagedUi": {
+    "input": "24-second excerpt of My Friend, starting at 60 seconds",
+    "noLyricsTimeline": true,
+    "vocalStagesReuseSix": true,
+    "pauseReturnAndResume": true,
+    "narrowLayoutNoHorizontalOverflow": true,
+    "liveSliders": {
+      "nativePlayCalls": 0,
+      "nativeGainUpdates": 1
+    },
+    "evidence": ".local/song-analysis-final-evidence"
+  },
+  "limits": [
+    "Zero-volume functional automation does not establish perceived audio quality or chord accuracy",
+    "Full-song timings exclude environment verification, worker startup and source preparation",
+    "Optional models were verified on short clips; no new full-song duet benchmark"
+  ],
+  "deployment": "Separate artifact; old system-cleanup executable unchanged; QA used isolated profiles. Normal user app was not stopped or replaced."
+}

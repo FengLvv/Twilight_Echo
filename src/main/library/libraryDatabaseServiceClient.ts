@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
+import { databaseQuerySignal } from './databaseQueryContext.ts'
+import { writeDiagnostic } from '../diagnostics/logger.ts'
 import type {
   LibraryDatabaseWorkerApi,
   LibraryDocumentExportOptions,
@@ -52,6 +54,7 @@ export interface DatabaseServiceOptions {
   startupTimeoutMs?: number
   requestTimeoutMs?: number
   maxPendingRequests?: number
+  maxQueuedRequests?: number
   /** Injection point for the actual worker integration test, not a storage fallback. */
   fork?: (entry: string) => DatabaseUtilityProcess
 }
@@ -189,6 +192,7 @@ export class LibraryDatabaseServiceClient implements LibraryDatabaseWorkerApi {
   private startupTimer: NodeJS.Timeout | null = null
   private readonly pending = new Map<string, Pending>()
   private reservations = 0
+  private readonly waiters = new Set<{ grant(): void; reject(error: Error): void }>()
   private stopped = false
   private closing = false
   private coreStateFilePath: string | undefined
@@ -344,7 +348,32 @@ export class LibraryDatabaseServiceClient implements LibraryDatabaseWorkerApi {
       pending.reject(error)
     }
     this.pending.clear()
+    for (const waiter of this.waiters) waiter.reject(error)
     child?.kill()
+  }
+
+  private reserve(signal?: AbortSignal): Promise<void> | void {
+    const cancelled = () => Object.assign(new Error('Database query cancelled'), { code: 'CANCELLED' })
+    if (signal?.aborted) return Promise.reject(cancelled())
+    if (this.reservations < (this.options.maxPendingRequests ?? 16) && !this.waiters.size) {
+      this.reservations++
+      return
+    }
+    if (this.waiters.size >= (this.options.maxQueuedRequests ?? 128))
+      return Promise.reject(Object.assign(new Error('Music library database request queue is full'), { code: 'BUSY' }))
+    return new Promise<void>((resolve, reject) => {
+      const finish = () => {
+        this.waiters.delete(waiter)
+        signal?.removeEventListener('abort', abort)
+      }
+      const waiter = {
+        grant: () => { finish(); this.reservations++; resolve() },
+        reject: (error: Error) => { finish(); reject(error) }
+      }
+      const abort = () => waiter.reject(cancelled())
+      this.waiters.add(waiter)
+      signal?.addEventListener('abort', abort, { once: true })
+    })
   }
 
   private async call<M extends DatabaseMethod>(
@@ -352,11 +381,15 @@ export class LibraryDatabaseServiceClient implements LibraryDatabaseWorkerApi {
     ...args: Parameters<LibraryDatabaseWorkerApi[M]>
   ): Promise<Awaited<ReturnType<LibraryDatabaseWorkerApi[M]>>> {
     if (this.closing) throw new Error('Music library database service is closing')
-    if (this.reservations >= (this.options.maxPendingRequests ?? 16))
-      throw new Error('Music library database request queue is full')
-    this.reservations++
+    const signal = databaseQuerySignal()
+    const reservation = this.reserve(signal)
+    if (reservation) await reservation
+    const startedAt = performance.now()
+    const slow = setTimeout(() => writeDiagnostic('database.rpc', 'request.slow', { method, pending: this.reservations, queued: this.waiters.size }, 'warn'), 2000)
     try {
+      if (signal?.aborted) throw Object.assign(new Error('Database query cancelled'), { code: 'CANCELLED' })
       await this.open()
+      if (signal?.aborted) throw Object.assign(new Error('Database query cancelled'), { code: 'CANCELLED' })
       if (!this.child) throw new Error('Music library database process is unavailable')
       const requestId = randomUUID()
       const payloadArgs: unknown[] = [...args]
@@ -386,7 +419,10 @@ export class LibraryDatabaseServiceClient implements LibraryDatabaseWorkerApi {
         }
       )
     } finally {
+      clearTimeout(slow)
+      if (performance.now() - startedAt >= 2000) writeDiagnostic('database.rpc', 'request.finished', { method, durationMs: performance.now() - startedAt })
       this.reservations--
+      if (!this.closing && !this.stopped) this.waiters.values().next().value?.grant()
     }
   }
 

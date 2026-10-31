@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-30",
+  "status": "implemented, built and locally validated",
+  "changes": [
+    "Playback URL resolution gets priority in the shared 5 requests/second budget, with bounded fairness for other requests.",
+    "A confirmed submission receipt and SHA-256 of the input order allow subsequent clicks in the same playlist to select an existing SQL occurrence.",
+    "Queue edits, Core reconnects, library revisions, changed input metadata, shuffle/heart mode and nonzero start positions prevent inappropriate queue reuse.",
+    "NetEase task progress notifications no longer invalidate catalog and genre indexes; actual catalog changes still do.",
+    "Privacy-safe preparation timing separates queue preparation, source resolution and native startup."
+  ],
+  "realServiceExperiment": {
+    "profile": "isolated QA profile with 13893 catalog tracks",
+    "queueEntries": 703,
+    "neteaseQuality": "auto",
+    "autoMix": "off",
+    "crossfadeSeconds": 0,
+    "gapless": false,
+    "definition": "Elapsed time until the real Core command / renderer queue adapter completes; not microphone-measured audible latency.",
+    "method": "Sequential baseline and optimized runs against the real NetEase service and native engine, using separate audio cache roots. Network and system load were not controlled.",
+    "samplesMs": [
+      { "scenario": "first click, build complete queue", "baseline": 1468, "optimized": 1535 },
+      { "scenario": "same playlist, click second track", "baseline": 733, "optimized": 1884 },
+      { "scenario": "same playlist, click first track", "baseline": 879, "optimized": 567 },
+      { "scenario": "next track after URL prefetch", "baseline": 2956, "optimized": 260 },
+      { "scenario": "previous track", "baseline": 367, "optimized": 219 },
+      { "scenario": "next during metadata enrichment", "baseline": 613, "optimized": 146 },
+      { "scenario": "second next during metadata enrichment", "baseline": 645, "optimized": 361 }
+    ],
+    "findings": [
+      "Repeated selections reach source resolution 2-3 ms after Core preparation starts, without rebuilding the complete queue.",
+      "The 2956 ms baseline next-track sample spent 2702 ms inside native playback startup.",
+      "The 1884 ms optimized repeat-click sample still spent 1144 ms in native startup, so the work does not eliminate all network-source delays.",
+      "No improvement is claimed for first uncached clicks from this experiment.",
+      "Initial baseline timing omitted the begin marker; only within-phase timing differences are usable for that baseline. Optimized begin timestamps were corrected and regression tested."
+    ],
+    "evidence": [".local/playback-baseline-adapter.json", ".local/playback-optimized.json"],
+    "temporaryCredentialsRemoved": true,
+    "normalUserProfileMutatedByTests": false
+  },
+  "checks": [
+    { "result": "passed", "tests": 220, "log": ".local/playback-focused-tests.tap", "scope": "Core playback, queue submission, renderer queue reuse, catalog, genres, protocol and NetEase library lifecycle" },
+    { "result": "passed", "tests": 123, "log": ".local/playback-provider-tests.tap", "scope": "NetEase provider, library sync and request scheduler including priority, rate budget, cancellation, fairness and clock changes" },
+    { "result": "passed", "tests": 1, "log": ".local/playback-packaged-tests.tap", "scope": "Actual optimized Windows executable first/cold startup, native audio and Core lifecycle" },
+    { "result": "passed", "scope": "Core, Node and Vue type checks, renderer budgets and git diff --check" }
+  ],
+  "build": {
+    "executable": "dist/playback-optimized/win-unpacked/TwilightEcho.exe",
+    "sha256": "34C3EF023B2EC35E2379F383E5BB7B261F665D6E672FE76CC61430204BAA5809",
+    "providerVersion": "1.2.1",
+    "providerResourcesMatchSource": true,
+    "buildLog": ".local/playback-vite-optimized.log",
+    "packageLog": ".local/playback-package.log",
+    "previousBuildRetained": true
+  }
+}

@@ -15,6 +15,7 @@ export interface CorePlayerPresentation {
 }
 
 export interface CoreSystemLyrics {
+  analysis?: import('./musicStudy.ts').StudyLyricsProjection
   state: CoreLyricsState
   content: CoreLyricsContent
 }

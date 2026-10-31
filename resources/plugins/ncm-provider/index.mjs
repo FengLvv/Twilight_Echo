@@ -1,3 +1,4 @@
+import { createRequestScheduler } from './request-scheduler.mjs'
 let contextRef = null
 let ncmApi = null
 
@@ -243,8 +244,7 @@ function resetCaches() {
   providerWriteRecordsLoaded = false
   providerWritePersistenceTail = Promise.resolve()
   // 令牌桶随会话一起重置：排队中的 acquire 取的是新桶令牌，语义不受影响。
-  requestTokenCount = REQUEST_TOKEN_BUCKET_CAPACITY
-  requestTokenRefillAt = Date.now()
+  requestScheduler.reset()
 }
 
 function runIdempotentProviderWrite(scope, args, requestContext, operation, replaySuccess) {
@@ -400,59 +400,13 @@ function throwIfRequestAborted(requestContext) {
   throw reason instanceof Error ? reason : new Error('Provider request was cancelled')
 }
 
-// 全局请求令牌桶（批量 8.6）：所有上游请求统一经 request() 出口，突发容量
-// 5、回灌速率 ~5 req/s。为批次 9 的并行化配安全带，同时降低风控触发概率。
-const REQUEST_TOKEN_BUCKET_CAPACITY = 5
-const REQUEST_TOKEN_REFILL_PER_MS = 5 / 1000
-let requestTokenCount = REQUEST_TOKEN_BUCKET_CAPACITY
-let requestTokenRefillAt = Date.now()
-let requestTokenTail = Promise.resolve()
-
-function acquireRequestToken(signal) {
-  const acquire = requestTokenTail.then(
-    () =>
-      new Promise((resolve, reject) => {
-        const attempt = () => {
-          if (signal?.aborted) {
-            reject(
-              signal.reason instanceof Error
-                ? signal.reason
-                : new Error('Provider request was cancelled')
-            )
-            return
-          }
-          const now = Date.now()
-          if (now < requestTokenRefillAt) {
-            // 系统时钟回拨（NTP 校时）：原地重置回灌基准，令牌不增不减，避免
-            // 回灌窗口永不可达导致全部请求挂死。
-            requestTokenRefillAt = now
-          } else {
-            requestTokenCount = Math.min(
-              REQUEST_TOKEN_BUCKET_CAPACITY,
-              requestTokenCount + (now - requestTokenRefillAt) * REQUEST_TOKEN_REFILL_PER_MS
-            )
-            requestTokenRefillAt = now
-          }
-          if (requestTokenCount >= 1) {
-            requestTokenCount -= 1
-            resolve()
-            return
-          }
-          setTimeout(
-            attempt,
-            Math.max(5, Math.ceil((1 - requestTokenCount) / REQUEST_TOKEN_REFILL_PER_MS))
-          )
-        }
-        attempt()
-      })
-  )
-  requestTokenTail = acquire.catch(() => undefined)
-  return acquire
-}
+const requestScheduler = createRequestScheduler()
 
 async function request(path, cookie, requestContext) {
   throwIfRequestAborted(requestContext)
-  await acquireRequestToken(requestContext?.signal)
+  const priority = /^\/song\/url(?:\/v1|\/match)?(?:\?|$)/.test(path) ? 'playback' : 'normal'
+  await requestScheduler.acquire(priority, requestContext?.signal)
+  throwIfRequestAborted(requestContext)
   const data = await ncmApi.request(shouldUsePcUa(path) ? withPcUa(path) : path, cookie, {
     signal: requestContext?.signal,
     idempotencyKey: requestContext?.idempotencyKey

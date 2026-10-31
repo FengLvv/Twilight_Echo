@@ -112,8 +112,9 @@ function voiceMotionRole(voice: LyricVoiceLayer): 'lead' | 'background' | 'harmo
         :aria-hidden="voice.role !== 'lead' && !isSupportingVoiceVisible(voice)"
         dir="auto"
       >
+        <slot v-if="voice.role === 'lead' && $slots.notation" name="notation" />
         <PlayingLyricWords
-          v-if="voice.words?.length"
+          v-else-if="voice.words?.length"
           :words="voice.words"
           :active="singing && dynamicVoiceKeys.has(voice.voiceKey)"
           :offset-seconds="offsetSeconds"

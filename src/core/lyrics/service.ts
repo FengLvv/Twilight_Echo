@@ -122,7 +122,9 @@ export class CoreLyricsService {
     }
   }
   content(): CoreLyricsContent {
-    const track = this.currentTrack.value
+    return this.contentFor(this.currentTrack.value)
+  }
+  private contentFor(track: TrackData | null): CoreLyricsContent {
     const automatic = track
       ? {
           original: track.lyrics,
@@ -137,11 +139,39 @@ export class CoreLyricsService {
     return {
       revision: this.getRevision(),
       contentRevision: this.contentRevision,
-      current: this.selection(),
+      current: track ? { trackId: track.id, occurrenceId: track.queueEntryId ?? null } : null,
       automatic,
       effective: automatic ? projectManagedLyrics(automatic, override) : null,
       override: override ? { ...override } : null,
       offsetSeconds: track ? this.management.effectiveOffsetSeconds(track.id) : 0
+    }
+  }
+  /** Resolve a background analysis source without observing it as the playing track. */
+  async forTrack(source: TrackData, signal?: AbortSignal): Promise<CoreLyricsContent> {
+    if (this.currentTrack.value?.id === source.id) {
+      await this.loader.ensureCurrentTrackLyricsLoaded(this.currentTrack.value, true)
+      return this.content()
+    }
+    if (this.stopped) throw new Error('Lyrics are shutting down')
+    const selected = { value: structuredClone(source) as TrackData | null }
+    const loader = createLyricsLoader({
+      ...this.options.sources,
+      currentTrack: selected,
+      lyricsLoadState: { value: { trackId: source.id, status: 'idle' as LyricsLoadState['status'] } },
+      getLyricsManagement: () => this.management,
+      patchTrackInQueues: () => {},
+      timers: this.options.timers
+    })
+    const abort = () => { void loader.shutdown() }
+    signal?.addEventListener('abort', abort, { once: true })
+    try {
+      signal?.throwIfAborted()
+      await loader.ensureCurrentTrackLyricsLoaded(selected.value!, true)
+      signal?.throwIfAborted()
+      return this.contentFor(selected.value)
+    } finally {
+      signal?.removeEventListener('abort', abort)
+      await loader.shutdown()
     }
   }
   observe(track: TrackData | null): void {

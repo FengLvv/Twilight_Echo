@@ -312,6 +312,7 @@ export class AudioEngineServiceBinding extends EventEmitter implements NativeAud
     await this.call('SetLoopRange', [start, end])
     return true
   }
+  SetStudyMixGains(gainsJson: string): void { this.coalescedFireAndForget('SetStudyMixGains',[gainsJson]) }
 
   SetOutputDevice(device: string): void {
     this.fireAndForget('SetOutputDevice', [device])

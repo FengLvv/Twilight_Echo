@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-31",
+  "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\phrase-score\\win-unpacked\\TwilightEcho.exe",
+  "sha256": "627651882809ea0232f655570fb2344415875df2a3b8a95cb209cbf04cd5e01c",
+  "nativeFullSong": {
+    "rows": 68,
+    "notes": 442,
+    "notesUnchanged": true,
+    "boundaryPaddingRests": 0
+  },
+  "freshModelAndIndependentLayout": {
+    "id": "20e6acdf-4f32-4e89-95ee-adbe40982b05",
+    "status": "completed",
+    "notes": 78,
+    "rows": 12,
+    "notesFileUnchanged": true,
+    "scoreOnlyRefresh": true,
+    "selectionUnchanged": true,
+    "nativeBoundaryRests": 0
+  },
+  "checks": {
+    "nodeTests": 79,
+    "pythonPhraseTests": 7,
+    "pythonWorkerTests": 6,
+    "resourceLifecycleTests": 2,
+    "typechecks": [
+      "core",
+      "node",
+      "web"
+    ],
+    "rendererBudget": true,
+    "packagedResourcesMatchSource": {
+      "worker.py": "3ea3ab06fb752d34de30528f70fc9be00a0596e92613f41c308e90c68e82d97a",
+      "vocal_pipeline.py": "27db19bfdbbd299b7088c6af1573770133d02493bc62c7752ac85ea5acd61e68",
+      "vocal_melody.py": "c19ebc47feb8575755e70ac8c3622e6ec7b46edae569a79da6de4e4a5f1a11e6",
+      "vocal_score.py": "b37fa4dfa31b020f6c44d046eef7e4247b8f738796d6a04b949e188ed27bfe4c"
+    }
+  },
+  "policy": "Current prerelease schema only; no legacy-cache reader, score migration or stage inference fallback.",
+  "numberedPreview": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\phrase-numbered-first-page.png",
+  "staffPreview": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\phrase-staff-first-page.png"
+}

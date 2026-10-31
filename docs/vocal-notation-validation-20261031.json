@@ -1,0 +1,79 @@
+{
+  "validatedAt": "2026-10-30T17:39:43.000Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\vocal-notation\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "2a461349af91db8306f788bb6729c35adc524c6db322e013821847b252af102c",
+  "changes": [
+    "Animated Analyze Song toggle, overlapping artwork/mixer fades and reduced-motion support",
+    "Opt-in vocal numbered notation next to chord display controls",
+    "Vocal notes with accidentals, octave dots and time-bound lyric row slots",
+    "Independent notation visibility and shared manual tonal reference",
+    "Six stems prepared or reused; no automatic chord or multi-vocal work for notation-only requests"
+  ],
+  "checks": {
+    "corePlaybackProtocolCacheAndNotation": 226,
+    "python": 18,
+    "nodeTypes": true,
+    "webTypes": true,
+    "packagedCompiledFilesMatch": 735,
+    "workerSourcesMatch": [
+      "worker.py",
+      "sheetsage_melody.py",
+      "sheetsage_harmony.py",
+      "harmony.py",
+      "separation.py",
+      "models.json"
+    ],
+    "dependencyClosure": 254
+  },
+  "realModels": {
+    "existingStems": {
+      "evidence": ".local/vocal-notation-dev-evidence",
+      "notes": 77,
+      "reusedSix": true,
+      "timings": {
+        "six": {
+          "elapsedMs": 70,
+          "cacheHit": true
+        },
+        "chords": {
+          "elapsedMs": 5990,
+          "cacheHit": false
+        },
+        "melody": {
+          "elapsedMs": 6882,
+          "cacheHit": false
+        }
+      }
+    },
+    "freshSong": {
+      "evidence": ".local/vocal-notation-packaged-evidence",
+      "notes": 77,
+      "readyMs": 44564,
+      "timings": {
+        "six": {
+          "elapsedMs": 2034,
+          "cacheHit": false
+        },
+        "melody": {
+          "elapsedMs": 6437,
+          "cacheHit": false
+        }
+      },
+      "noChordStage": true
+    }
+  },
+  "ui": {
+    "fixedSlots": true,
+    "tonicConversionWithoutRetranscription": true,
+    "cachedVisibility": true,
+    "pausedAudioClockAligned": true,
+    "narrowToolbarFits": true,
+    "animationEvidence": "docs/analysis-motion-validation-20261031.json"
+  },
+  "limits": [
+    "Vocal lead melody estimation can be wrong, especially with overlapping singers; no hand-labeled note-accuracy benchmark was claimed",
+    "Notes use actual audio durations; full rhythmic score engraving is outside this annotation feature",
+    "UI verification used a real 24 second audio excerpt, synthetic sidecar lyrics and paused Core queue positions; no physical audio endpoint or perceptual listening validation in this run"
+  ],
+  "deployment": "Separate artifact and isolated QA profiles; normal user profile and previous portable packages were not replaced"
+}

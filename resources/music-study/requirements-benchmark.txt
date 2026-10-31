@@ -1,0 +1,5 @@
+# Optional research dependencies; the application worker does not import these.
+mir_eval==0.8.2
+matplotlib==3.10.1
+seaborn==0.13.2
+scikit-learn==1.6.1

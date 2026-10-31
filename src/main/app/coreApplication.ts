@@ -48,6 +48,7 @@ export class CoreApplicationRuntime {
   private readonly clientId = `system:${randomUUID()}`
   private readonly options: CoreApplicationOptions
   private latest: CoreSnapshot | null = null
+  private readonly shutdownHooks: Array<() => Promise<void>> = []
   constructor(options: CoreApplicationOptions) {
     this.options = options
     options.supervisor.on('client-message', this.message)
@@ -60,6 +61,9 @@ export class CoreApplicationRuntime {
   }
   start(): Promise<void> {
     return this.options.supervisor.start()
+  }
+  addShutdownHook(callback: () => Promise<void>): void {
+    this.shutdownHooks.push(callback)
   }
   retry(): Promise<void> {
     return this.options.supervisor.retry()
@@ -110,11 +114,13 @@ export class CoreApplicationRuntime {
   async shutdown(): Promise<void> {
     await this.options.settings.flush()
     await this.options.supervisor.shutdown()
+    await Promise.all(this.shutdownHooks.map(callback => callback()))
     this.detach()
   }
   /** Only after the user explicitly chooses to quit without saving. */
   async forceShutdown(): Promise<void> {
     await this.options.supervisor.forceShutdown()
+    await Promise.all(this.shutdownHooks.map(callback => callback()))
     this.detach()
   }
   private detach(): void {

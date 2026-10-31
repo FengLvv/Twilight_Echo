@@ -7,6 +7,7 @@ import type {
   DesktopLyricsTransportAction
 } from '../../shared/desktopLyrics.ts'
 import type { ExperienceWindowOptions } from '../../shared/experienceWindow.ts'
+import type { StudyLyricDisplay, StudyLyricDisplayPatch } from '../../shared/musicStudy.ts'
 
 const enabledCallbacks = new Set<(enabled: boolean) => void>()
 const resyncCallbacks = new Set<() => void>()
@@ -73,6 +74,8 @@ export const desktopLyricsHostApi = {
 }
 
 export const desktopLyricsWindowApi = {
+  setAnalysis: (sessionId: string, patch: StudyLyricDisplayPatch): Promise<StudyLyricDisplay> =>
+    ipcRenderer.invoke('desktopLyrics:setAnalysis', sessionId, patch),
   bootstrap: (): Promise<DesktopLyricsBootstrap> => ipcRenderer.invoke('desktopLyrics:bootstrap'),
   updateQuickSettings: (
     patch: Partial<DesktopLyricsSettingsV3>

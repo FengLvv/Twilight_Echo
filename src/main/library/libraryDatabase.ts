@@ -1,4 +1,5 @@
 import type { MusicExplorationDatabaseApi } from '../../shared/musicExploration.ts'
+import { removeObsoleteNcmLibrary } from './removeObsoleteNcmLibrary.ts'
 import { LibraryDatabaseExploration, EXPLORATION_SCHEMA_SQL, EXPLORATION_SCHEMA_OBJECTS } from './libraryDatabaseExploration.ts'
 import { LibraryDatabaseIdentificationSchedule, IDENTIFICATION_SCHEDULE_SCHEMA_SQL } from './libraryDatabaseIdentificationSchedule.ts'
 import type { LibraryPlaybackQueueReference } from '../../shared/playbackSession.ts'
@@ -627,6 +628,7 @@ export class LibraryDatabase {
       // A previous owner's unacknowledged construction is never playable.
       // Recovery only marks it; bounded background maintenance releases rows.
       this.queues.recoverBuilds()
+      removeObsoleteNcmLibrary(this.sql)
     } catch (error) {
       this.sql.close()
       throw error

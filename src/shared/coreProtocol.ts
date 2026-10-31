@@ -6,6 +6,7 @@ import type { AudioRecoveryKind, AudioRecoveryState } from './audioRecovery.ts'
 import type { CorePlaylistQueries, CorePlaylistCommands } from './corePlaylists.ts'
 import type { CoreRemoteCommands, CoreRemoteQueries } from './coreRemote.ts'
 import type { CoreQueueSubmitCommand, CoreQueueInsert, CoreQueueTrackInput } from './coreQueueSubmission.ts'
+import type { StudyCommands as importMusicStudyCommands, StudyQueries as importMusicStudyQueries } from './musicStudy.ts'
 import type {
   CoreSystemPlaybackAction,
   CorePlayerPresentation,
@@ -270,6 +271,7 @@ export interface CoreSnapshot {
   bookmarksRevision: number | null
   lyricsRevision: number | null
   lyricsContentRevision: number | null
+  studyRevision?: number | null
   workspaceRevision: number | null
   workspaceContentRevision: number | null
   streams: CoreStreamsState | null
@@ -280,7 +282,7 @@ export interface CoreSnapshot {
   heart: CoreHeartState | null
 }
 
-export interface CoreCommands extends CorePlaylistCommands, CoreRemoteCommands {
+export interface CoreCommands extends CorePlaylistCommands, CoreRemoteCommands, importMusicStudyCommands {
   'ratings.set': import('./musicRatings.ts').MusicRatingsSet
   'preferences.set': import('./musicPreferences.ts').MusicPreferencesSet
   'tags.create': import('./musicTags.ts').MusicTagsCreate
@@ -496,6 +498,7 @@ export interface CoreCommands extends CorePlaylistCommands, CoreRemoteCommands {
 
 export interface CoreQueries
   extends
+    importMusicStudyQueries,
     CoreLibraryQueries,
     CorePlaylistQueries,
     CoreRemoteQueries,
@@ -775,6 +778,26 @@ const OPERATIONS: Record<
   CoreOperation,
   { kind: CoreRequest['kind']; permission: CoreClientIdentity['permissions'][number] }
 > = {
+  'study.submit': { kind: 'command', permission: 'library:write' },
+  'study.state': { kind: 'query', permission: 'playback:read' },
+  'study.song': { kind: 'query', permission: 'playback:read' },
+  'study.lyricsDisplay': { kind: 'query', permission: 'playback:read' },
+  'study.setLyricsDisplay': { kind: 'command', permission: 'library:write' },
+  'study.analyze': { kind: 'command', permission: 'library:write' },
+  'study.transcribeMelody': { kind: 'command', permission: 'library:write' },
+  'study.splitVocals': { kind: 'command', permission: 'library:write' },
+  'study.chordsVisible': { kind: 'command', permission: 'library:write' },
+  'study.project': { kind: 'query', permission: 'playback:read' },
+  'study.create': { kind: 'command', permission: 'library:write' },
+  'study.cancel': { kind: 'command', permission: 'library:write' },
+  'study.retry': { kind: 'command', permission: 'library:write' },
+  'study.delete': { kind: 'command', permission: 'library:write' },
+  'study.edit': { kind: 'command', permission: 'library:write' },
+  'study.mix': { kind: 'command', permission: 'playback:write' },
+  'study.transport': { kind: 'command', permission: 'playback:write' },
+  'study.export': { kind: 'command', permission: 'library:read' },
+  'study.choosePack': { kind: 'command', permission: 'settings:write' },
+  'study.analyzeChords': { kind: 'command', permission: 'library:write' },
   'opra.search': { kind: 'query', permission: 'settings:read' },
   'opra.profile': { kind: 'query', permission: 'settings:read' },
   'opra.status': { kind: 'query', permission: 'settings:read' },
@@ -1148,6 +1171,11 @@ export function coreOperation(value: unknown): (typeof OPERATIONS)[CoreOperation
   return typeof value === 'string' && Object.hasOwn(OPERATIONS, value)
     ? OPERATIONS[value as CoreOperation]
     : null
+}
+
+/** Agent introspection shares the exact registry used by request validation. */
+export function listCoreOperations() {
+  return Object.entries(OPERATIONS).map(([name, operation]) => ({ name, ...operation }))
 }
 
 export function isCoreRequest(value: unknown): value is CoreRequestEnvelope {

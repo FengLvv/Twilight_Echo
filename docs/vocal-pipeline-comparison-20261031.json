@@ -1,0 +1,607 @@
+{
+  "date": "2026-10-31",
+  "device": "NVIDIA RTX 5080 16GB",
+  "scope": "Supplied-lyric transcription components; no ASR, no new stem separation, no GUI/app integration, no chord analysis.",
+  "inputs": [
+    {
+      "id": "zh_qinghuaci",
+      "title": "青花瓷",
+      "language": "zh",
+      "duration": 16.0,
+      "original_start": 62.0,
+      "vocal_sha256": "5f66eb37cd0785adbff4922eaf47ecd7871729f94c980eaf2c2e3d5046df5244",
+      "mix_sha256": "070d6f081408d71d0c89800854b725ba804905bd46741dbc2efcbceb2af5497e",
+      "lyrics_sha256": "0f882f8ba84f2c6cd1c7016d23c5151321cea51263d55760332205a8df045f01",
+      "lyric_characters": 40
+    },
+    {
+      "id": "ja_myfriend",
+      "title": "My Friend - SPYAIR",
+      "language": "ja",
+      "duration": 14.0,
+      "original_start": 64.0,
+      "vocal_sha256": "08fcba682c4bffdd452a529f157d62b308e7b3a40050289c2ad5ca66b55f0d96",
+      "mix_sha256": "addab928f9cfa699ab2596e9c333286f46f31b4145f88215bc16effdf1912cb4",
+      "lyrics_sha256": "6c48fa7150f61fc00f7205e8356a490207f62f5b6cf900ce25c046ea86643a25",
+      "lyric_characters": 36
+    }
+  ],
+  "sourceRepositories": {
+    "Vocal2Midi": {
+      "commit": "f589c183ec9a4b25ea234459b8a4b72ba993af50",
+      "status": ""
+    },
+    "sheetsage-pro": {
+      "commit": "c49fa41d6823baef59c96e8f62dec2d9bb8575ae",
+      "status": ""
+    },
+    "Phonsa": {
+      "commit": "8c6abaa82a77a71738698bce745243121484654a",
+      "status": ""
+    },
+    "GAME": {
+      "commit": "69ba01ded0ddda5495e51ba373685f1be1a67ea2",
+      "status": ""
+    },
+    "TIFA": {
+      "commit": "7b210ca36ff5a2b79187fb1727af58fc977cc301",
+      "status": ""
+    },
+    "jianpu-ly": {
+      "commit": "b3c2bbb7de423b7c9956204898e6ac1a7ca50c62",
+      "status": ""
+    }
+  },
+  "environment": {
+    "torch": "2.8.0+cu128",
+    "torchaudio": "2.8.0+cu128",
+    "numpy": "1.26.4",
+    "onnxruntime-directml": "1.24.4",
+    "transformers": "4.45.2",
+    "beat-this": "1.1.0",
+    "music21": "10.5.2",
+    "jianpu-ly": "1.891"
+  },
+  "vocal2midi": {
+    "pipeline": "Vocal2Midi supplied-text subpipeline",
+    "repoCommit": "f589c183ec9a4b25ea234459b8a4b72ba993af50",
+    "asrUsed": false,
+    "tifaLoadSeconds": 2.5254503000178374,
+    "gameLoadSeconds": 1.9829436999862082,
+    "tifaProvider": "dml",
+    "gameProvider": "dml",
+    "gameModel": "GAME-1.0-medium ONNX v1.0.3",
+    "japaneseLyricMode": "romaji (upstream default)",
+    "cases": [
+      {
+        "case": "zh_qinghuaci",
+        "pass": 0,
+        "inputSeconds": 16.0,
+        "alignmentSeconds": 3.199141499993857,
+        "gameSeconds": 0.6160937999957241,
+        "processingSeconds": 3.815235299989581,
+        "notes": 43,
+        "lyricNotes": 40,
+        "continuations": 3,
+        "wordIntervals": 47,
+        "minimumOnset": 0.2199999988079071,
+        "maximumOffset": 15.999999519437551
+      },
+      {
+        "case": "ja_myfriend",
+        "pass": 0,
+        "inputSeconds": 14.0,
+        "alignmentSeconds": 0.5462448000325821,
+        "gameSeconds": 0.6309116000193171,
+        "processingSeconds": 1.1771564000518993,
+        "notes": 41,
+        "lyricNotes": 41,
+        "continuations": 0,
+        "wordIntervals": 49,
+        "minimumOnset": 0.47999998182058334,
+        "maximumOffset": 13.60999976657331
+      },
+      {
+        "case": "zh_qinghuaci",
+        "pass": 1,
+        "inputSeconds": 16.0,
+        "alignmentSeconds": 0.45551070000510663,
+        "gameSeconds": 0.2150308999698609,
+        "processingSeconds": 0.6705415999749675,
+        "notes": 43,
+        "lyricNotes": 40,
+        "continuations": 3,
+        "wordIntervals": 47,
+        "minimumOnset": 0.2199999988079071,
+        "maximumOffset": 15.999999519437551
+      },
+      {
+        "case": "ja_myfriend",
+        "pass": 1,
+        "inputSeconds": 14.0,
+        "alignmentSeconds": 0.6053247000090778,
+        "gameSeconds": 0.6663361999671906,
+        "processingSeconds": 1.2716608999762684,
+        "notes": 41,
+        "lyricNotes": 41,
+        "continuations": 0,
+        "wordIntervals": 49,
+        "minimumOnset": 0.47999998182058334,
+        "maximumOffset": 13.60999976657331
+      }
+    ]
+  },
+  "sheetsagePro": {
+    "pipeline": "SheetSage-Pro supplied-lyric transcription components",
+    "repoCommit": "c49fa41d6823baef59c96e8f62dec2d9bb8575ae",
+    "asrUsed": false,
+    "timeScope": "Per component cold subprocess wall time including imports, model loading and inference.",
+    "changesToUpstreamSource": false,
+    "clipStrategy": "single",
+    "fabricatedAlignmentFallbackAllowed": false,
+    "japaneseBackend": "Experimental in-memory registration with the public native Japanese checkpoint.",
+    "cases": [
+      {
+        "case": "zh_qinghuaci",
+        "inputSeconds": 16.0,
+        "alignmentColdSeconds": 27.547582400031388,
+        "lyricUnits": 40,
+        "phonemes": 84,
+        "variants": [
+          {
+            "model": "small",
+            "gameColdSeconds": 22.298446299973875,
+            "matchingSeconds": 0.0019225000287406147,
+            "notes": 44,
+            "num_melody_notes": 44,
+            "num_lyric_units": 40,
+            "num_matched_units": 40,
+            "num_unmatched_lyrics": 0,
+            "num_unmatched_notes": 1,
+            "coverage": 1.0,
+            "mean_confidence": 0.7415,
+            "melisma_count": 3,
+            "fallback_count": 0,
+            "lyric_continuation_count": 3,
+            "expected_continuation_count": 3,
+            "num_multi_note_lyric_units": 3,
+            "num_repeated_text_units_preserved": 9,
+            "continuation_marker": "#"
+          },
+          {
+            "model": "medium",
+            "gameColdSeconds": 8.595049100054894,
+            "matchingSeconds": 0.001574800000526011,
+            "notes": 44,
+            "num_melody_notes": 44,
+            "num_lyric_units": 40,
+            "num_matched_units": 40,
+            "num_unmatched_lyrics": 0,
+            "num_unmatched_notes": 1,
+            "coverage": 1.0,
+            "mean_confidence": 0.7428,
+            "melisma_count": 3,
+            "fallback_count": 0,
+            "lyric_continuation_count": 3,
+            "expected_continuation_count": 3,
+            "num_multi_note_lyric_units": 3,
+            "num_repeated_text_units_preserved": 9,
+            "continuation_marker": "#"
+          }
+        ],
+        "status": "complete"
+      },
+      {
+        "case": "ja_myfriend",
+        "inputSeconds": 14.0,
+        "alignmentColdSeconds": 25.176332200004254,
+        "lyricUnits": 41,
+        "phonemes": 86,
+        "variants": [
+          {
+            "model": "small",
+            "gameColdSeconds": 22.07691189995967,
+            "matchingSeconds": 0.0013535000034607947,
+            "notes": 43,
+            "num_melody_notes": 43,
+            "num_lyric_units": 41,
+            "num_matched_units": 39,
+            "num_unmatched_lyrics": 2,
+            "num_unmatched_notes": 0,
+            "coverage": 0.9512,
+            "mean_confidence": 0.7791,
+            "melisma_count": 4,
+            "fallback_count": 0,
+            "lyric_continuation_count": 4,
+            "expected_continuation_count": 4,
+            "num_multi_note_lyric_units": 4,
+            "num_repeated_text_units_preserved": 17,
+            "continuation_marker": "#"
+          },
+          {
+            "model": "medium",
+            "gameColdSeconds": 7.745818399998825,
+            "matchingSeconds": 0.001229400048032403,
+            "notes": 39,
+            "num_melody_notes": 39,
+            "num_lyric_units": 41,
+            "num_matched_units": 39,
+            "num_unmatched_lyrics": 2,
+            "num_unmatched_notes": 0,
+            "coverage": 0.9512,
+            "mean_confidence": 0.795,
+            "melisma_count": 0,
+            "fallback_count": 0,
+            "lyric_continuation_count": 0,
+            "expected_continuation_count": 0,
+            "num_multi_note_lyric_units": 0,
+            "num_repeated_text_units_preserved": 18,
+            "continuation_marker": "#"
+          }
+        ],
+        "status": "complete"
+      }
+    ]
+  },
+  "singableLyricIdentityValidation": [
+    {
+      "case": "zh_qinghuaci",
+      "singableUnits": 40,
+      "orderedLyricIdentityMatches": true,
+      "nonpitchedUnitsExcluded": []
+    },
+    {
+      "case": "ja_myfriend",
+      "singableUnits": 41,
+      "orderedLyricIdentityMatches": true,
+      "nonpitchedUnitsExcluded": [
+        "cl"
+      ]
+    }
+  ],
+  "chineseAlignerAgreement": {
+    "units": 40,
+    "medianAbsoluteOnsetDifferenceSeconds": 0.020000000000000906,
+    "maximumAbsoluteOnsetDifferenceSeconds": 0.18999999999999995,
+    "meaning": "Agreement between two estimates, not ground-truth timing accuracy."
+  },
+  "sharedBeatTracking": {
+    "checkpointSha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+    "modelLoadSeconds": 0.38255309994565323,
+    "scope": "Full source mixture beat tracking, then crop the grid to each test excerpt.",
+    "cases": [
+      {
+        "case": "zh_qinghuaci",
+        "seconds": 0.9748146000201814,
+        "tempoBpm": 107.14285714285671,
+        "beats": [
+          0.5,
+          1.0600000000000023,
+          1.6199999999999974,
+          2.180000000000007,
+          2.739999999999995,
+          3.280000000000001,
+          3.8400000000000034,
+          4.3799999999999955,
+          4.939999999999998,
+          5.5,
+          6.060000000000002,
+          6.6200000000000045,
+          7.180000000000007,
+          7.719999999999999,
+          8.280000000000001,
+          8.840000000000003,
+          9.379999999999995,
+          9.939999999999998,
+          10.5,
+          11.060000000000002,
+          11.599999999999994,
+          12.180000000000007,
+          12.719999999999999,
+          13.280000000000001,
+          13.840000000000003,
+          14.400000000000006,
+          14.939999999999998,
+          15.5
+        ],
+        "downbeats": [
+          1.0600000000000023,
+          3.280000000000001,
+          5.5,
+          7.719999999999999,
+          9.939999999999998,
+          12.180000000000007,
+          14.400000000000006
+        ]
+      },
+      {
+        "case": "ja_myfriend",
+        "seconds": 0.3411849999683909,
+        "tempoBpm": 96.77419354838861,
+        "beats": [
+          0.12000000000000455,
+          0.7399999999999949,
+          1.3400000000000034,
+          1.9599999999999937,
+          2.5799999999999983,
+          3.180000000000007,
+          3.799999999999997,
+          4.420000000000002,
+          5.019999999999996,
+          5.640000000000001,
+          6.239999999999995,
+          6.859999999999999,
+          7.480000000000004,
+          8.099999999999994,
+          8.700000000000003,
+          9.319999999999993,
+          9.920000000000002,
+          10.540000000000006,
+          11.14,
+          11.760000000000005,
+          12.379999999999995,
+          12.980000000000004,
+          13.599999999999994
+        ],
+        "downbeats": [
+          0.12000000000000455,
+          1.3400000000000034,
+          3.799999999999997,
+          5.019999999999996,
+          6.239999999999995,
+          7.480000000000004,
+          8.700000000000003,
+          9.920000000000002,
+          11.14,
+          12.379999999999995,
+          13.599999999999994
+        ]
+      }
+    ]
+  },
+  "nativeQuantizationAndRendering": [
+    {
+      "case": "zh_qinghuaci",
+      "pdf": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\zh_qinghuaci-comparison.pdf",
+      "engraving": [
+        {
+          "pipeline": "Vocal2Midi",
+          "notes": 43,
+          "displayGridBeats": 0.125,
+          "maxDisplayAdjustmentBeats": 0.06018518518522953,
+          "sharedDisplayKey": "F# major",
+          "meterScope": "4/4 engraving view using detected downbeat phase; not a ground-truth meter label."
+        },
+        {
+          "pipeline": "SheetSage-Pro",
+          "notes": 44,
+          "displayGridBeats": 0.125,
+          "maxDisplayAdjustmentBeats": 0.06212857142857331,
+          "sharedDisplayKey": "F# major",
+          "meterScope": "4/4 engraving view using detected downbeat phase; not a ground-truth meter label."
+        }
+      ],
+      "vocal2midiNativeQuantizationSeconds": 0.0007686999742873013,
+      "proNativeQuantization": {
+        "small": {
+          "status": "ok",
+          "enabled": true,
+          "grid_source": "beat_this_full_source",
+          "subdivisions_per_beat": 4,
+          "num_input_notes": 44,
+          "num_output_notes": 44,
+          "note_retention_ratio": 1.0,
+          "mean_abs_onset_shift_sec": 0.016562,
+          "median_abs_onset_shift_sec": 0.009281,
+          "max_abs_onset_shift_sec": 0.071812,
+          "mean_abs_offset_shift_sec": 0.011778,
+          "median_abs_offset_shift_sec": 0.009896,
+          "max_abs_offset_shift_sec": 0.034792,
+          "mean_onset_grid_residual_before_sec": 0.025578,
+          "mean_onset_grid_residual_after_sec": 0.009574,
+          "median_onset_grid_residual_before_sec": 0.015,
+          "median_onset_grid_residual_after_sec": 0.002021,
+          "max_onset_grid_residual_before_sec": 0.280208,
+          "max_onset_grid_residual_after_sec": 0.280208,
+          "num_collision_clipped": 24,
+          "num_notes_shifted": 39,
+          "num_notes_kept_raw": 5,
+          "num_notes_merged": 0,
+          "num_notes_removed": 0,
+          "merge_same_pitch_gap_sec": 0.0,
+          "min_note_retention_ratio": 0.85,
+          "safety_fallback_used": false,
+          "safety_fallback_reason": null,
+          "used_fallback_structure": false,
+          "warning": null
+        },
+        "medium": {
+          "status": "ok",
+          "enabled": true,
+          "grid_source": "beat_this_full_source",
+          "subdivisions_per_beat": 4,
+          "num_input_notes": 44,
+          "num_output_notes": 44,
+          "note_retention_ratio": 1.0,
+          "mean_abs_onset_shift_sec": 0.015121,
+          "median_abs_onset_shift_sec": 0.009281,
+          "max_abs_onset_shift_sec": 0.071812,
+          "mean_abs_offset_shift_sec": 0.009529,
+          "median_abs_offset_shift_sec": 0.0075,
+          "max_abs_offset_shift_sec": 0.030104,
+          "mean_onset_grid_residual_before_sec": 0.02375,
+          "mean_onset_grid_residual_after_sec": 0.009188,
+          "median_onset_grid_residual_before_sec": 0.015,
+          "median_onset_grid_residual_after_sec": 0.002234,
+          "max_onset_grid_residual_before_sec": 0.280208,
+          "max_onset_grid_residual_after_sec": 0.280208,
+          "num_collision_clipped": 28,
+          "num_notes_shifted": 41,
+          "num_notes_kept_raw": 3,
+          "num_notes_merged": 0,
+          "num_notes_removed": 0,
+          "merge_same_pitch_gap_sec": 0.0,
+          "min_note_retention_ratio": 0.85,
+          "safety_fallback_used": false,
+          "safety_fallback_reason": null,
+          "used_fallback_structure": false,
+          "warning": null
+        }
+      }
+    },
+    {
+      "case": "ja_myfriend",
+      "pdf": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\ja_myfriend-comparison.pdf",
+      "engraving": [
+        {
+          "pipeline": "Vocal2Midi",
+          "notes": 41,
+          "displayGridBeats": 0.125,
+          "maxDisplayAdjustmentBeats": 0.06048387096807417,
+          "sharedDisplayKey": "a minor",
+          "meterScope": "4/4 engraving view using detected downbeat phase; not a ground-truth meter label."
+        },
+        {
+          "pipeline": "SheetSage-Pro",
+          "notes": 43,
+          "displayGridBeats": 0.125,
+          "maxDisplayAdjustmentBeats": 0.12718387096773753,
+          "sharedDisplayKey": "a minor",
+          "meterScope": "4/4 engraving view using detected downbeat phase; not a ground-truth meter label."
+        }
+      ],
+      "vocal2midiNativeQuantizationSeconds": 0.0007464999798685312,
+      "proNativeQuantization": {
+        "small": {
+          "status": "ok",
+          "enabled": true,
+          "grid_source": "beat_this_full_source",
+          "subdivisions_per_beat": 4,
+          "num_input_notes": 43,
+          "num_output_notes": 43,
+          "note_retention_ratio": 1.0,
+          "mean_abs_onset_shift_sec": 0.016226,
+          "median_abs_onset_shift_sec": 0.011406,
+          "max_abs_onset_shift_sec": 0.071812,
+          "mean_abs_offset_shift_sec": 0.012305,
+          "median_abs_offset_shift_sec": 0.009792,
+          "max_abs_offset_shift_sec": 0.066615,
+          "mean_onset_grid_residual_before_sec": 0.020349,
+          "mean_onset_grid_residual_after_sec": 0.004346,
+          "median_onset_grid_residual_before_sec": 0.015208,
+          "median_onset_grid_residual_after_sec": 0.002552,
+          "max_onset_grid_residual_before_sec": 0.075208,
+          "max_onset_grid_residual_after_sec": 0.018802,
+          "num_collision_clipped": 30,
+          "num_notes_shifted": 43,
+          "num_notes_kept_raw": 0,
+          "num_notes_merged": 0,
+          "num_notes_removed": 0,
+          "merge_same_pitch_gap_sec": 0.0,
+          "min_note_retention_ratio": 0.85,
+          "safety_fallback_used": false,
+          "safety_fallback_reason": null,
+          "used_fallback_structure": false,
+          "warning": null
+        },
+        "medium": {
+          "status": "ok",
+          "enabled": true,
+          "grid_source": "beat_this_full_source",
+          "subdivisions_per_beat": 4,
+          "num_input_notes": 39,
+          "num_output_notes": 39,
+          "note_retention_ratio": 1.0,
+          "mean_abs_onset_shift_sec": 0.012674,
+          "median_abs_onset_shift_sec": 0.009,
+          "max_abs_onset_shift_sec": 0.056406,
+          "mean_abs_offset_shift_sec": 0.012643,
+          "median_abs_offset_shift_sec": 0.005208,
+          "max_abs_offset_shift_sec": 0.066615,
+          "mean_onset_grid_residual_before_sec": 0.016234,
+          "mean_onset_grid_residual_after_sec": 0.00356,
+          "median_onset_grid_residual_before_sec": 0.010208,
+          "median_onset_grid_residual_after_sec": 0.002448,
+          "max_onset_grid_residual_before_sec": 0.075208,
+          "max_onset_grid_residual_after_sec": 0.018802,
+          "num_collision_clipped": 24,
+          "num_notes_shifted": 38,
+          "num_notes_kept_raw": 1,
+          "num_notes_merged": 0,
+          "num_notes_removed": 0,
+          "merge_same_pitch_gap_sec": 0.0,
+          "min_note_retention_ratio": 0.85,
+          "safety_fallback_used": false,
+          "safety_fallback_reason": null,
+          "used_fallback_structure": false,
+          "warning": null
+        }
+      }
+    }
+  ],
+  "engravingValidation": [
+    {
+      "case": "zh_qinghuaci",
+      "pipeline": "vocal2midi",
+      "sourceEvents": 43,
+      "engravedMidiEvents": 43,
+      "pitchSequenceMatches": true,
+      "lyricSlotsMatchEvents": true,
+      "maxMusicXmlToEngravedMidiOnsetErrorBeats": 0.0
+    },
+    {
+      "case": "zh_qinghuaci",
+      "pipeline": "sheetsage-pro",
+      "sourceEvents": 44,
+      "engravedMidiEvents": 44,
+      "pitchSequenceMatches": true,
+      "lyricSlotsMatchEvents": true,
+      "maxMusicXmlToEngravedMidiOnsetErrorBeats": 0.0
+    },
+    {
+      "case": "ja_myfriend",
+      "pipeline": "vocal2midi",
+      "sourceEvents": 41,
+      "engravedMidiEvents": 41,
+      "pitchSequenceMatches": true,
+      "lyricSlotsMatchEvents": true,
+      "maxMusicXmlToEngravedMidiOnsetErrorBeats": 0.0
+    },
+    {
+      "case": "ja_myfriend",
+      "pipeline": "sheetsage-pro",
+      "sourceEvents": 43,
+      "engravedMidiEvents": 43,
+      "pitchSequenceMatches": true,
+      "lyricSlotsMatchEvents": true,
+      "maxMusicXmlToEngravedMidiOnsetErrorBeats": 0.0
+    }
+  ],
+  "artifacts": [
+    {
+      "case": "zh_qinghuaci",
+      "pdf": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\zh_qinghuaci-comparison.pdf",
+      "bytes": 110533,
+      "sha256": "d11bd76676da86f8e8d1980fd918fa2b0f1ff8800ac23475a2248bfe8f964bea",
+      "png": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\zh_qinghuaci-comparison.png"
+    },
+    {
+      "case": "ja_myfriend",
+      "pdf": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\ja_myfriend-comparison.pdf",
+      "bytes": 90622,
+      "sha256": "d5aedcc334c46b3e88381e636051302730cd98f1f00b3caad1634f6e5a6f7734",
+      "png": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\notation-comparison\\output\\pdf\\ja_myfriend-comparison.png"
+    }
+  ],
+  "appExecutableSha256": "2a461349af91db8306f788bb6729c35adc524c6db322e013821847b252af102c",
+  "limits": [
+    "Two short excerpts only; no manually annotated note/rhythm reference, no full-song transcription or cross-genre benchmark.",
+    "Coverage counts are attachment of given lyric units to notes, not ASR accuracy or proof of correct pitch.",
+    "Japanese units follow each G2P. The 41 vocal2midi units exclude a nonpitched cl; preserving original kanji and long-vowel spelling requires semantic mapping in app integration.",
+    "Vocal2Midi warm timings use resident ONNX models; SheetSage-Pro cold component timings include subprocess/import/model loading and cannot be compared as pure inference latency.",
+    "The Pro medium control matches model size but retains each upstream language-conditioning and inference policy; it is not a one-variable experiment.",
+    "Native Phonsa Japanese weights were explicitly configured and registered in the isolated harness because the shipped Pro registry marks ja unavailable.",
+    "Score engraving uses a common 1/32-note display grid, inferred key, and 4/4 view. Actual raw timestamps remain separate.",
+    "The existing renderer required data-format adapters for integer display BPM, split double-dotted values, lyric placeholders, and relative-major handling of minor keys. No upstream source was edited."
+  ]
+}

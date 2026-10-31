@@ -28,7 +28,9 @@ export class CoreWindowConnection implements CoreConnection {
   private connecting: Promise<CoreSnapshot> | null = null
   private disposed = false
   private activeRequests = 0
+  private activeReads = 0
   private readonly requestWaiters = new Set<{
+    kind: CoreRequestEnvelope['kind']
     grant(): void
     reject(error: Error): void
   }>()
@@ -104,7 +106,9 @@ export class CoreWindowConnection implements CoreConnection {
       throw Object.assign(new Error('Core request was cancelled'), { code: 'CANCELLED' })
     // A real album/artist page can mount more readers than Core's per-client
     // budget. Apply backpressure before dispatch, never replay a rejected command.
-    if (this.activeRequests < 12) this.activeRequests++
+    const canDispatch = () => this.activeRequests < 12 && (request.kind === 'command' || this.activeReads < 8)
+    const reserve = () => { this.activeRequests++; if (request.kind === 'query') this.activeReads++ }
+    if (canDispatch()) reserve()
     else
       await new Promise<void>((resolve, reject) => {
         const finish = () => {
@@ -112,9 +116,10 @@ export class CoreWindowConnection implements CoreConnection {
           signal?.removeEventListener('abort', abort)
         }
         const waiter = {
+          kind: request.kind,
           grant: () => {
             finish()
-            this.activeRequests++
+            reserve()
             resolve()
           },
           reject: (error: Error) => {
@@ -139,7 +144,13 @@ export class CoreWindowConnection implements CoreConnection {
     } finally {
       signal?.removeEventListener('abort', cancel)
       this.activeRequests--
-      this.requestWaiters.values().next().value?.grant()
+      if (request.kind === 'query') this.activeReads--
+      while (this.activeRequests < 12) {
+        const waiters = [...this.requestWaiters]
+        const next = waiters.find(w => w.kind === 'command') ?? (this.activeReads < 8 ? waiters[0] : undefined)
+        if (!next) break
+        next.grant()
+      }
     }
   }
   subscribe(listener: (message: CoreClientMessage) => void): () => void {

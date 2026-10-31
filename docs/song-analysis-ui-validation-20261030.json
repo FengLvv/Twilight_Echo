@@ -1,0 +1,80 @@
+{
+  "validatedAt": "2026-10-30T09:38:44.819Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\song-analysis-ui\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "80b94d4c1cad35d73c715c7d5d05c5a092465cc5c75d0c3fdc21c813963bcaef",
+  "changes": [
+    "Transparent widened mixer using existing icon and popover components",
+    "Vocals and vocal children placed first",
+    "Fixed time-based lyric chord slots with high-contrast active state; no-chord labels hidden",
+    "Warm original/mix source preparation, queue restoration and reused PCM endpoint",
+    "WASAPI shared stopped buffers reset before warm restart"
+  ],
+  "checks": {
+    "corePlaybackProtocolLyricsAndCache": 219,
+    "nodeTypes": true,
+    "webTypes": true,
+    "nativePcmAmplitudeAndSwitchGate": true,
+    "packagedCoreColdAndHeadlessPlayback": true,
+    "packagedCompiledFilesMatch": 735,
+    "dependencyClosure": 254
+  },
+  "ui": {
+    "shared": {
+      "evidence": ".local/song-analysis-polish-evidence",
+      "appearance": {
+        "background": "rgba(0, 0, 0, 0)",
+        "width": 460,
+        "first": "人声",
+        "textButtons": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "chordRowsStable": true,
+      "switches": 6,
+      "prepareMs": {
+        "min": 5.651,
+        "max": 29.393
+      },
+      "devicePauseMs": {
+        "min": 1.096,
+        "max": 3.437
+      }
+    },
+    "exclusive": {
+      "evidence": ".local/song-analysis-ui-packaged-evidence",
+      "backend": "wasapi-exclusive",
+      "vocalChildrenAndResponsiveLayout": true,
+      "sliders": {
+        "nativePlayCalls": 0,
+        "nativeGainUpdates": 1
+      },
+      "switches": 12,
+      "prepareMs": {
+        "min": 17.471,
+        "max": 56.648
+      },
+      "devicePauseMs": {
+        "min": 15.061,
+        "max": 25.234
+      }
+    }
+  },
+  "limits": [
+    "Timing is native preparation/control timing, excluding endpoint acoustic buffer latency",
+    "Different sample rates, channel layouts or DSD use full device renegotiation",
+    "Functional playback automation used zero master volume; no perceptual quality claim"
+  ],
+  "testExecution": "Physical endpoint tests were serialized after a concurrent exclusive/shared run returned WASAPI device-in-use 0x8889000a. The sequential packaged runtime run passed.",
+  "deployment": "Separate artifact; currently running song-analysis executable and normal profile were not replaced."
+}

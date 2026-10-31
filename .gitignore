@@ -1,5 +1,11 @@
 # Dependencies
 node_modules/
+resources/music-study/**/__pycache__/
+agent-harness/**/__pycache__/
+agent-harness/*.egg-info/
+agent-harness/.pytest_cache/
+agent-harness/build/
+.playwright-cli/
 .pnp/
 .pnp.*
 .pnpm-store/

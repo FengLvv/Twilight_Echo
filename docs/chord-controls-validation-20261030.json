@@ -1,0 +1,139 @@
+{
+  "validatedAt": "2026-10-30T10:34:46.091Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\chord-controls\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "e9fccd338ee93e38e4e8d225193383d7094d11f3e25bcf3b1b53471917ae976c",
+  "changes": [
+    "Always available chord button shares Analyze Song workflow",
+    "Toolbar controls do not overlap time display",
+    "Only artwork is replaced; lyric bounds remain unchanged",
+    "Chord names and Roman degrees with inferred or manual tonic",
+    "One song title and state icon per analysis progress row"
+  ],
+  "checks": {
+    "coreProtocolPlaybackCacheAndChordDegrees": 223,
+    "webTypes": true,
+    "packagedCompiledFilesMatch": 735,
+    "dependencyClosure": 254,
+    "packagedCoreColdAndHeadlessPlayback": true
+  },
+  "ui": {
+    "evidence": ".local/chord-controls-evidence",
+    "backend": "wasapi-exclusive",
+    "freshRealModelPipeline": {
+      "sixBeforeChords": true,
+      "analyzeCalls": 1,
+      "stages": {
+        "six": {
+          "elapsedMs": 2251,
+          "cacheHit": false
+        },
+        "chords": {
+          "elapsedMs": 6516,
+          "cacheHit": false
+        }
+      }
+    },
+    "lyricBoundsUnchangedAt1440And1024": true,
+    "romanDegreesWithoutReanalysis": true,
+    "compactWorkingAndDoneIcons": true,
+    "vocalChildrenReuseSix": true,
+    "childControlsFitWithoutHorizontalScrolling": true,
+    "nativeSliders": {
+      "nativePlayCalls": 0,
+      "nativeGainUpdates": 1
+    },
+    "warmSwitches": [
+      {
+        "ready": true,
+        "devicePauseMs": 20.28,
+        "totalMs": 48.329
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 14.682,
+        "totalMs": 37.219
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 22.443,
+        "totalMs": 46.339
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 25.115,
+        "totalMs": 47.885
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 21.181,
+        "totalMs": 48.093
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 15.305,
+        "totalMs": 40.86
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 20.636,
+        "totalMs": 25.587
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 19.528,
+        "totalMs": 45.013
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 18.3,
+        "totalMs": 45.037
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 21.849,
+        "totalMs": 24.241
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 19.632,
+        "totalMs": 48.712
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 18.294,
+        "totalMs": 49.894
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 19.605,
+        "totalMs": 48.096
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 16.218,
+        "totalMs": 45.756
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 23.128,
+        "totalMs": 25.254
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 14.925,
+        "totalMs": 40.419
+      },
+      {
+        "ready": true,
+        "devicePauseMs": 19.62,
+        "totalMs": 45.239
+      }
+    ]
+  },
+  "limits": [
+    "Whole-song tonic inference is heuristic; manual key selection is available for ambiguous keys and modulation",
+    "UI checks use a 24 second real audio excerpt, sidecar test lyrics and zero master volume; no perceptual listening claim",
+    "Warm-switch times exclude endpoint acoustic buffer latency"
+  ],
+  "deployment": "Separate artifact; the previous running application and normal user profile were not replaced."
+}

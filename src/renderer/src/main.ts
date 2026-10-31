@@ -18,9 +18,12 @@ const isMiniPlayer = windowKind === 'mini-player'
 const isTrayPlayer = windowKind === 'tray-player'
 const isDesktopLyrics = windowKind === 'desktop-lyrics'
 const isDynamicIsland = windowKind === 'dynamic-island'
-const isSatelliteWindow = isMiniPlayer || isTrayPlayer || isDesktopLyrics || isDynamicIsland
+const isScoreExport = windowKind === 'score-export'
+const isSatelliteWindow = isMiniPlayer || isTrayPlayer || isDesktopLyrics || isDynamicIsland || isScoreExport
 if (isSatelliteWindow) {
-  const documentClass = isMiniPlayer
+  const documentClass = isScoreExport
+    ? 'score-export-document-root'
+    : isMiniPlayer
     ? 'mini-player-document'
     : isTrayPlayer
       ? 'tray-player-document'
@@ -93,7 +96,9 @@ async function mountApp(): Promise<void> {
   }
   await import('./assets/icon-fonts')
   const startupSnapshot = isSatelliteWindow ? null : beginStartupSnapshot()
-  const rootComponent = isMiniPlayer
+  const rootComponent = isScoreExport
+    ? (await import('./score-export/ScoreExportApp.vue')).default
+    : isMiniPlayer
     ? (await import('./mini-player/MiniPlayerApp.vue')).default
     : isTrayPlayer
       ? (await import('./tray-player/TrayPlayerApp.vue')).default

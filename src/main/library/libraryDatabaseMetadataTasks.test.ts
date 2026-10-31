@@ -8,6 +8,21 @@ import { emptyMusicVersions } from '../../shared/musicVersions.ts'
 import type { CatalogEntityReference } from '../../shared/musicCatalog.ts'
 
 const MBID = 'a223958d-5c56-4b2c-a30a-87e357bc121b'
+
+test('one claim retires a bounded invalid batch without repeatedly sorting the backlog',t=>{
+  const db=new LibraryDatabase(':memory:');t.after(()=>db.close())
+  const insert=db.sql.prepare('INSERT INTO metadata_jobs VALUES(?,?,?,?,?,?,?)')
+  for(let i=0;i<150;i++){
+    const id='invalid-'+i,job={id,entityId:'missing-'+i,type:'identify',provider:'platform.ncm',language:'en',externalId:'',state:'queued',generation:0,attempts:0,nextAttemptAt:0,outcome:null,reason:null,candidate:null,updatedAt:0}
+    insert.run(id,id,job.entityId,'queued',0,'stale',JSON.stringify(job))
+  }
+  const prepare=db.sql.prepare.bind(db.sql);let selections=0
+  db.sql.prepare=((sql:string)=>{if(sql.includes('SELECT * FROM metadata_jobs j WHERE state'))selections++;return prepare(sql)}) as typeof db.sql.prepare
+  assert.equal(db.metadataClaim(1000),null)
+  assert.equal(selections,1)
+  assert.equal(db.sql.prepare("SELECT count(*) n FROM metadata_jobs WHERE state='cancelled'").get()!.n,100)
+  assert.equal(db.sql.prepare("SELECT count(*) n FROM metadata_jobs WHERE state='queued'").get()!.n,50)
+})
 function fixture(t: test.TestContext, count = 8) {
   const db = new LibraryDatabase(':memory:')
   t.after(() => db.close())

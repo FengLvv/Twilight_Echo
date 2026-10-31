@@ -1078,6 +1078,12 @@ TAE_Result TwilightAudioEngine::seek(double positionSeconds) {
   return TAE_RESULT_OK;
 }
 
+TAE_Result TwilightAudioEngine::setStudyMixGains(const std::string& gainsJson) {
+  std::lock_guard transportLock(transportMutex_);
+  std::lock_guard lock(mutex_);
+  return pipeline_ && pipeline_->setStudyMixGains(gainsJson) ? TAE_RESULT_OK : TAE_RESULT_INVALID_ARGUMENT;
+}
+
 TAE_Result TwilightAudioEngine::setVolume(double volume) {
   std::lock_guard transportLock(transportMutex_);
   const ClockWake wake(*this);
@@ -3164,6 +3170,11 @@ TAE_Result TAE_Play(TAE_EngineHandle engine, const char* source, double start_ti
   return fromHandle(engine)->play(source, start_time_seconds);
 }
 
+TAE_Result TAE_PlayWithState(TAE_EngineHandle engine, const char* source, double start_time_seconds, int initially_paused) {
+  if(!engine||!source)return TAE_RESULT_INVALID_ARGUMENT;
+  return fromHandle(engine)->play(source,start_time_seconds,initially_paused!=0);
+}
+
 TAE_Result TAE_Load(TAE_EngineHandle engine, const char* source, double start_time_seconds) {
   if (!engine || !source) return TAE_RESULT_INVALID_ARGUMENT;
   return fromHandle(engine)->play(source, start_time_seconds, true);
@@ -3187,6 +3198,11 @@ TAE_Result TAE_Stop(TAE_EngineHandle engine) {
 TAE_Result TAE_Seek(TAE_EngineHandle engine, double position_seconds) {
   if (!engine) return TAE_RESULT_NOT_INITIALIZED;
   return fromHandle(engine)->seek(position_seconds);
+}
+
+TAE_Result TAE_SetStudyMixGains(TAE_EngineHandle engine, const char* gains_json) {
+  if (!engine || !gains_json) return TAE_RESULT_INVALID_ARGUMENT;
+  return fromHandle(engine)->setStudyMixGains(gains_json);
 }
 
 TAE_Result TAE_SetVolume(TAE_EngineHandle engine, double volume) {

@@ -1,4 +1,5 @@
 import { validCoreDspPayload } from './coreDsp.ts'
+import { validStudyPayload } from './musicStudy.ts'
 import { validCommentsRequest, validCommentPublish } from './ncmComments.ts'
 import { EXPERIENCE_MUSIC_OPERATIONS } from './pluginExperience.ts'
 import { validCatalogPayload } from './musicCatalog.ts'
@@ -413,6 +414,10 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
               : 32 * 1024 * 1024
   if (!isBoundedCoreJson(payload, budget) || !record(payload)) return false
   const p = payload
+  if (name.startsWith('study.')) {
+    return validStudyPayload(name, p) && (name !== 'study.create' || !p.input ||
+      validCorePayload('queue.insert', { id: 'study', revision: 0, items: [p.input] }))
+  }
   switch (name) {
     case 'opra.search':
       return keys(p, ['query']) && typeof p.query === 'string' && p.query.length <= 256 && !p.query.includes('\0')
@@ -1845,6 +1850,7 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
           coreStateBatchByteLimit(p.domain as CoreStateDomain, p.rows.length)
       )
   }
+  return false
 }
 
 function tagPatch(value: unknown): boolean {

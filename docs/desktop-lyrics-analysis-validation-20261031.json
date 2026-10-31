@@ -1,0 +1,90 @@
+{
+  "completedAt": "2026-10-31T03:31:31.323Z",
+  "exe": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\lyrics-analysis-sync\\win-unpacked\\TwilightEcho.exe",
+  "exeSha256": "8aaf390ce32bfc97ed513f805c0ffc32f0f75f4ce9a002c80e249d72945fd440",
+  "checks": {
+    "targetedTests": 139,
+    "passed": 139,
+    "failed": 0,
+    "coreTypes": true,
+    "nodeTypes": true,
+    "webTypes": true,
+    "productionBuild": true,
+    "rendererBudgets": true,
+    "windowsPackage": true,
+    "packagedDependencyClosure": 254,
+    "packagedStudyResourceClosure": true,
+    "diffCheck": true
+  },
+  "source": {
+    "song": "青花瓷",
+    "notes": 442,
+    "scoreRows": 68,
+    "analysisReused": true,
+    "transcriptionAccuracyReevaluated": false
+  },
+  "developmentUi": {
+    "startedAt": "2026-10-31T03:28:13.805Z",
+    "sharedLayout": true,
+    "packetBytes": 36398,
+    "projectScoreRows": 68,
+    "projectedScoreRows": 5,
+    "bidirectionalVisibility": true,
+    "chordReadyMs": 113,
+    "degreesAndKeySync": true,
+    "keyChangeNoInference": true,
+    "auxiliaryLayers": true,
+    "doubleSpeedLineClock": true,
+    "vertical": true,
+    "lockedWindow": {
+      "focusable": true,
+      "visible": true,
+      "clickThroughApplied": true
+    },
+    "taskbar": true,
+    "instrumentalChords": true,
+    "staleActionsRejected": true,
+    "songSwitchReset": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T03:28:34.858Z"
+  },
+  "packagedUi": {
+    "startedAt": "2026-10-31T03:30:24.525Z",
+    "sharedLayout": true,
+    "packetBytes": 36398,
+    "projectScoreRows": 68,
+    "projectedScoreRows": 5,
+    "bidirectionalVisibility": true,
+    "chordReadyMs": 135,
+    "degreesAndKeySync": true,
+    "keyChangeNoInference": true,
+    "auxiliaryLayers": true,
+    "doubleSpeedLineClock": true,
+    "vertical": true,
+    "lockedWindow": {
+      "focusable": true,
+      "visible": true,
+      "clickThroughApplied": true
+    },
+    "taskbar": true,
+    "instrumentalChords": true,
+    "staleActionsRejected": true,
+    "songSwitchReset": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T03:30:48.456Z",
+    "shutdownErrors": []
+  },
+  "limits": [
+    "GUI playback was muted; no physical speaker listening test.",
+    "Double-speed line transition verified with a simulated host clock.",
+    "Click-through verified at Electron window policy calls, not physical cross-app mouse interactions."
+  ],
+  "designAudit": {
+    "warnings": 1,
+    "reason": "Existing karaoke progress uses gradient text."
+  },
+  "evidence": ".local/desktop-analysis-packaged-evidence",
+  "isolatedUserData": ".local/desktop-analysis-qa"
+}

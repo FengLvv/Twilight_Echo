@@ -1,6 +1,7 @@
 import { diagnosticsApi } from './diagnostics.ts'
 import { coreApi } from './domains/coreApi.ts'
 import { contextBridge, ipcRenderer } from 'electron'
+import type { AgentScoreExportData, AgentScoreExportReply } from '../shared/agentScoreExport.ts'
 import type {
   MiniPlayerBootstrap,
   MiniPlayerCommand,
@@ -265,7 +266,13 @@ function exposedApiForDocument(): { core: typeof coreApi } & (
       experienceWindow: typeof experienceWindowApi
     }
   | { dynamicIsland: typeof dynamicIslandWindowApi; data: typeof miniPlayerCoverDataApi }
+  | { diagnostics: typeof diagnosticsApi; scoreExport: { bootstrap(): Promise<AgentScoreExportData>; complete(reply: AgentScoreExportReply): Promise<void> } }
 ) {
+  if (new URLSearchParams(window.location.search).get('window') === 'score-export')
+    return { core: coreApi, diagnostics: diagnosticsApi, scoreExport: {
+      bootstrap: () => ipcRenderer.invoke('agent-score:bootstrap'),
+      complete: reply => ipcRenderer.invoke('agent-score:complete', reply)
+    } }
   if (isDesktopLyricsDocument())
     return {
       core: coreApi,

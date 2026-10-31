@@ -134,6 +134,7 @@ class TwilightAudioEngine {
   TAE_Result stop();
   TAE_Result seek(double positionSeconds);
   TAE_Result setVolume(double volume);
+  TAE_Result setStudyMixGains(const std::string& gainsJson);
   TAE_Result setPlaybackRate(double rate);
   TAE_Result setLoopRange(double startSeconds, double endSeconds);
   TAE_Result setOutputDevice(const std::string& deviceId);

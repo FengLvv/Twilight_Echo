@@ -1,4 +1,5 @@
 #include "FFmpegDecoder.h"
+#include "StudyMixInput.h"
 #include "../core/DiagnosticLog.h"
 #include "FFmpegFileInput.h"
 
@@ -778,6 +779,16 @@ bool FFmpegDecoder::open(const std::string& source, std::string* error) {
     }
   }
   if (impl_->inputFactory) std::atomic_store(&impl_->customInput, (*impl_->inputFactory)(source));
+  if (!looksHttp && extensionOf(source) == "temix") {
+    try {
+      std::atomic_store(&impl_->customInput, std::shared_ptr<SeekableInput>(std::make_shared<StudyMixInput>(source)));
+      inputFormat = av_find_input_format("wav");
+    } catch (const std::exception& exception) {
+      av_dict_free(&openOptions);
+      if (error) *error = exception.what();
+      return false;
+    }
+  }
   if (std::atomic_load(&impl_->customInput)) {
     auto* buffer = static_cast<unsigned char*>(av_malloc(32768));
     if (!buffer) { av_dict_free(&openOptions); if (error) *error = "Cannot allocate input buffer"; return false; }

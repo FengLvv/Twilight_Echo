@@ -535,3 +535,82 @@
   font-size: 0.65em;
   color: rgba(255, 255, 255, 0.85);
 }
+
+.dl-slot-shell.has-annotations .dl-line-content {
+  --lyric-score-font-size: var(--dl-size);
+  --lyric-score-font-family: var(--dl-font);
+  --te-playback-lyric-active-text: var(--dl-active);
+  max-width: none;
+}
+.dl-root.has-annotations .dl-slots.is-vertical.is-double {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dl-root.has-annotations:not(.is-vertical):not(.is-taskbar) .dl-board {
+  padding-top: 14px;
+}
+.dl-root.has-annotations.is-hovering:not(.is-vertical):not(.is-taskbar) .dl-board {
+  padding-top: 68px;
+}
+.dl-slot-shell.has-annotations .lyric-chords {
+  font-size: 0.4em;
+  margin-bottom: 0.2em;
+}
+.dl-line-content.is-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.dl-slot-shell.has-annotations .is-compact .lyric-chords {
+  width: max-content;
+  min-width: 2em;
+  font-size: 1em;
+  margin: 0;
+}
+.dl-slot-shell.has-annotations .is-chord-only .lyric-chords {
+  font-size: 1em;
+}
+.dl-slot-shell.is-vertical.has-annotations .lyric-rhythmic-score {
+  width: max-content;
+  writing-mode: horizontal-tb;
+}
+.dl-slot-shell.is-vertical.has-annotations .lyric-chords {
+  display: flex;
+  flex-direction: column;
+  writing-mode: horizontal-tb;
+  width: auto;
+  gap: 0.4em;
+  margin-inline-end: 0.4em;
+}
+.dl-toolbar .chord-display-button {
+  color: inherit;
+}
+.dl-toolbar {
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 24px);
+}
+.dl-root.is-vertical .dl-toolbar {
+  flex-wrap: nowrap;
+}
+.dl-analysis-spinning {
+  animation: dl-analysis-spin 1s linear infinite;
+}
+@keyframes dl-analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dl-action-error {
+  max-width: min(90vw, 420px);
+  color: #fff;
+  background: rgba(17, 19, 25, 0.92);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-analysis-spinning {
+    animation: none;
+  }
+}

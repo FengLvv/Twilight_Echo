@@ -879,6 +879,10 @@ interface WindowAPI {
     executeCommand: (command: string, args?: unknown[]) => Promise<unknown>
     readThemeStylesheet: (stylesheetPath: string) => Promise<string>
   }
+  scoreExport: {
+    bootstrap(): Promise<import('../shared/agentScoreExport.ts').AgentScoreExportData>
+    complete(reply: import('../shared/agentScoreExport.ts').AgentScoreExportReply): Promise<void>
+  }
   desktopLyrics: {
     setEnabled: (enabled: boolean, options?: ExperienceWindowOptions) => Promise<boolean>
     publishSession: (session: DesktopLyricsSession) => void
@@ -887,6 +891,7 @@ interface WindowAPI {
     onResyncRequested: (cb: () => void) => () => void
     onLoadFailed: (cb: (payload: { code: number; description: string }) => void) => () => void
     bootstrap: () => Promise<DesktopLyricsBootstrap>
+    setAnalysis: (sessionId: string, patch: import('../shared/musicStudy.ts').StudyLyricDisplayPatch) => Promise<import('../shared/musicStudy.ts').StudyLyricDisplay>
     updateQuickSettings: (
       patch: Partial<DesktopLyricsSettingsV3>
     ) => Promise<DesktopLyricsSettingsV3>

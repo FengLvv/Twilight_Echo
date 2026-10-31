@@ -32,6 +32,8 @@ import { normalizeCloudSongId } from './ncm/cloudTransferHelpers.ts'
 import type { CoreSettingsService } from './settings/service.ts'
 import type { CoreSleepTimer } from './playback/sleepService.ts'
 import type { CoreAutoMixService } from './audio/autoMixService.ts'
+import type { CoreMusicStudyService } from './audio/musicStudyService.ts'
+import { isRequestCancelled } from '../shared/cancellation.ts'
 import type { CoreAnalysisService } from './audio/analysisService.ts'
 import type { CoreLibraryLoudnessService } from './audio/libraryLoudnessService.ts'
 import type { CoreLibraryMaintenance } from './library/maintenanceService.ts'
@@ -86,6 +88,7 @@ interface Client {
   seen: Set<string>
 }
 export interface CoreApplicationDependencies {
+  queryContext?<T>(signal: AbortSignal, read: () => Promise<T>): Promise<T>
   comments?: Pick<import('./comments/service.ts').NativeCommentsService, 'request' | 'account' | 'publish'>
   opra?: Pick<OpraCatalog, 'search' | 'getProfile' | 'getStatus' | 'refresh'>
   playlistSources?: CorePlaylistSourceEdits
@@ -122,6 +125,7 @@ export interface CoreApplicationDependencies {
   libraryMaintenance?: CoreLibraryMaintenance
   libraryRepair?: { shutdown(): Promise<void> }
   autoMix?: CoreAutoMixService
+  musicStudy?: CoreMusicStudyService
   analysis?: CoreAnalysisService
   libraryLoudness?: CoreLibraryLoudnessService
   sleepTimer?: CoreSleepTimer
@@ -138,6 +142,7 @@ export interface CoreApplicationDependencies {
     | 'setSleepTimerGain'
     | 'applyBpm'
     | 'clearBpm'
+    | 'studySourceTrack' | 'beginStudyAudition' | 'replaceStudyAudition' | 'studyAuditionState' | 'controlStudyAudition' | 'updateStudyMixGains'
   >
   library: Pick<LibraryDatabaseApi, 'getMetadata' | 'queryTracks' | 'readLibraryQueue'> &
     CoreLibraryReadDatabase
@@ -273,6 +278,8 @@ export class CoreApplication {
     }))
   }
   snapshot(identity?: CoreClientIdentity): CoreSnapshot {
+    const lyricPlayback = this.dependencies.playback.snapshot()
+    this.dependencies.musicStudy?.bindLyrics(lyricPlayback.track?.id ?? '', lyricPlayback.queue?.occurrenceId ?? null)
     // Graph transactions advance the same catalog revision without running the
     // derived-index job, which may be paused. Publish the latest observed value.
     const catalogRevisions = [
@@ -376,6 +383,7 @@ export class CoreApplication {
         !identity || identity.permissions.includes('library:read')
           ? (this.dependencies.lyrics?.getContentRevision() ?? null)
           : null,
+      studyRevision: !identity || identity.role === 'desktop' ? this.dependencies.musicStudy?.getRevision() ?? null : null,
       statisticsRevision:
         !identity || identity.permissions.includes('statistics:read')
           ? this.dependencies.statistics.getRevision()
@@ -526,11 +534,15 @@ export class CoreApplication {
       client.seen.add(raw.requestId)
       if (client.seen.size > 1024) client.seen.delete(client.seen.values().next().value!)
       this.active++
-      const value = await this.dispatch(raw, controller.signal, client.identity)
+      const signal = controller.signal
+      const read = () => this.dispatch(raw, signal, client.identity)
+      const value = raw.kind === 'query' && this.dependencies.queryContext
+        ? await this.dependencies.queryContext(controller.signal, read)
+        : await read()
       reply({ ok: true, value })
     } catch (error) {
       const e = error as { code?: string; message?: string }
-      reply({ ok: false, error: { code: e?.code ?? 'FAILED', message: projectCoreError(error) } })
+      reply({ ok: false, error: { code: isRequestCancelled(error) ? 'CANCELLED' : e?.code ?? 'FAILED', message: projectCoreError(error) } })
     } finally {
       if (controller) {
         client.requests.delete(raw.requestId)
@@ -544,6 +556,38 @@ export class CoreApplication {
     identity: CoreClientIdentity
   ): Promise<unknown> {
     const playback = this.dependencies.playback
+    if (request.name.startsWith('study.')) {
+      if (identity.role !== 'desktop') throw failure('FORBIDDEN', '分轨工作台只对桌面窗口开放')
+      const study=this.dependencies.musicStudy
+      if (!study) throw failure('NOT_READY', '分轨工作台尚未就绪')
+      switch (request.name) {
+        case 'study.state': return study.state(request.payload)
+        case 'study.submit': return study.submit(request.payload)
+        case 'study.song': return study.song(request.payload.songId)
+        case 'study.lyricsDisplay': return study.lyricsDisplay(request.payload.songId)
+        case 'study.setLyricsDisplay': {
+          const current = playback.snapshot()
+          if (current.track?.id !== request.payload.songId) throw failure('CANCELLED', '当前歌曲已变化')
+          study.bindLyrics(current.track.id, current.queue?.occurrenceId ?? null)
+          return study.setLyricsDisplay(request.payload)
+        }
+        case 'study.analyze': return study.analyze(request.payload.songId)
+        case 'study.transcribeMelody': return study.transcribeMelody(request.payload.songId)
+        case 'study.splitVocals': return study.splitVocals(request.payload.id,request.payload.kind)
+        case 'study.chordsVisible': return study.chordsVisible(request.payload.id,request.payload.visible)
+        case 'study.project': return study.project(request.payload.id)
+        case 'study.create': return study.create(request.payload)
+        case 'study.cancel': return study.cancel(request.payload.id)
+        case 'study.retry': return study.retry(request.payload.id)
+        case 'study.delete': return study.remove(request.payload.id)
+        case 'study.edit': return study.edit(request.payload)
+        case 'study.mix': return study.setMix(request.payload)
+        case 'study.transport': return study.transport(request.payload)
+        case 'study.export': return study.export(request.payload)
+        case 'study.choosePack': return study.choosePack()
+        case 'study.analyzeChords':return study.analyzeChords(request.payload.id,request.payload.stems)
+      }
+    }
     if (
       request.name === 'liked.play' ||
       request.name === 'heart.refill' ||
@@ -806,12 +850,16 @@ export class CoreApplication {
         if (!this.dependencies.presentation)
           throw failure('NOT_READY', 'Player presentation is unavailable')
         return this.dependencies.presentation.snapshot()
-      case 'player.lyrics':
+      case 'player.lyrics': {
         if (!this.dependencies.lyrics) throw failure('NOT_READY', 'Lyrics are unavailable')
+        const content = this.dependencies.lyrics.content()
         return {
           state: this.dependencies.lyrics.state(),
-          content: this.dependencies.lyrics.content()
+          content,
+          analysis: this.dependencies.musicStudy && content.current
+            ? await this.dependencies.musicStudy.lyricsProjection(content.current.trackId) : undefined
         }
+      }
       case 'playback.diagnostics':
         if (!this.dependencies.outputInfo)
           throw failure('NOT_READY', 'Output diagnostics are unavailable')
@@ -2083,6 +2131,7 @@ export class CoreApplication {
         await this.dependencies.network?.flush()
         return this.dependencies.statistics.flush()
     }
+    throw failure('FAILED', 'Unsupported Core operation')
   }
   async shutdown(): Promise<void> {
     await this.dependencies.catalog?.shutdown()
@@ -2106,6 +2155,7 @@ export class CoreApplication {
       await this.dependencies.outputTest?.stop()
       await this.dependencies.sleepTimer?.shutdown()
       await this.dependencies.autoMix?.shutdown()
+      await this.dependencies.musicStudy?.shutdown()
       await this.dependencies.modelPack?.shutdown()
       await this.dependencies.analysis?.shutdown()
       await this.dependencies.libraryLoudness?.shutdown()

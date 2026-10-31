@@ -66,7 +66,10 @@ function fixture(t: test.TestContext) {
       }
     }),
     playback: {
-      snapshot: () => ({ queue }) as ReturnType<CorePlaybackSession['snapshot']>,
+      snapshot: () => ({ queue: queue ? {
+        id:queue.id,revision:queue.revision,index:queue.index,total:queue.total,occurrenceId:queue.selectedEntryId,
+        canUndo:queue.canUndo,undoLabel:queue.undoLabel
+      } : null }) as ReturnType<CorePlaybackSession['snapshot']>,
       edit: async (id, revision, edit) => {
         queue = (edit.kind === 'insert'
           ? db.insertCorePlaybackQueue(id, revision, edit)
@@ -92,6 +95,7 @@ function fixture(t: test.TestContext) {
           { signal }
         )
         queue = ready
+        options.onAdopt?.()
         selectedPosition = options.position ?? 0
         commits++
       }
@@ -103,6 +107,28 @@ function fixture(t: test.TestContext) {
   })
   return { db, service, batches, timers, state: () => ({ queue, commits, selectedPosition }) }
 }
+
+test('a concurrent queue replacement or edit cannot receive another submission reuse receipt', async t => {
+  for (const changed of [{id:'other',revision:1},{id:'own',revision:2}]) await t.test(JSON.stringify(changed),async()=>{
+    let reads=0
+    const own={id:'own',revision:1,total:1,index:0,occurrenceId:'entry'}
+    const service=new CoreQueueSubmission({
+      newId:()=> 'upload',schedule:()=>()=>{},resolve:async()=>[{id:'track'}],
+      playback:{
+        edit:async()=>{},
+        snapshot:()=>({queue:++reads===1 ? own : {...own,...changed}}) as ReturnType<CorePlaybackSession['snapshot']>,
+        fromPages:async(produce,options)=>{await produce(async()=>{});options?.onAdopt?.()}
+      }
+    })
+    try {
+      const start=await service.submit('window',{kind:'begin',selectedIndex:0})
+      await service.submit('window',{kind:'append',id:start.id,sequence:1,items:[provider(1)]})
+      const committed=await service.submit('window',{kind:'commit',id:start.id,sequence:2})
+      assert.equal(committed.state,'committed')
+      assert.equal(committed.queue,undefined)
+    } finally { await service.shutdown() }
+  })
+})
 
 test('mixed submissions keep bounded SQL pages, duplicate occurrence identity and canonical CUE fields', async (t) => {
   const f = fixture(t)
@@ -120,6 +146,8 @@ test('mixed submissions keep bounded SQL pages, duplicate occurrence identity an
   assert.deepEqual(f.batches, [200, 200, 200])
   const result = await f.service.submit('window', { kind: 'commit', id: start.id, sequence: 4 })
   assert.equal(result.total, 600)
+  assert.equal(result.queue?.id, f.state().queue!.id)
+  assert.equal(result.queue?.revision, f.state().queue!.revision)
   const queue = f.state().queue!
   assert.equal(queue.index, 202)
   assert.equal(f.state().selectedPosition, 9)

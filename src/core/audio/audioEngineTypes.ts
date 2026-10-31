@@ -23,11 +23,12 @@ export interface AudioEngineScheduler {
 }
 
 export interface NativeAudioBinding {
-  Play: (source: string, startTime?: number) => void
+  Play: (source: string, startTime?: number, initiallyPaused?: boolean) => void
   Pause: () => void
   Stop: () => void
   Seek: (time: number) => void
   SetVolume: (volume: number) => void
+  SetStudyMixGains?: (gainsJson: string) => void
   SetPlaybackRate: (rate: number) => void
   SetAutoMixMode?: (mode: import('../../shared/twilightAutoMix.ts').AutoMixMode) => void
   SelectAutoMix?: (requestJson: string) => string | Promise<unknown>

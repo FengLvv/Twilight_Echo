@@ -1,0 +1,205 @@
+{
+  "modelLoadSeconds": 3.088251899986062,
+  "sourceCommit": "e7b3946c940a9216a5314f9ba11a19fd70a6befb",
+  "modelRevision": "4c617b1a88c8e663351d9072c549d81d7f78a36f",
+  "device": "NVIDIA GeForce RTX 5080",
+  "torch": "2.8.0+cu128",
+  "loader": {
+    "method": "official AutoModel with public checkpoint directly",
+    "configVocabulary": 151936,
+    "weightVocabulary": 152101,
+    "loadingInfo": {
+      "missing_keys": [],
+      "unexpected_keys": [],
+      "mismatched_keys": [],
+      "error_msgs": []
+    }
+  },
+  "cases": [
+    {
+      "id": "zh_qinghuaci_vocals",
+      "source": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\study-ui-profile\\music-study\\eaf5c401-fd46-456a-a328-a624ae563873\\vocals.wav",
+      "clip": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_vocals.wav",
+      "sourceStart": 60,
+      "duration": 20.0,
+      "sampleRate": 44100,
+      "rms": 0.21730253100395203,
+      "generationSeconds": 12.670551499992143,
+      "totalSeconds": 24.55283340002643,
+      "generatedTokens": 360,
+      "hitTokenCap": false,
+      "peakAllocatedMiB": 4049.12158203125,
+      "explicitPitchTokens": 56,
+      "explicitNoteTokens": 56,
+      "explicitBpmTokens": [
+        "100"
+      ],
+      "parsedPairs": 56,
+      "wordGroups": 49,
+      "melismaGroups": 5,
+      "idealScoreSeconds": 19.0875,
+      "textGroupsExcludingRests": 42,
+      "restEvents": 7,
+      "nonRestEvents": 49,
+      "continuationEvents": 7,
+      "noteValueDistribution": {
+        "<NOTE_DOT_16>": 17,
+        "<NOTE_8>": 26,
+        "<NOTE_4>": 1,
+        "<NOTE_DOT_8>": 8,
+        "<NOTE_DOT_32>": 1,
+        "<NOTE_16>": 1,
+        "<NOTE_2>": 1,
+        "<NOTE_DOT_2>": 1
+      },
+      "artifacts": {
+        ".wav": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_vocals.wav",
+          "sha256": "d55d07e7b5c66696f611a57d7471b38785176c362742034716817e8e155025e4"
+        },
+        ".raw.txt": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_vocals.raw.txt",
+          "sha256": "f9d739eb93eb05a91148265cd3fb6f4a5b2baab0e07a15987ac57663085357b8"
+        },
+        ".parsed.json": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_vocals.parsed.json",
+          "sha256": "2163f262bcd81e6a5f1f2fd7d9ad8e3a2fadc052f517f6e40009510af152582b"
+        }
+      },
+      "observedOutcome": "structurally_parseable_with_unvalidated_notes_and_rhythm"
+    },
+    {
+      "id": "zh_qinghuaci_mix",
+      "source": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\study-ui-profile\\music-study\\eaf5c401-fd46-456a-a328-a624ae563873\\original.wav",
+      "clip": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_mix.wav",
+      "sourceStart": 60,
+      "duration": 20.0,
+      "sampleRate": 44100,
+      "rms": 0.24969302117824554,
+      "generationSeconds": 12.115593899972737,
+      "totalSeconds": 12.135050799988676,
+      "generatedTokens": 365,
+      "hitTokenCap": false,
+      "peakAllocatedMiB": 4127.322265625,
+      "explicitPitchTokens": 57,
+      "explicitNoteTokens": 57,
+      "explicitBpmTokens": [
+        "120"
+      ],
+      "parsedPairs": 57,
+      "wordGroups": 50,
+      "melismaGroups": 5,
+      "idealScoreSeconds": 18.875,
+      "textGroupsExcludingRests": 42,
+      "restEvents": 8,
+      "nonRestEvents": 49,
+      "continuationEvents": 7,
+      "noteValueDistribution": {
+        "<NOTE_DOT_16>": 8,
+        "<NOTE_8>": 27,
+        "<NOTE_DOT_8>": 13,
+        "<NOTE_4>": 5,
+        "<NOTE_16>": 2,
+        "<NOTE_2>": 1,
+        "<NOTE_1>": 1
+      },
+      "artifacts": {
+        ".wav": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_mix.wav",
+          "sha256": "66c60f47099fb4876b513669b3ac1ef8d85b6f15029212e7f91f8e3dcdf5348d"
+        },
+        ".raw.txt": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_mix.raw.txt",
+          "sha256": "6063b027f021b14bcc93dbf8e328ce6e276218d8fc1a0ae209a5fe54b4ae9ccf"
+        },
+        ".parsed.json": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\zh_qinghuaci_mix.parsed.json",
+          "sha256": "9efb1b9ecc839589b33a4a52c5b0aaebb0ed3ac05e49c968403456cb238403ae"
+        }
+      },
+      "observedOutcome": "structurally_parseable_with_unvalidated_notes_and_rhythm"
+    },
+    {
+      "id": "ja_myfriend_vocals",
+      "source": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\vocal-notation-packaged-qa\\music-study\\c14e2692-9d33-4a96-b2e2-dadab9c3a584\\vocals.wav",
+      "clip": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\ja_myfriend_vocals.wav",
+      "sourceStart": 0,
+      "duration": 20.0,
+      "sampleRate": 44100,
+      "rms": 0.17395047843456268,
+      "generationSeconds": 15.65393299999414,
+      "totalSeconds": 15.671587300021201,
+      "generatedTokens": 463,
+      "hitTokenCap": false,
+      "peakAllocatedMiB": 4125.94580078125,
+      "explicitPitchTokens": 101,
+      "explicitNoteTokens": 101,
+      "explicitBpmTokens": [
+        "89"
+      ],
+      "parsedPairs": 101,
+      "wordGroups": 9,
+      "melismaGroups": 2,
+      "idealScoreSeconds": 14.662921348314606,
+      "textGroupsExcludingRests": 5,
+      "restEvents": 4,
+      "nonRestEvents": 97,
+      "continuationEvents": 92,
+      "noteValueDistribution": {
+        "<NOTE_16>": 43,
+        "<NOTE_DOT_16>": 8,
+        "<NOTE_32>": 27,
+        "<NOTE_DOT_32>": 22,
+        "<NOTE_8>": 1
+      },
+      "artifacts": {
+        ".wav": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\ja_myfriend_vocals.wav",
+          "sha256": "a20ba2c6bd4f4e8b0cba57faf6d2b209ae43eb8d395c8ce0a75052a45931e87b"
+        },
+        ".raw.txt": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\ja_myfriend_vocals.raw.txt",
+          "sha256": "42fbd00d476ec1aefbba145b1a9d82dfaa2270c520196ca65e089b45ec45523c"
+        },
+        ".parsed.json": {
+          "path": "D:\\Tools\\TwilightEchoToolchain\\study\\research-20261031\\vocalparse-test\\ja_myfriend_vocals.parsed.json",
+          "sha256": "c52f27aa465c68b7820fe77e8a13ccd38619786f92f1fca8a0e16e42ff958046"
+        }
+      },
+      "observedOutcome": "lyric_note_association_failed_on_this_japanese_excerpt"
+    }
+  ],
+  "assessmentDate": "2026-10-31",
+  "scope": "Isolated local feasibility probe; not integrated into the player; no pitch/rhythm ground-truth benchmark.",
+  "environment": {
+    "python": "3.11.14",
+    "torch": "2.8.0+cu128",
+    "torchaudio": "2.8.0+cu128",
+    "transformers": "4.57.6",
+    "qwen-asr": "0.0.6",
+    "vocalparse": "1.0.0"
+  },
+  "referenceLyrics": {
+    "url": "https://music.163.com/api/song/lyric?id=259138&lv=-1&kv=-1&tv=-1",
+    "httpStatus": 200,
+    "apiCode": 200,
+    "spotCheckCharacters": 42,
+    "spotCheckDifferentCharacters": 4,
+    "scope": "Selected corresponding text span only; no full-track CER or note/rhythm scoring."
+  },
+  "limits": [
+    "Only three 20-second excerpts, including the same Chinese passage in two input forms.",
+    "Official symbolic durations and BPM are not physical audio timestamps.",
+    "Tempo prediction differs between Chinese isolated vocals (100 BPM) and mixture (120 BPM).",
+    "Japanese output contains only 5 non-rest text groups and 92 continuation events.",
+    "No comparison benchmark against SheetSage2 or other models.",
+    "Generation timing includes decode/parse/output; excludes model load and initial audio preprocessing.",
+    "Peak allocated VRAM is a PyTorch allocation metric, not total device/process usage."
+  ],
+  "existingAppUnchanged": {
+    "torch": "2.8.0+cu128",
+    "transformers": "4.45.2",
+    "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\vocal-notation\\win-unpacked\\TwilightEcho.exe",
+    "sha256": "2a461349af91db8306f788bb6729c35adc524c6db322e013821847b252af102c"
+  }
+}

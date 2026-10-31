@@ -1,0 +1,31 @@
+{
+  "validatedAt": "2026-10-30T13:16:14.760Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\analysis-toggle\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "87a2d6db3f9c2b617646ccafd1c99c85c36f0d77a3d247a25dfc947fde9c5ad5",
+  "changes": [
+    "Analyze Song is a pressed-state button; second click returns to original and artwork",
+    "Removed redundant Return to Artwork action",
+    "Pending preparation and native mix acknowledgements cannot reactivate a closed view"
+  ],
+  "checks": {
+    "webTypes": true,
+    "playingMusicRegression": 29,
+    "packagedCompiledFilesMatch": 735,
+    "dependencyClosure": 254,
+    "packagedVisualAndKeyboardToggle": true,
+    "isolatedVueLifecycle": {
+      "success": true,
+      "basicToggle": true,
+      "cancelDuringPreparation": true,
+      "stalePreparationFenced": true,
+      "cancelDuringMixAcknowledgement": true,
+      "reentryAfterCancellation": true,
+      "scope": "real Vue composable with isolated Core stub; no physical audio"
+    }
+  },
+  "limits": [
+    "No physical WASAPI endpoint was enumerated. UI and isolated lifecycle checks only; audio round trip not verified in this run.",
+    "Audio opening returned 0x80070490; Core enumerated no concrete WASAPI endpoint, only the automatic placeholder and ASIO drivers. No normal profile or device settings were changed."
+  ],
+  "evidence": ".local/analysis-toggle-packaged-evidence"
+}

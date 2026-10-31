@@ -1,0 +1,70 @@
+{
+  "completedAt": "2026-10-31T05:21:33.207Z",
+  "exe": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\staff-key-signature\\win-unpacked\\TwilightEcho.exe",
+  "sha256": "ee0b2cc659b7b1fe4a1018e1cb373a711a4e9a247f70054d4129b371ab0ef64a",
+  "checks": {
+    "targetedTests": 175,
+    "passed": 175,
+    "failed": 0,
+    "vueTypes": true,
+    "productionBuild": true,
+    "rendererBudget": true,
+    "packagedDependencies": 255
+  },
+  "automaticKeyScope": "Whole-song major/minor estimate; no segmented modulation or other mode classification added.",
+  "accidentalRules": [
+    "Key signature is the default.",
+    "Temporary changes have per-bar and per-octave scope.",
+    "Tied continuations preserve pitch without repeating accidentals."
+  ],
+  "ui": {
+    "startedAt": "2026-10-31T05:20:27.327Z",
+    "sharedLayout": true,
+    "packetBytes": 36424,
+    "projectScoreRows": 68,
+    "projectedScoreRows": 5,
+    "bidirectionalVisibility": true,
+    "chordReadyMs": 135,
+    "degreesAndKeySync": true,
+    "keyChangeNoInference": true,
+    "scoreFonts": {
+      "digits": [
+        "Inter"
+      ],
+      "accidental": [
+        "Segoe UI Symbol"
+      ]
+    },
+    "staffLayoutMs": 815,
+    "staffSync": true,
+    "automaticKey": {
+      "tonic": 1,
+      "mode": "major",
+      "manualFInlineAccidentals": 3,
+      "automaticInlineAccidentals": 0
+    },
+    "staffClock": true,
+    "staffFits": true,
+    "staffVertical": true,
+    "staffTaskbar": true,
+    "staffKeyWithoutInference": true,
+    "staffSwitchWithoutInference": true,
+    "auxiliaryLayers": true,
+    "doubleSpeedLineClock": true,
+    "vertical": true,
+    "lockedWindow": {
+      "focusable": true,
+      "visible": true,
+      "clickThroughApplied": true
+    },
+    "taskbar": true,
+    "instrumentalChords": true,
+    "staleActionsRejected": true,
+    "songSwitchReset": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T05:21:00.264Z",
+    "shutdownErrors": []
+  },
+  "evidence": ".local/staff-key-evidence"
+}

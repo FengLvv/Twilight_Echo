@@ -1,0 +1,136 @@
+{
+  "completedAt": "2026-10-31T04:15:17.421Z",
+  "exe": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\score-display\\win-unpacked\\TwilightEcho.exe",
+  "exeSha256": "3f830bb29d2fbe67d25c83db0ca4bb1b8451a6498e106034c343184d28fd0953",
+  "typography": {
+    "digitsAndChordLetters": "Inter",
+    "accidentals": "Segoe UI Symbol with DejaVu Sans fallback",
+    "digitSizeUnchangedByAccidentals": true
+  },
+  "staffRenderer": {
+    "name": "abcjs",
+    "version": "6.7.2",
+    "entry": "abcjs/src/api/abc_tunebook_svg.js",
+    "lazyVisibleRows": true,
+    "modelInferenceOnModeOrKeyChanges": false,
+    "meterGrouping": "Existing four-quarter grouping; meter recognition not added"
+  },
+  "checks": {
+    "targetedTests": 172,
+    "passed": 172,
+    "failed": 0,
+    "coreTypes": true,
+    "nodeTypes": true,
+    "webTypes": true,
+    "productionBuild": true,
+    "rendererBudgets": true,
+    "packagedDependencyClosure": 255,
+    "packagedStudyResourceClosure": true,
+    "diffCheck": true
+  },
+  "developmentUi": {
+    "startedAt": "2026-10-31T04:08:33.410Z",
+    "sharedLayout": true,
+    "packetBytes": 36424,
+    "projectScoreRows": 68,
+    "projectedScoreRows": 5,
+    "bidirectionalVisibility": true,
+    "chordReadyMs": 217,
+    "degreesAndKeySync": true,
+    "keyChangeNoInference": true,
+    "scoreFonts": {
+      "digits": [
+        "Inter"
+      ],
+      "accidental": [
+        "Segoe UI Symbol"
+      ]
+    },
+    "staffLayoutMs": 994,
+    "staffSync": true,
+    "staffClock": true,
+    "staffFits": true,
+    "staffVertical": true,
+    "staffTaskbar": true,
+    "staffKeyWithoutInference": true,
+    "staffSwitchWithoutInference": true,
+    "auxiliaryLayers": true,
+    "doubleSpeedLineClock": true,
+    "vertical": true,
+    "lockedWindow": {
+      "focusable": true,
+      "visible": true,
+      "clickThroughApplied": true
+    },
+    "taskbar": true,
+    "instrumentalChords": true,
+    "staleActionsRejected": true,
+    "songSwitchReset": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T04:09:03.075Z",
+    "shutdownErrors": [
+      "Core is not ready"
+    ]
+  },
+  "packagedUi": {
+    "startedAt": "2026-10-31T04:14:02.734Z",
+    "sharedLayout": true,
+    "packetBytes": 36424,
+    "projectScoreRows": 68,
+    "projectedScoreRows": 5,
+    "bidirectionalVisibility": true,
+    "chordReadyMs": 247,
+    "degreesAndKeySync": true,
+    "keyChangeNoInference": true,
+    "scoreFonts": {
+      "digits": [
+        "Inter"
+      ],
+      "accidental": [
+        "Segoe UI Symbol"
+      ]
+    },
+    "staffLayoutMs": 383,
+    "staffSync": true,
+    "staffClock": true,
+    "staffFits": true,
+    "staffVertical": true,
+    "staffTaskbar": true,
+    "staffKeyWithoutInference": true,
+    "staffSwitchWithoutInference": true,
+    "auxiliaryLayers": true,
+    "doubleSpeedLineClock": true,
+    "vertical": true,
+    "lockedWindow": {
+      "focusable": true,
+      "visible": true,
+      "clickThroughApplied": true
+    },
+    "taskbar": true,
+    "instrumentalChords": true,
+    "staleActionsRejected": true,
+    "songSwitchReset": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T04:14:32.731Z",
+    "shutdownErrors": []
+  },
+  "designAudit": {
+    "findings": 3,
+    "disposition": "Retain incumbent Inter to match project UI and unify Latin text and numbers."
+  },
+  "source": {
+    "song": "青花瓷",
+    "notes": 442,
+    "rows": 68,
+    "reusedAnalysis": true,
+    "accuracyReevaluated": false
+  },
+  "limits": [
+    "No physical speaker listening test; QA playback was muted.",
+    "Vertical windows retain standard horizontal staff geometry.",
+    "Double-speed line clock also exercised with a simulated host clock."
+  ],
+  "evidence": ".local/score-display-packaged-evidence"
+}

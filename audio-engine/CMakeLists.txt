@@ -18,6 +18,13 @@ endif()
 
 if(TAE_BUILD_TESTS)
   enable_testing()
+  add_executable(twilight_study_mix_tests tests/study_mix_tests.cpp)
+  add_test(NAME twilight_study_mix_unit COMMAND twilight_study_mix_tests)
+  if(MSVC)
+    target_compile_options(twilight_study_mix_tests PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(twilight_study_mix_tests PRIVATE -UNDEBUG)
+  endif()
 endif()
 
 set(TAE_DEFAULT_PCM_PROVIDER "legacy" CACHE STRING

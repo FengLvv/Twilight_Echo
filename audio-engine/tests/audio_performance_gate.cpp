@@ -1316,6 +1316,58 @@ void writeScenarioJson(std::ostream& out, const ScenarioReport& report, bool tra
   out << '\n';
 }
 
+void verifyStudyLiveMix() {
+  const auto root=std::filesystem::temp_directory_path()/"twilight-study-live-gate";
+  std::filesystem::create_directories(root);
+  const auto writeFloat=[&](const char* name,float value){
+    std::ofstream out(root/name,std::ios::binary|std::ios::trunc);
+    const unsigned frames=44100*6,bytes=frames*8;
+    out.write("RIFF",4);writeLe32(out,36+bytes);out.write("WAVEfmt ",8);writeLe32(out,16);
+    writeLe16(out,3);writeLe16(out,2);writeLe32(out,44100);writeLe32(out,44100*8);writeLe16(out,8);writeLe16(out,32);
+    out.write("data",4);writeLe32(out,bytes);for(unsigned i=0;i<frames*2;++i)out.write(reinterpret_cast<const char*>(&value),4);
+  };
+  writeFloat("bass.wav",.2f);writeFloat("vocals.wav",.1f);writeFloat("original.wav",.4f);
+  const auto manifest=root/"mix.temix";
+  {std::ofstream file(manifest);file<<"TEMIX1\n44100 264600 2\n1\n"<<(root/"bass.wav").string()<<"\n0\n"<<(root/"vocals.wav").string()<<"\n";}
+  g_pcmSharedFormat=true;
+  AudioPipeline pipeline;QueueItem item;item.id="study";item.source=manifest.string();item.durationSeconds=6;
+  std::string error;
+  assert(pipeline.play(item,std::nullopt,0,"controlled-pump","controlled",1,"{\"dspEnabled\":false,\"gapless\":false}",false,&error)==TAE_RESULT_OK);
+  const auto backend=latestBackend();assert(backend&&backend->render);
+  std::vector<float> samples(kCallbackFrames*2);
+  const auto pump=[&](){for(int i=0;i<12;++i){backend->render(samples.data(),kCallbackFrames);std::this_thread::sleep_for(std::chrono::milliseconds(1));}};
+  pump();for(float sample:samples)assert(std::abs(sample-.2f)<.0001f);
+  const auto before=pipeline.status();
+  assert(pipeline.setStudyMixGains("{\"bass\":0,\"vocals\":1}"));
+  pump();for(float sample:samples)assert(std::abs(sample-.1f)<.0001f);
+  assert(latestBackend()==backend&&pipeline.status().positionSeconds>before.positionSeconds);
+  assert(pipeline.setStudyMixGains("{\"bass\":0,\"vocals\":0}"));
+  pump();for(float sample:samples)assert(std::abs(sample)<.0001f);
+  assert(!pipeline.setStudyMixGains("{\"bass\":-1,\"vocals\":1}"));
+  assert(pipeline.seek(2.123,&error)==TAE_RESULT_OK);
+  assert(pipeline.setStudyMixGains("{\"bass\":1,\"vocals\":1}"));
+  pump();for(float sample:samples)assert(std::abs(sample-.3f)<.0001f);
+  assert(!pipeline.status().outputPerfect);
+  QueueItem original=item;original.id="original";original.source=(root/"original.wav").string();
+  for(int pass=0;pass<3;++pass){
+    const double position=pipeline.status().positionSeconds;
+    const auto switchedAt=std::chrono::steady_clock::now();
+    assert(pipeline.play(original,std::nullopt,position,"controlled-pump","controlled",1,"{\"dspEnabled\":false,\"gapless\":false}",false,&error)==TAE_RESULT_OK);
+    assert(latestBackend()==backend);
+    pump();for(float sample:samples)assert(std::abs(sample-.4f)<.0001f);
+    assert(pipeline.status().positionSeconds>=position);
+    assert(pipeline.play(item,std::nullopt,pipeline.status().positionSeconds,"controlled-pump","controlled",1,"{\"dspEnabled\":false,\"gapless\":false}",false,&error)==TAE_RESULT_OK);
+    assert(latestBackend()==backend);
+    pump();for(float sample:samples)assert(std::abs(sample-.2f)<.0001f);
+    std::cout<<"study round trip ms: "<<std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-switchedAt).count()<<"\n";
+  }
+  assert(pipeline.play(original,std::nullopt,2,"controlled-pump","controlled",1,"{\"dspEnabled\":false,\"gapless\":false}",false,&error,true)==TAE_RESULT_OK);
+  assert(latestBackend()==backend&&pipeline.status().state==PipelineState::Paused);
+  assert(std::abs(pipeline.status().positionSeconds-2)<.001);
+  pipeline.stop();g_pcmSharedFormat=false;
+  std::cout<<"STUDY_LIVE_MIX_OK: live gains, aligned seeks, warm original/mix switches, pause and stable device\n";
+}
+
 }  // namespace
 
 namespace twilight::audio {
@@ -1353,6 +1405,7 @@ int main(int argc, char** argv) {
 #else
   ScopedPerformanceTestThreadPriority performanceTestThreadPriority;
   ScopedControlledBackendFactory controlledBackendFactory;
+  if(argc==2&&std::string(argv[1])=="--verify-study-mix"){verifyStudyLiveMix();return 0;}
   if (argc == 2 && std::string(argv[1]) == "--verify-flac-tail")
     return verifyFlacTailContinuation();
   if (argc == 2 && std::string(argv[1]) == "--verify-automix-transport") {

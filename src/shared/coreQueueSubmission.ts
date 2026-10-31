@@ -1,5 +1,6 @@
 import type { CueRange } from './cue.ts'
 import type { TrackData } from './track.ts'
+import type { CoreQueueReference } from './coreProtocol.ts'
 
 /** Display hints are not source authority. Core looks up local/network/stream
  * identities and resolves provider URLs itself. Each array position is a new occurrence. */
@@ -33,6 +34,8 @@ export interface CoreQueueSubmitReply {
   state: 'building' | 'committed' | 'aborted'
   sequence: number
   total: number
+  /** Confirmed SQL queue after commit; never a preview or a playback URL. */
+  queue?: CoreQueueReference
 }
 export interface CoreQueueInsert {
   id: string

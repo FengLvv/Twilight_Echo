@@ -236,6 +236,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
     () => runtime.appSettings.shortcutEnabled.closeWindow !== false
   )
   runtime.mainWindow.on('ready-to-show', () => {
+    if (process.argv.includes('--agent-headless')) return
     if (windowState?.maximized) runtime.mainWindow?.maximize()
     runtime.mainWindow?.show()
   })

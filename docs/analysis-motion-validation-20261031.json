@@ -1,0 +1,50 @@
+{
+  "validatedAt": "2026-10-30T17:16:26.178Z",
+  "artifact": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\analysis-motion\\win-unpacked\\TwilightEcho.exe",
+  "executableSha256": "151042fdebaac246642659a688e1faf535fbe52fc962c35de992e5fab6ed8330",
+  "compiledFiles": 735,
+  "checks": {
+    "webTypes": true,
+    "playingMusicRegression": 29,
+    "packagedAnimation": true
+  },
+  "motion": {
+    "enter": [
+      {
+        "property": "opacity",
+        "duration": 280
+      },
+      {
+        "property": "translate",
+        "duration": 280
+      }
+    ],
+    "exit": [
+      {
+        "property": "opacity",
+        "duration": 220
+      },
+      {
+        "property": "translate",
+        "duration": 220
+      }
+    ],
+    "reduced": [
+      {
+        "property": "opacity",
+        "duration": 120
+      }
+    ],
+    "off": [],
+    "systemReduced": [
+      {
+        "property": "opacity",
+        "duration": 120
+      }
+    ]
+  },
+  "interruptedToggleClean": true,
+  "lyricsUnchanged": true,
+  "evidence": ".local/analysis-motion-packaged-evidence",
+  "limit": "Animation and UI validation only; no physical playback endpoint was available."
+}

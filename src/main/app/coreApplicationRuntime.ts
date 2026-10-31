@@ -15,6 +15,9 @@ import { THEME_WORKSHOP_ID } from '../../shared/themeWorkshop.ts'
 import { TWILIGHT_AUTOMIX_AVAILABLE } from '../../shared/twilightAutoMix.ts'
 import { CoreApplicationRuntime, installCoreApplication } from './coreApplication.ts'
 import { getCoreAfterglowMode } from './coreAfterglowRuntime.ts'
+import { startAgentBridge } from '../agent/bridge.ts'
+import agentManifest from '../../../resources/agent-cli/commands.json'
+import { createAgentActions } from '../agent/actions.ts'
 
 /** Explicit cutover composition. Does not create any legacy music service owner. */
 export function createCoreApplication(): CoreApplicationRuntime {
@@ -82,6 +85,17 @@ export function createCoreApplication(): CoreApplicationRuntime {
     system
   })
   installCoreApplication(application)
+  const agentActions = createAgentActions(root, application)
+  const agent = startAgentBridge({
+    profile: root,
+    version: app.getVersion(),
+    executable: process.execPath,
+    manifest: agentManifest,
+    custom: agentActions.custom,
+    snapshot: () => application.snapshot(),
+    request: (name, payload) => application.request(name as never, payload as never)
+  }).catch(error => { console.error('[agent.bridge]', error); return null })
+  application.addShutdownHook(async () => { await agentActions.stop(); await (await agent)?.stop() })
   supervisor.on('settings', () => getCoreAfterglowMode()?.reassertShortcuts())
   let retryPromptOpen = false
   supervisor.on('status', (status) => {

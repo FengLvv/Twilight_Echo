@@ -33,6 +33,72 @@ import { CoreSleepTimer } from './sleepService.ts'
 import { createPlaybackSourceRecovery } from './sourceRecovery.ts'
 import { createLogicalTrackModel } from '../../shared/logicalTrackModel.ts'
 
+test('song mix shares ordinary transport and clock, preserves identity and returns at the latest position',async t=>{
+  const observed:Array<{id:string|undefined;source:string;position:number;state:string}>=[]
+  const f=await fixture(t,undefined,undefined,(track,info)=>observed.push({id:track?.id,source:info.source,position:info.position,state:info.state}))
+  await f.session.fromQuery({ids:['a','b'],sort:'playlist'},'a')
+  await f.session.seek(12)
+  const before=f.session.snapshot(), queue=before.queue
+  const nativeBefore=f.engine.info.source
+  await f.session.beginStudyAudition('/study/mix.temix')
+  assert.deepEqual(f.session.snapshot().queue,queue)
+  assert.equal(f.session.snapshot().track?.id,'a')
+  assert.equal(f.session.snapshot().playback?.state,'playing')
+  assert.equal(f.session.snapshot().playback?.position,12)
+  await f.session.controlStudyAudition({action:'seek',position:4})
+  assert.equal((await f.session.studyAuditionState())?.position,4)
+  await f.session.replaceStudyAudition('/study/changed.temix')
+  assert.equal(f.engine.info.position,4)
+  f.engine.nativeLoop=true
+  await f.session.controlStudyAudition({action:'loop',position:2,end:6})
+  assert.deepEqual((await f.session.studyAuditionState())?.loop,{start:2,end:6})
+  await f.session.setVolume(.3)
+  await tick();await tick()
+  assert.equal(observed.some(sample=>sample.id==='a'&&sample.source.includes('/study/')),true)
+  const stopsBeforeReturn=f.engine.calls.filter(call=>call==='stop').length
+  await f.session.controlStudyAudition({action:'exit'})
+  assert.equal(f.engine.calls.filter(call=>call==='stop').length,stopsBeforeReturn,'returning to original keeps playback alive until the replacement is ready')
+  assert.deepEqual(f.session.snapshot().queue,queue)
+  assert.equal(f.session.snapshot().playback?.position,4)
+  assert.equal(f.session.snapshot().playback?.state,'playing')
+  assert.equal(f.engine.info.source,nativeBefore)
+})
+test('ordinary song selection revokes study audition and an old exit cannot restore over that selection',async t=>{
+  const f=await fixture(t)
+  await f.session.fromQuery({ids:['a','b'],sort:'playlist'},'a')
+  await f.session.beginStudyAudition('/study/mix.temix')
+  await f.session.fromQuery({ids:['b'],sort:'playlist'},'b')
+  await f.session.controlStudyAudition({action:'exit'})
+  assert.equal(await f.session.studyAuditionState(),null)
+  assert.equal(f.session.snapshot().track?.id,'b')
+})
+test('Stop during stem playback stops the same queue without restarting original audio', async t => {
+  const f = await fixture(t)
+  await f.session.fromQuery({ids:['a','b'],sort:'playlist'},'a')
+  await f.session.beginStudyAudition('/study/mix.temix')
+  const plays = f.engine.calls.filter(call => call === 'play').length
+  await f.session.stop()
+  assert.equal(await f.session.studyAuditionState(), null)
+  assert.equal(f.session.snapshot().playback?.state, 'stopped')
+  assert.equal(f.session.snapshot().track?.id, 'a')
+  assert.equal(f.engine.calls.filter(call => call === 'play').length, plays)
+  await f.session.controlStudyAudition({action:'exit'})
+  assert.equal(f.session.snapshot().playback?.state, 'stopped')
+})
+test('stem EOF advances the ordinary queue and stale song bindings cannot replace the successor', async t => {
+  const f = await fixture(t)
+  await f.session.fromQuery({ids:['a','b'],sort:'playlist'},'a')
+  const occurrence = f.session.snapshot().queue?.occurrenceId ?? undefined
+  await f.session.beginStudyAudition('/study/mix.temix', {songId:'a',occurrenceId:occurrence})
+  f.engine.info={...f.engine.info,state:'stopped',position:60,duration:60}
+  f.engine.emit('playback-info',f.engine.info)
+  for(let i=0;i<8;i++)await tick()
+  assert.equal(f.session.snapshot().track?.id,'b')
+  assert.equal(await f.session.studyAuditionState(),null)
+  await assert.rejects(f.session.beginStudyAudition('/study/late.temix',{songId:'a',occurrenceId:occurrence}),{code:'CANCELLED'})
+  assert.equal(f.session.snapshot().track?.id,'b')
+})
+
 test('Focus paged source owner receives one adoption receipt before native acknowledgement and none on preparation failure', async t => {
   const f = await fixture(t)
   let adopted = 0
@@ -937,6 +1003,21 @@ test('Cast AB seeks in Core without native transport and mute keeps the local pr
   await f.fire({ state: 'playing', position: 4, duration: 60 })
   assert.equal(f.session.snapshot().playback?.position, 2)
   assert.deepEqual(f.engine.calls, native)
+})
+
+test('a superseded liked read keeps cancellation identity even if the provider loses its error code',async t=>{
+  const provider=heartProvider(),original=provider.call
+  let enter!:()=>void
+  const entered=new Promise<void>(resolve=>{enter=resolve})
+  provider.call=async(method,args,signal)=>{
+    if(method!=='fetchUserLibrary')return original(method,args,signal)
+    enter()
+    return new Promise((_,reject)=>signal!.addEventListener('abort',()=>reject(new Error('Playback intent superseded')),{once:true}))
+  }
+  const f=await heartFixture(t,provider)
+  const pending=f.session.startLiked({selectedId:'ncm:1'})
+  const cancelled=assert.rejects(pending,{code:'CANCELLED'})
+  await entered;await f.session.stop();await cancelled
 })
 
 test('Core builds the authenticated liked queue in bounded pages, uses the provider cursor and selects an identity on a later page', async (t) => {
@@ -2174,7 +2255,7 @@ class Engine extends EventEmitter implements CorePlaybackEngine {
     this.items = items
     this.token += ':load'
     this.info.queueIndex = startIndex
-    this.info.source = items[startIndex].source
+    this.info.source = items[startIndex]?.source ?? ''
     if (this.failLoad) throw new Error('Reply lost after native LoadQueue')
   }
   async rebindQueue(request: NativeQueueRebind) {
@@ -2513,7 +2594,7 @@ async function fixture(
   extra?: Partial<
     Pick<
       CorePlaybackSessionOptions,
-      'sleepTimer' | 'setNativeSleepGain' | 'naturalBoundary' | 'schedule' | 'automaticPlaybackAllowed'
+      'sleepTimer' | 'setNativeSleepGain' | 'naturalBoundary' | 'schedule' | 'automaticPlaybackAllowed' | 'preparationTiming'
     >
   >
 ) {
@@ -2618,6 +2699,21 @@ async function fixture(
     }
   }
 }
+
+test('preparation timing stays bounded and private, and observer failure cannot stop audio',async t=>{
+  const f=await fixture(t),events:Array<{phase:string;elapsedMs:number}>=[]
+  const measured=f.create({preparationTiming:event=>{events.push(event);throw new Error('diagnostic sink failed')}})
+  await measured.initialize()
+  try {
+    await measured.fromQuery({ids:['a','b'],sort:'playlist'},'a')
+    assert.equal(measured.snapshot().playback?.state,'playing')
+    assert.equal(events[0]?.phase,'begin')
+    assert.equal(events[0]?.elapsedMs,0)
+    assert.ok(events.some(e=>e.phase==='native-ready'))
+    assert.ok(events.every(e=>e.elapsedMs>=0&&e.elapsedMs<10000))
+    assert.equal(JSON.stringify(events).includes('disc.flac'),false)
+  } finally { await measured.shutdown() }
+})
 
 test('catalog sources enter the existing durable queue and native resolution with exact CUE identity and fresh occurrences', async t => {
   const resolved: TrackData[] = []

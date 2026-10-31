@@ -1,4 +1,20 @@
 import type { MotionPreference } from './motion.ts'
+import type { StudyChord, StudyLyricDisplay, StudyResult } from './musicStudy.ts'
+import type { ChordKey } from './lyrics/chordDegrees.ts'
+
+export interface RhythmicLyricScore {
+  svg: string
+  text: string
+  notes: NonNullable<StudyResult['melody']>['notes']
+}
+export interface DesktopLyricsAnalysis {
+  display: StudyLyricDisplay
+  key: ChordKey | null
+  inferred: ChordKey | null
+  melodyBusy: boolean
+  chordsBusy: boolean
+  error?: string
+}
 
 export const DESKTOP_LYRICS_SETTINGS_VERSION = 3
 export const DESKTOP_LYRICS_MAX_CONTENT_BYTES = 1024 * 1024
@@ -20,6 +36,8 @@ export interface DesktopLyricsWord {
 }
 
 export interface DesktopLyricsLine {
+  score?: RhythmicLyricScore
+  chords?: StudyChord[]
   id: string
   startMs: number | null
   endMs: number | null
@@ -30,6 +48,7 @@ export interface DesktopLyricsLine {
 }
 
 export interface DesktopLyricsSession {
+  analysis?: DesktopLyricsAnalysis
   schemaVersion: 1
   sessionId: string
   contentRevision: number

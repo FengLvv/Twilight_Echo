@@ -62,17 +62,17 @@ export function createCorePlayerAudio(core: CorePlayerClient, failed: (error: un
     core.state.value?.settingsRevision == null
       ? ''
       : `${core.state.value.epoch}:${core.state.value.audioRevision}:${core.state.value.settingsRevision}`
-  const output = createCorePlayerResource(key, () => core.query('audio.output', {}), failed)
-  const dsp = createCorePlayerResource(key, () => core.query('audio.dsp', {}), failed)
-  const dspStatus = createCorePlayerResource(key, () => core.query('audio.dsp.status', {}), failed)
+  const output = createCorePlayerResource(key, (signal) => core.query('audio.output', {}, signal), failed)
+  const dsp = createCorePlayerResource(key, (signal) => core.query('audio.dsp', {}, signal), failed)
+  const dspStatus = createCorePlayerResource(key, (signal) => core.query('audio.dsp.status', {}, signal), failed)
   const diagnostics = createCorePlayerResource(
     () => {
       const state = core.state.value
       return state?.phase === 'ready'
-        ? `${state.epoch}:${state.audioRevision}:${state.playback?.position}:${state.playback?.state}`
+        ? `${state.epoch}:${state.audioRevision}:${state.playback?.state}`
         : ''
     },
-    () => core.query('playback.diagnostics', {}),
+    (signal) => core.query('playback.diagnostics', {}, signal),
     failed
   )
   const audioProcessing = computed(() => dsp.value.value?.processing ?? emptyProcessing)

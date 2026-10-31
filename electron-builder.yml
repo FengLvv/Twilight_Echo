@@ -19,6 +19,7 @@ files:
   - package.json
   - THIRD-PARTY-NOTICES.txt
   - '!out/renderer/audio-engine/**'
+  - '!out/renderer/music-study/**'
   - '!out/renderer/plugins/**'
   - '!out/renderer/plugin-index/**'
   # Keep packaged Inter/Jakarta + MiSans subsets; strip legacy TTF/OTF/WOFF.
@@ -31,6 +32,25 @@ files:
   - '!node_modules/**/*.md'
   - '!node_modules/@neteasecloudmusicapienhanced/api/public/**'
 extraResources:
+  - from: resources/music-study
+    to: music-study
+    filter:
+      - worker.py
+      - harmony.py
+      - separation.py
+      - btc_harmony.py
+      - sheetsage_harmony.py
+      - vocal_melody.py
+      - vocal_pipeline.py
+      - vocal_score.py
+      - vocal_models.json
+      - models.json
+      - vendor/**
+      - '!vendor/**/__pycache__/**'
+      - btc/**
+      - '!btc/**/__pycache__/**'
+      - THIRD_PARTY.md
+      - licenses/**
   - from: resources/automix-stems
     to: automix-stems
     filter:

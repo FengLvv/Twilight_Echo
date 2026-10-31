@@ -72,6 +72,8 @@ TAE_API TAE_Result TAE_SetPaused(TAE_EngineHandle engine, int paused);
 TAE_API TAE_Result TAE_Stop(TAE_EngineHandle engine);
 TAE_API TAE_Result TAE_Seek(TAE_EngineHandle engine, double position_seconds);
 TAE_API TAE_Result TAE_SetVolume(TAE_EngineHandle engine, double volume);
+TAE_API TAE_Result TAE_SetStudyMixGains(TAE_EngineHandle engine, const char* gains_json);
+TAE_API TAE_Result TAE_PlayWithState(TAE_EngineHandle engine, const char* source, double start_time_seconds, int initially_paused);
 TAE_API TAE_Result TAE_SetPlaybackRate(TAE_EngineHandle engine, double rate);
 /**
  * Sample-timed A-B loop on the active track.

@@ -1,6 +1,7 @@
 import '../../adapters-node/index.ts'
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
+import { writeDiagnostic } from '../diagnostics/logger.ts'
 import {
   coreOperation,
   isCoreRequest,
@@ -420,12 +421,15 @@ export class CoreSupervisor extends EventEmitter {
       })
     return new Promise((resolve, reject) => {
       const child = this.child!
+      const startedAt = performance.now()
+      writeDiagnostic('core.request', 'start', { operation: request.name, kind: request.kind })
       const finish = () => {
+        writeDiagnostic('core.request', 'finish', { operation: request.name, kind: request.kind, durationMs: performance.now() - startedAt })
         clearTimeout(timer)
-        signal?.removeEventListener('abort', cancel)
+        signal?.removeEventListener('abort', aborted)
         this.pending.delete(request.requestId)
       }
-      const cancel = () => {
+      const cancel = (timedOut = false) => {
         finish()
         if (this.child === child)
           child.postMessage({
@@ -437,15 +441,17 @@ export class CoreSupervisor extends EventEmitter {
         reject(
           Object.assign(
             new Error(
-              request.kind === 'command'
-                ? 'Core request cancelled; command outcome may be unknown'
-                : 'Core query cancelled'
+              timedOut
+                ? request.kind === 'command' ? 'Core command timed out; outcome may be unknown' : 'Core query timed out'
+                : request.kind === 'command' ? 'Core request cancelled; command outcome may be unknown' : 'Core query cancelled'
             ),
-            { code: request.kind === 'command' ? 'OUTCOME_UNKNOWN' : 'CANCELLED' }
+            { code: request.kind === 'command' ? 'OUTCOME_UNKNOWN' : timedOut ? 'FAILED' : 'CANCELLED' }
           )
         )
       }
-      const timer = setTimeout(cancel, this.options.requestTimeoutMs ?? 30_000)
+      const aborted = () => cancel()
+      const timer = setTimeout(() => cancel(true), this.options.requestTimeoutMs ??
+        (['study.choosePack', 'study.export', 'study.create'].includes(request.name) ? 200_000 : 30_000))
       this.pending.set(request.requestId, {
         epoch: request.epoch,
         command: request.kind === 'command',
@@ -454,7 +460,7 @@ export class CoreSupervisor extends EventEmitter {
         reject,
         dispose: finish
       })
-      signal?.addEventListener('abort', cancel, { once: true })
+      signal?.addEventListener('abort', aborted, { once: true })
       try {
         child.postMessage({ kind: 'core:request', clientId, request })
       } catch (error) {

@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import AppBackgroundLayer from './AppBackgroundLayer.vue'
+import { useSongAnalysis } from '../composables/useSongAnalysis.ts'
+import LyricChords from './LyricChords.vue'
+import LyricNumberedNotes from './LyricNumberedNotes.vue'
+import LyricRhythmicScore from './LyricRhythmicScore.vue'
+import { rhythmicLyricScore } from '../../../shared/lyrics/lyricAnalysis.ts'
+import { activeVocalNote, buildLyricNoteRows } from '../utils/numberedNotes.ts'
+import ChordTimeline from './ChordTimeline.vue'
+import ChordDisplayControl from './ChordDisplayControl.vue'
+import { useChordDisplay } from '../composables/useChordDisplay.ts'
+import { buildLyricChordRows, activeChord } from '../utils/lyricChords.ts'
 import {
   computed,
   defineAsyncComponent,
@@ -101,9 +111,31 @@ const lyricWordClock = {
 }
 const { visualizerActive } = storeToRefs(visualizationStore)
 const { seek } = playbackStore
+const analysis=useSongAnalysis(()=>currentTrack.value?.id??'')
+const chordDisplay=useChordDisplay(()=>analysis.project.value,()=>currentTrack.value?.id??'')
+const SongAnalysisPanel=defineAsyncComponent(()=>import('./SongAnalysisPanel.vue'))
+const chordPosition=ref(0)
+let chordFrame:number|undefined
+function updateChordClock(){chordPosition.value=estimatePlaybackClockPosition();if((analysis.chordsVisible.value||analysis.melodyVisible.value)&&isPlaying.value)chordFrame=requestAnimationFrame(updateChordClock)}
+watch([analysis.chordsVisible,analysis.melodyVisible,isPlaying,playbackClockSnapshot],()=>{if(chordFrame!==undefined)cancelAnimationFrame(chordFrame);chordFrame=undefined;updateChordClock()},{immediate:true})
+onBeforeUnmount(()=>{if(chordFrame!==undefined)cancelAnimationFrame(chordFrame)})
+const lyricChordRows = computed(() => buildLyricChordRows(analysis.project.value?.result?.chords.segments ?? [], lyricTimeline.value, currentLyricOffsetSeconds.value))
+function lineChords(index:number){return lyricChordRows.value[index]?.chords ?? []}
+const interludeChord=computed(()=>activeChord(analysis.project.value?.result?.chords.segments??[],chordPosition.value))
+const lyricNoteRows = computed(() => buildLyricNoteRows(analysis.project.value?.result?.melody?.notes ?? [], lyricTimeline.value, currentLyricOffsetSeconds.value))
+const currentVocalNote = computed(() => activeVocalNote(analysis.project.value?.result?.melody?.notes ?? [], chordPosition.value))
+const vocalScores = computed(() => {
+  const melody = analysis.project.value?.result?.melody
+  return new Map(melody?.scores?.map(score => [score.lineId, rhythmicLyricScore(melody, score.lineId, score.text)]))
+})
+const lineScore = (index: number, text: string) => {
+  const score = vocalScores.value.get(index)
+  return analysis.melodyVisible.value && score?.text === text ? score : undefined
+}
 const { settings } = useSettingsStore()
 const lyricsManagement = useLyricsManagement()
 const { pushNotice } = useAppNoticeStore()
+watch(analysis.melodyError, message => { if (message && analysis.melodyEnabled.value) pushNotice({ kind: 'error', message }) })
 watch(
   () => currentTrack.value?.id,
   async () => {
@@ -511,6 +543,7 @@ const currentLyricOffsetSeconds = computed(() =>
 )
 
 const hasLyrics = computed(() => lyricLines.value.length > 0)
+const hasTimedLyrics = computed(() => lyricTimeline.value.some(line => line.timed))
 const lyricsStillLoading = computed(
   () =>
     !hasLyrics.value &&
@@ -527,7 +560,7 @@ const lyricsPendingLabel = computed(() =>
   lyricsStillLoading.value ? '加载歌词…' : lyricsLoadFailed.value ? '歌词加载失败' : '暂无歌词'
 )
 const reserveLyricsColumn = computed(
-  () => hasLyrics.value || lyricsStillLoading.value || lyricsLoadFailed.value
+  () => hasLyrics.value || lyricsStillLoading.value || lyricsLoadFailed.value || analysis.chordsReady.value
 )
 const activeLyricIndex = ref(-1)
 const highlightedLyricIndex = ref(-1)
@@ -906,8 +939,33 @@ onBeforeUnmount(() => {
         <i :class="viewMode === 'cover' ? 'pi pi-chart-bar' : 'pi pi-times'"></i>
       </button>
 
-      <div v-if="currentTrack && viewMode === 'cover'" class="playback-time">
-        <PlayingMusicTimeChip />
+      <button
+        v-if="currentTrack && viewMode === 'cover'"
+        type="button"
+        class="visualizer-toggle-button song-analysis-trigger"
+        aria-label="分析歌曲"
+        :disabled="analysis.leaving.value"
+        :aria-pressed="analysis.open.value"
+        :aria-expanded="analysis.open.value"
+        :aria-busy="analysis.starting.value"
+        :title="analysis.starting.value ? '正在分析歌曲' : analysis.open.value ? '关闭歌曲分析' : '分析歌曲'"
+        @click="analysis.toggle"
+      >
+        <span class="analysis-button-icon" aria-hidden="true">
+          <Transition name="analysis-icon" :css="lyricMotionLevel !== 'off'">
+            <i
+              :key="analysis.starting.value ? 'busy' : analysis.open.value ? 'active' : 'idle'"
+              :class="analysis.starting.value ? 'pi pi-spin pi-spinner' : 'pi pi-sitemap'"
+            />
+          </Transition>
+        </span>
+      </button>
+
+      <div v-if="currentTrack && viewMode === 'cover'" class="playback-tools">
+        <button type="button" class="ghost-button chords-toggle" :aria-expanded="analysis.open.value" :aria-busy="analysis.chordsBusy.value" :disabled="analysis.chordsBusy.value || analysis.leaving.value" :title="analysis.chordsBusy.value ? '正在识别和弦' : '分析歌曲并显示和弦'" @click="analysis.analyze"><i v-if="analysis.chordsBusy.value" class="pi pi-spin pi-spinner" aria-hidden="true"/>和弦</button>
+        <ChordDisplayControl :mode="chordDisplay.mode.value" :selected-key="chordDisplay.override.value" :inferred="chordDisplay.inferred.value" :notation-visible="analysis.melodyEnabled.value" :notation-mode="chordDisplay.notationMode.value" @notation-mode="chordDisplay.setNotationMode" @mode="chordDisplay.setMode" @key="chordDisplay.setKey"/>
+        <button type="button" class="ghost-button chords-toggle melody-toggle" :aria-label="chordDisplay.notationMode.value === 'staff' ? '人声五线谱' : '人声简谱'" :aria-pressed="analysis.melodyEnabled.value" :aria-busy="analysis.melodyEnabled.value && analysis.melodyBusy.value" :title="analysis.melodyError.value || (analysis.melodyEnabled.value && analysis.melodyBusy.value ? '正在识别人声乐谱' : chordDisplay.notationMode.value === 'staff' ? '人声五线谱' : '人声简谱')" @click="analysis.toggleMelody"><i v-if="analysis.melodyEnabled.value && analysis.melodyBusy.value" class="pi pi-spin pi-spinner" aria-hidden="true"/><i v-else-if="analysis.melodyError.value" class="pi pi-exclamation-circle" aria-hidden="true"/>{{ chordDisplay.notationMode.value === 'staff' ? '五线谱' : '简谱' }}</button>
+        <div class="playback-time"><PlayingMusicTimeChip /></div>
       </div>
 
       <Transition
@@ -924,18 +982,23 @@ onBeforeUnmount(() => {
           <div v-if="currentTrack" :key="`stage:${coverIdentity}`" class="stage">
             <main
               class="layout"
-              :class="{ 'layout--single': !reserveLyricsColumn }"
+              :class="{ 'layout--single': !reserveLyricsColumn, 'layout--analysis': analysis.open.value }"
               :style="layoutStyle"
             >
               <section class="cover-column">
-                <div class="cover-frame" :style="coverStyle">
-                  <CoverImg
-                    :cover="currentTrack.cover"
-                    :cover-source="currentTrack.coverSource"
-                    :identity="currentTrack.id"
-                    class="cover-image"
-                    alt="cover"
-                  />
+                <div class="cover-frame" :class="{'cover-frame--analysis':analysis.open.value}" :style="coverStyle">
+                  <Transition name="analysis-view" :css="lyricMotionLevel !== 'off'">
+                    <SongAnalysisPanel key="analysis" v-if="analysis.open.value" :project="analysis.project.value" :mode="analysis.mode.value" :tracks="analysis.tracks.value" :error="analysis.error.value" :position="chordPosition" @change="analysis.changeMix" @family="analysis.family" @split="analysis.split" @environment="analysis.store.core.command('study.choosePack',{}).then(()=>analysis.analyze()).catch(e=>analysis.error.value=String(e))"/>
+                    <CoverImg
+                      v-else
+                      key="artwork"
+                      :cover="currentTrack.cover"
+                      :cover-source="currentTrack.coverSource"
+                      :identity="currentTrack.id"
+                      class="cover-image"
+                      alt="cover"
+                    />
+                  </Transition>
                 </div>
 
                 <div
@@ -983,12 +1046,12 @@ onBeforeUnmount(() => {
                 @wheel.prevent
                 @touchmove.prevent
                 :class="{
-                  'lyrics-column--pending': !hasLyrics,
+                  'lyrics-column--pending': !hasLyrics && !analysis.chordsReady.value,
                   'lyrics-column--karaoke-disabled': !lyricsAppearance.karaokeEnabled
                 }"
                 :style="lyricStyle"
               >
-                <div class="lyrics-head" aria-hidden="true" />
+                <div class="lyrics-head"><LyricChords v-if="hasLyrics&&!hasTimedLyrics&&analysis.chordsVisible.value&&interludeChord" :chords="[interludeChord]" :position="chordPosition" :format-label="chordDisplay.label"/><LyricNumberedNotes v-if="(!hasLyrics||!hasTimedLyrics)&&analysis.melodyVisible.value&&currentVocalNote" :notes="[currentVocalNote]" :position="chordPosition" :tonal-key="chordDisplay.key.value"/></div>
 
                 <div
                   ref="lyricsEl"
@@ -999,16 +1062,17 @@ onBeforeUnmount(() => {
                   @touchend.passive="onLyricsTouchEnd"
                   @touchcancel.passive="onLyricsTouchEnd"
                 >
-                  <div v-if="!hasLyrics" class="lyrics-pending" aria-live="polite">
+                  <div v-if="!hasLyrics&&!analysis.chordsVisible.value&&!analysis.melodyVisible.value" class="lyrics-pending" aria-live="polite">
                     {{ lyricsPendingLabel }}
                   </div>
+                  <ChordTimeline v-if="!hasLyrics&&analysis.chordsVisible.value" :chords="analysis.project.value?.result?.chords.segments??[]" :position="chordPosition" :format-label="chordDisplay.label" @seek="seek"/>
                   <div
                     v-if="hasLyrics && lyricInterludeDotsTop != null"
                     class="lyric-interlude-dots"
                     :style="{ '--lyric-interlude-top': `${lyricInterludeDotsTop}px` }"
                     aria-hidden="true"
                   >
-                    <span></span><span></span><span></span>
+                    <b v-if="analysis.chordsVisible.value&&interludeChord" class="interlude-chord">{{chordDisplay.label(interludeChord.label)}}</b><span></span><span></span><span></span>
                   </div>
                   <div v-if="hasLyrics" class="lyrics-list">
                     <!-- The keyed stage may remount with identical lyric content. -->
@@ -1016,6 +1080,14 @@ onBeforeUnmount(() => {
                       v-for="item in renderedLyricLines"
                       :key="lyricRowKey(item)"
                       v-memo="[
+                        analysis.chordsVisible.value,
+                        analysis.melodyVisible.value,
+                        currentVocalNote?.start,
+                        chordDisplay.mode.value,
+                        chordDisplay.override.value,
+                        chordDisplay.key.value,
+                        analysis.project.value?.revision,
+                        interludeChord?.start,
                         coverIdentity,
                         item.index === highlightedLyricIndex,
                         item.singing,
@@ -1051,6 +1123,8 @@ onBeforeUnmount(() => {
                       @pointerdown.stop
                       @click="jumpToLyric(item.line.time)"
                     >
+                      <LyricChords v-if="analysis.chordsVisible.value" :key="`chords:${coverIdentity}:${item.index}`" :chords="lineChords(item.index)" :position="chordPosition" :start="lyricChordRows[item.index]?.start" :end="lyricChordRows[item.index]?.end" :format-label="chordDisplay.label"/>
+                      <LyricNumberedNotes v-if="analysis.melodyVisible.value && !lineScore(item.index, item.line.text)" :notes="lyricNoteRows[item.index]?.notes ?? []" :position="chordPosition" :start="lyricNoteRows[item.index]?.start" :end="lyricNoteRows[item.index]?.end" :tonal-key="chordDisplay.key.value"/>
                       <PlayingLyricLine
                         :line="item.line"
                         :singing="item.singing && viewMode === 'cover' && displayedView === 'cover'"
@@ -1062,7 +1136,11 @@ onBeforeUnmount(() => {
                         :translation-style="lyricTranslationStyle"
                         :romanization-style="lyricRomanizationStyle"
                         :harmony-style="lyricHarmonyStyle"
-                      />
+                      >
+                        <template v-if="lineScore(item.index, item.line.text)" #notation>
+                          <LyricRhythmicScore :svg="lineScore(item.index, item.line.text)!.svg" :text="item.line.text" :notes="lineScore(item.index, item.line.text)!.notes" :position="chordPosition" :tonal-key="chordDisplay.key.value" :notation-mode="chordDisplay.notationMode.value" />
+                        </template>
+                      </PlayingLyricLine>
                     </button>
                   </div>
                 </div>
@@ -1145,6 +1223,85 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.cover-frame--analysis{overflow:visible!important;background:none!important;border-radius:20px!important;box-shadow:none!important}.cover-frame--analysis:before,.cover-frame--analysis:after{display:none!important}.lyrics-head{display:flex;justify-content:flex-end;align-items:center;min-height:30px}.chords-toggle{border:1px solid currentColor;border-radius:16px;padding:4px 12px;background:transparent;color:inherit;opacity:.65;font:inherit;font-size:12px;cursor:pointer}.chords-toggle[aria-pressed=true]{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}.chords-toggle:focus-visible{outline:2px solid var(--accent-color);outline-offset:3px}.interlude-chord{font-size:20px;color:inherit;margin-right:12px}.chord-only-list{height:100%;overflow:auto;display:flex;flex-direction:column;gap:24px;padding:30vh 10px;box-sizing:border-box}.chord-only-list button{font:inherit;font-size:32px;background:none;border:0;color:inherit;opacity:.35;cursor:pointer}.chord-only-list button[aria-current=true]{opacity:1;color:var(--accent-color)}
+.visualizer-toggle-button.song-analysis-trigger {
+  left: 94px;
+}
+.visualizer-toggle-button.song-analysis-trigger[aria-pressed='true'] {
+  color: var(--te-playback-track-title, #fff);
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.song-analysis-trigger:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.song-analysis-trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.analysis-button-icon {
+  position: relative;
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+.analysis-button-icon > i {
+  position: absolute;
+  inset: 0;
+}
+.analysis-icon-enter-active,
+.analysis-icon-leave-active {
+  transition:
+    opacity var(--te-motion-hover, 160ms) ease,
+    scale var(--te-motion-hover, 160ms) var(--te-ease-soft, ease);
+}
+.analysis-icon-enter-from,
+.analysis-icon-leave-to {
+  opacity: 0;
+  scale: 0.65;
+}
+.analysis-view-enter-active,
+.analysis-view-leave-active {
+  transition:
+    opacity var(--te-motion-panel, 280ms) var(--te-ease-soft, ease),
+    translate var(--te-motion-panel, 280ms) var(--te-ease-soft, ease);
+  will-change: opacity, translate;
+}
+.analysis-view-leave-active {
+  transition-duration: var(--te-motion-return, 220ms);
+  pointer-events: none;
+}
+.analysis-view-enter-from,
+.analysis-view-leave-to {
+  opacity: 0;
+  translate: 0 6px;
+}
+.cover-frame:has(.analysis-view-leave-active) {
+  overflow: visible !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:global(html[data-te-motion='reduced'] .playing-music .analysis-view-enter-active),
+:global(html[data-te-motion='reduced'] .playing-music .analysis-view-leave-active),
+:global(html[data-te-motion='reduced'] .playing-music .analysis-icon-enter-active),
+:global(html[data-te-motion='reduced'] .playing-music .analysis-icon-leave-active) {
+  transition-property: opacity !important;
+  transition-duration: 120ms !important;
+  translate: none !important;
+  scale: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .analysis-view-enter-active,
+  .analysis-view-leave-active,
+  .analysis-icon-enter-active,
+  .analysis-icon-leave-active {
+    transition-property: opacity;
+    transition-duration: 120ms;
+    translate: none;
+    scale: 1;
+  }
+}
 .cover-metadata-link {
   padding: 0;
   border: 0;
@@ -1570,6 +1727,7 @@ html[data-te-motion='off'] .backdrop-fluid::before {
 }
 
 .cover-frame {
+  position: relative;
   width: min(
     var(--te-playback-cover-size, var(--te-playback-cover-scale, 100%)),
     max(120px, calc(100vh - 100px - var(--te-font-size-body, 14px) * 180 / 14))
@@ -1804,11 +1962,34 @@ html[data-te-motion='off'] .backdrop-fluid::before {
   min-width: 0;
 }
 
-.playback-time {
+.playback-tools {
   position: absolute;
   top: calc(var(--te-titlebar-inset, 40px) + 16px);
   right: 42px;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 120px);
+}
+.playback-tools .playback-time {
+  position: static;
+  flex: none;
+}
+.playback-tools .chords-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  flex: none;
+  font-size: calc(var(--te-font-size-body, 14px) * 12 / 14);
+  white-space: nowrap;
+  color: var(--te-playback-control-text, rgba(255,255,255,.7));
+}
+.playback-tools .chords-toggle:disabled {
+  cursor: progress;
+  opacity: .7;
 }
 
 .time-chip {
@@ -2271,7 +2452,7 @@ html[data-te-motion='off'] .backdrop-fluid::before {
     padding: 98px 16px 16px;
   }
 
-  .playback-time {
+  .playback-tools {
     right: 16px;
   }
 

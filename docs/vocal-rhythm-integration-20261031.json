@@ -1,0 +1,180 @@
+{
+  "completedAt": "2026-10-31T02:21:19.995945+00:00",
+  "pipeline": "Vocal2Midi TiFA + GAME medium ONNX, supplied lyrics, Beat This!, music21/jianpu-ly/LilyPond",
+  "exe": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\vocal-rhythm\\win-unpacked\\TwilightEcho.exe",
+  "exeSha256": "d549fafbb753bb24a8d1af6894cf00cb745fe5aa084770257e5d8a10be11658c",
+  "modelHome": "D:/Tools/TwilightEchoToolchain/study",
+  "asrUsed": false,
+  "freshPackagedWholeSong": {
+    "startedAt": "2026-10-31T02:10:34.666Z",
+    "readyMs": 139737,
+    "notes": 442,
+    "scores": 68,
+    "timings": {
+      "six": {
+        "elapsedMs": 8919,
+        "cacheHit": false
+      },
+      "melody": {
+        "elapsedMs": 86871,
+        "cacheHit": false
+      }
+    },
+    "keyWithoutInference": true,
+    "cachedToggle": true,
+    "clockAligned": true,
+    "narrowFits": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T02:13:06.716Z"
+  },
+  "finalPackagedCachedUi": {
+    "startedAt": "2026-10-31T02:18:18.813Z",
+    "readyMs": 1331,
+    "notes": 442,
+    "scores": 68,
+    "timings": {
+      "six": {
+        "elapsedMs": 8919,
+        "cacheHit": false
+      },
+      "melody": {
+        "elapsedMs": 86871,
+        "cacheHit": false
+      }
+    },
+    "keyWithoutInference": true,
+    "cachedToggle": true,
+    "clockAligned": true,
+    "narrowFits": true,
+    "errors": [],
+    "success": true,
+    "completedAt": "2026-10-31T02:18:33.420Z"
+  },
+  "artifacts": {
+    "notes": 442,
+    "rows": 68,
+    "scores": 68,
+    "allOriginalTextPreserved": true,
+    "allNotesMappedInSvg": true,
+    "midiPitchParity": true,
+    "maxMidiTimeErrorSeconds": 0.0005013573467778087,
+    "project": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\vocal-rhythm-packaged-qa\\music-study\\a6844086-8ffa-4c79-b490-0e97d6223976"
+  },
+  "realClips": [
+    {
+      "case": "zh_qinghuaci",
+      "seconds": 31.066887699998915,
+      "notes": 43,
+      "scores": 6,
+      "tempo": 107.14285714285722,
+      "key": {
+        "tonic": 6,
+        "mode": "major"
+      },
+      "originalWords": [
+        "釉",
+        "色",
+        "渲",
+        "染",
+        "仕",
+        "女",
+        "图",
+        "韵",
+        "味",
+        "被",
+        "私",
+        "藏",
+        "而",
+        "你",
+        "嫣",
+        "然",
+        "的",
+        "一",
+        "笑",
+        "如",
+        "含",
+        "苞",
+        "待",
+        "放",
+        "你",
+        "的",
+        "美",
+        "一",
+        "缕",
+        "飘",
+        "散",
+        "去",
+        "到",
+        "我",
+        "去",
+        "不",
+        "了",
+        "的",
+        "地",
+        "方"
+      ]
+    },
+    {
+      "case": "ja_myfriend",
+      "seconds": 30.22040469996864,
+      "notes": 41,
+      "scores": 3,
+      "tempo": 96.77419354838722,
+      "key": {
+        "tonic": 9,
+        "mode": "minor"
+      },
+      "originalWords": [
+        "く",
+        "だ",
+        "ら",
+        "な",
+        "い",
+        "事",
+        "が",
+        "よかっ",
+        "た",
+        "現実",
+        "は",
+        "苦しい",
+        "夢",
+        "ばかり",
+        "追え",
+        "ない",
+        "早く",
+        "大人",
+        "に",
+        "なろう",
+        "と",
+        "し",
+        "た"
+      ]
+    }
+  ],
+  "checks": {
+    "coreTests": 18,
+    "pythonTests": 20,
+    "packagedResourceClosure": true,
+    "typecheck": [
+      "core",
+      "node",
+      "web"
+    ],
+    "rendererBudget": true,
+    "packagedDependencyClosure": 254,
+    "installerVerified": true,
+    "tifaOfficialReexportByteIdentical": true,
+    "diffCheck": true
+  },
+  "scope": [
+    "Full-song inference used real six-stem vocals and provider timed lyrics in an isolated QA profile.",
+    "The last engraving-only change removes an assumed meter/barline from the lyric view. Existing notes were re-engraved and tested in the final package without repeating model inference.",
+    "Tests use paused playback and queue seeking; no claim of physical audio-device listening validation.",
+    "Pitch, rhythm, key and lexical boundaries have not been manually annotated as ground truth."
+  ],
+  "screenshots": {
+    "normal": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\vocal-rhythm-packaged-evidence\\notation.png",
+    "narrow": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\vocal-rhythm-packaged-evidence\\narrow.png"
+  }
+}
