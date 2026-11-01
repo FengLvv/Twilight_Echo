@@ -2,9 +2,32 @@ import json
 import unittest
 from types import SimpleNamespace as Word
 from vocal_pipeline import validate_lines, source_owners, restore_spelling, lyric_groups
-from vocal_score import inert_svg, phrase_part
+from vocal_score import inert_svg, phrase_part, engraving_part
 
 class VocalPipelineTests(unittest.TestCase):
+    def test_render_adapter_supports_every_eighth_beat_pickup_without_changing_source_events(self):
+        from music21 import stream,meter
+        import jianpu_ly
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            for tick in range(1,32):
+                start=tick/8
+                rows=[(i,dict(beat=start+i*.75,durationBeats=.75)) for i in range(12)]
+                original,events=phrase_part(rows)
+                original_measures=list(original.getElementsByClass(stream.Measure))
+                pickup=float(original_measures[0].paddingLeft)
+                rendered=engraving_part(original)
+                score=stream.Score();score.append(rendered)
+                xml=Path(directory)/'phrase.musicxml';score.write('musicxml',fp=str(xml))
+                # The native converter previously failed for the 3.5-beat edge.
+                source=jianpu_ly.process_input(jianpu_ly.xml2jianpu(xml.read_text(encoding='utf-8')))
+                self.assertTrue(source)
+                self.assertEqual(float(original_measures[0].paddingLeft),pickup)
+                self.assertEqual([float(m.highestTime) for m in rendered.getElementsByClass(stream.Measure)],
+                                 [float(m.highestTime) for m in original_measures])
+                self.assertAlmostEqual(sum(end-begin for begin,end,index in events),9)
+
     def test_phrase_pickup_and_final_partial_measure_keep_only_interior_rests(self):
         from music21 import stream
         rows=[(i,{'beat':b,'durationBeats':d}) for i,(b,d) in enumerate([(78.5,.5),(79,.5),(79.5,.5),(80,.5),(81,.5),(81.5,.5),(82,1)])]

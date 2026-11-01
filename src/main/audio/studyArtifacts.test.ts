@@ -14,13 +14,13 @@ import type { StudyResult } from '../../shared/musicStudy.ts'
 const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 function result(): StudyResult {
   const six = studySignature(['htdemucs6-reference-seeded-v1', 'torch/hub/checkpoints/5c90dfd2-34c22ccb.th'], 'source', {})
-  const notes = studySignature(['vocal2midi-tifa-game-medium-rhythm-v1', ...Object.keys(VOCAL_MODEL_HASHES).sort()], six + '|' + hash('lyrics'), {})
+  const notes = studySignature(['vocal2midi-tifa-game-medium-rhythm-v2', ...Object.keys(VOCAL_MODEL_HASHES).sort()], six + '|' + hash('lyrics'), {})
   return { version: 1, duration: 10, sampleRate: 44100, frames: 441000, stems: ['vocals'], harmonicStems: ['piano'],
     ready: ['six', 'chords', 'melody'], sourceSha256: 'source', waveforms: {},
     chords: { segments: [{ start: 0, end: 10, label: 'C', confidence: 'unrated', candidates: [] }], algorithm: 'model', tuningCents: null }, originalChords: { segments: [] },
     melody: { notes: [{ start: 1, end: 2, midi: 60 }], scores: [{ lineId: 0, text: 'lyrics', svg: '<svg>' + '<g></g>'.repeat(1000) + '</svg>' }],
-      key: null, algorithm: 'vocal2midi-tifa-game-medium-rhythm-v1', source: 'vocals', lyricsKey: hash('lyrics') },
-    cache: { signatures: { six, notes, score: 'lyric-phrase-v1|notesHash', chords: studySignature(['sheetsage2-mert2-chord-full-paper-v1', 'sheetsage2/model.safetensors', 'mert2/model.safetensors'], six + '|piano', {}) },
+      key: null, algorithm: 'vocal2midi-tifa-game-medium-rhythm-v2', source: 'vocals', lyricsKey: hash('lyrics') },
+    cache: { signatures: { six, notes, score: 'lyric-phrase-v2|notesHash', chords: studySignature(['sheetsage2-mert2-chord-full-paper-v1', 'sheetsage2/model.safetensors', 'mert2/model.safetensors'], six + '|piano', {}) },
       files: {}, notesHash: 'notesHash' },
     models: { instruments: 'six', voices: 'kara', singers: 'duet', singersSampleRate: 24000, singersChannels: 1 } }
 }

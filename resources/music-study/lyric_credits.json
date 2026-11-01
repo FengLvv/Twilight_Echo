@@ -1,0 +1,13 @@
+{
+  "roles": [
+    "作词", "作曲", "编曲", "制作人", "制作", "监制", "出品人", "出品", "词", "曲", "词曲",
+    "混音", "混音师", "混音室", "母带", "母带处理", "母带工程师", "录音", "录音师", "录音室",
+    "演唱", "配唱", "配唱制作", "配唱制作人", "人声编辑", "人声录音", "人声制作", "人声处理", "人声监唱",
+    "吉他", "电吉他", "木吉他", "吉他录音", "贝斯", "贝斯录音", "鼓", "鼓录音", "钢琴", "键盘",
+    "弦乐", "弦乐编写", "弦乐录音", "弦乐监制", "和声", "和声设计", "和声编写", "和声录音", "和音",
+    "乐团", "指挥", "音乐总监", "音乐制作", "音乐制作人", "发行", "发行公司", "版权", "版权提供",
+    "lyricist", "lyrics", "composer", "arranger", "producer", "produced by", "mixed by", "mixing",
+    "mastering", "mastered by", "recording", "recording engineer", "recording studio", "recorded by",
+    "guitar", "guitars", "bass", "drums", "piano", "keyboards", "strings", "backing vocals", "vocal editing"
+  ]
+}

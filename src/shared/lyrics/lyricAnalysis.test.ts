@@ -24,7 +24,7 @@ const analysis: StudyLyricsProjection = {
   chordsBusy: false,
   chords: [{ start: 14, end: 17, label: 'D', confidence: 'unrated', candidates: [] }],
   melody: {
-    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v1',
+    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v2',
     source: 'vocals',
     key: { tonic: 0, mode: 'major' },
     notes: Array.from({ length: 20 }, (_, i) => ({

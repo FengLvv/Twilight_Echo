@@ -66,6 +66,7 @@ def _is_singable_phone(phone_text: str, language: str | None) -> bool:
 
 
 def _find_word_nucleus_start(word, language: str | None) -> float | None:
+    language = getattr(word, 'source_language', language)
     phonemes = getattr(word, "phonemes", None) or []
     for phoneme in phonemes:
         if _is_singable_phone(getattr(phoneme, "text", ""), language):
@@ -102,7 +103,7 @@ def _english_syllable_chunks(word):
 
 
 def _extract_vowel_boundaries_english(result_word, original_chars: list[str]):
-    """Per-syllable chunk boundaries for English.
+    """English syllables and per-word boundaries for mixed-language lyrics.
 
     Each chunk becomes one align unit for GAME; chunk 0 carries the whole word
     as its lyric and every later chunk carries "+" (the syllable-position
@@ -132,7 +133,12 @@ def _extract_vowel_boundaries_english(result_word, original_chars: list[str]):
                 lyric = original_chars[char_idx]
                 char_idx += 1
 
-        chunks = _english_syllable_chunks(word)
+        word_language = getattr(word, 'source_language', 'en')
+        if word_language == 'en':
+            chunks = _english_syllable_chunks(word)
+        else:
+            nucleus = _find_word_nucleus_start(word, word_language)
+            chunks = [(nucleus, float(word.end))] if nucleus is not None else None
         if chunks is None:
             if word.end > last_end:
                 word_durs.append(word.end - last_end)
@@ -202,7 +208,10 @@ def load_game_model(model_dir: str, device=None, use_cache: bool = True):
 
 
 def extract_vowel_boundaries(result_word, original_chars: list[str], language: str | None = None):
-    if (language or "").lower() == "en":
+    if (language or "").lower() == "en" or any(
+        getattr(word, 'source_language', language) != language for word in result_word
+        if word.text not in _NON_SINGABLE_WORD_TOKENS
+    ):
         return _extract_vowel_boundaries_english(result_word, original_chars)
 
     word_durs = []

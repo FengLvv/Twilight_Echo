@@ -1,98 +1,53 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { createStudyCacheValidator } from './studyCache.ts'
+import { createStudyCacheValidator, studySignature } from './studyCache.ts'
 import { VOCAL_MODEL_HASHES } from './studyModelRegistry.ts'
+import { STUDY_MELODY_ALGORITHM, STUDY_SCORE_LAYOUT, type StudyResult } from '../../shared/musicStudy.ts'
 
-test('cache validity follows input, model and per-stage files and keeps captured sources usable offline', async (t) => {
-  const root = await mkdtemp(join(tmpdir(), 'study-cache-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const hash = (data: string) => createHash('sha256').update(data).digest('hex')
-  const sixKey = 'torch/hub/checkpoints/5c90dfd2-34c22ccb.th',
-    voiceKey = 'UVR_MDXNET_KARA_2.onnx'
-  const fp = {
-    [sixKey]: 'six-model',
-    [voiceKey]: 'voice-model',
-    'sheetsage2/model.safetensors': 'chord-model',
-    'mert2/model.safetensors': 'mert-model'
+async function fixture() {
+  const root=await mkdtemp(join(tmpdir(),'study-cache-'))
+  const six=studySignature(['htdemucs6-reference-seeded-v1','torch/hub/checkpoints/5c90dfd2-34c22ccb.th'],'pcm',{})
+  const result: StudyResult={version:1,duration:10,sampleRate:44100,frames:441000,stems:['vocals'],
+    harmonicStems:['piano'],sourceSha256:'pcm',waveforms:{},ready:['six','chords','melody'],
+    chords:{segments:[],tuningCents:null,algorithm:'model'},originalChords:{segments:[]},
+    melody:{algorithm:STUDY_MELODY_ALGORITHM,source:'vocals',key:null,lyricsKey:'lyrics',notes:[],scores:[]},
+    cache:{files:{},notesHash:'notes',signatures:{six,
+      chords:studySignature(['sheetsage2-mert2-chord-full-paper-v1','sheetsage2/model.safetensors','mert2/model.safetensors'],six+'|piano',{}),
+      notes:studySignature([STUDY_MELODY_ALGORITHM,...Object.keys(VOCAL_MODEL_HASHES).sort()],six+'|lyrics',{}),
+      score:STUDY_SCORE_LAYOUT+'|notes'}},
+    models:{instruments:'six',voices:'kara',singers:'duet',singersSampleRate:24000,singersChannels:1}}
+  for(const name of ['original','vocals','drums','bass','other','piano','guitar'] as const){
+    await writeFile(join(root,name+'.wav'),name)
+    result.cache!.files[name]={bytes:Buffer.byteLength(name),sha256:createHash('sha256').update(name).digest('hex')}
   }
-  const files = [
-    'original',
-    'vocals',
-    'drums',
-    'bass',
-    'other',
-    'piano',
-    'guitar',
-    'lead',
-    'backing'
-  ]
-  for (const file of files) await writeFile(join(root, file + '.wav'), file)
-  const sixFiles = Object.fromEntries(files.slice(1, 7).map((file) => [file, hash(file)]))
-  const stages = {
-    six: { signature: 'six-model|' + hash('original'), files: sixFiles },
-    leadBacking: {
-      signature: 'voice-model|' + hash('vocals'),
-      files: { lead: hash('lead'), backing: hash('backing') }
-    }
-  }
-  await writeFile(join(root, 'stages.json'), JSON.stringify(stages))
-  const result = {
-    sourceSha256: hash('original'),
-    ready: ['six', 'chords', 'leadBacking'],
-    harmonicStems: ['bass', 'piano', 'guitar', 'other']
-  }
-  await writeFile(join(root, 'result.json'), JSON.stringify(result))
-  const signature =
-    'chord-model|mert-model|' +
-    result.harmonicStems.map((file) => file + ':' + hash(file)).join('|')
-  await writeFile(join(root, 'chords.json'), JSON.stringify({ signature, chords: {} }))
-  const validate = createStudyCacheValidator()
-  assert.deepEqual((await validate(root, fp, join(root, 'missing-source.flac'))).ready, [
-    'six',
-    'leadBacking',
-    'chords'
-  ])
-  await writeFile(
-    join(root, 'result.json'),
-    JSON.stringify({ ...result, melody: { algorithm:'vocal2midi-tifa-game-medium-rhythm-v1' }, ready: [...result.ready, 'melody'] })
-  )
-  const notesCache = JSON.stringify({
-      signature: ['vocal2midi-tifa-game-medium-rhythm-v1', ...Object.keys(VOCAL_MODEL_HASHES).sort()].join('|') + '|' + hash('vocals') + '|' + hash('lyrics'),
-      lyrics:'lyrics',
-      melody: { notes: [] }
-    })
-  await writeFile(join(root,'vocal-notes.json'),notesCache)
-  await writeFile(join(root,'vocal-score.json'),JSON.stringify({signature:'lyric-phrase-v1|'+hash(notesCache),scores:[]}))
-  assert((await validate(root, fp)).ready.includes('melody'))
-  assert(
-    !(await validate(root, { ...fp, [Object.keys(VOCAL_MODEL_HASHES)[0]]: 'new-vocal-model' })).ready.includes(
-      'melody'
-    )
-  )
-  await rm(join(root,'vocal-score.json'))
-  assert.deepEqual((await validate(root, fp)).ready, ['six', 'leadBacking', 'chords'])
-  await writeFile(join(root, 'vocal-notes.json'), '{broken')
-  assert.deepEqual((await validate(root, fp)).ready, ['six', 'leadBacking', 'chords'])
-  await writeFile(join(root, 'result.json'), JSON.stringify(result))
-  assert.deepEqual((await validate(root, { ...fp, [voiceKey]: 'new-voice' })).ready, [
-    'six',
-    'chords'
-  ])
-  assert.deepEqual(
-    (await validate(root, { ...fp, 'mert2/model.safetensors': 'new-chords' })).ready,
-    ['six', 'leadBacking']
-  )
-  await writeFile(join(root, 'lead.wav'), 'damaged')
-  assert.deepEqual((await validate(root, fp)).ready, ['six', 'chords'])
-  await rm(join(root, 'bass.wav'))
-  assert.deepEqual((await validate(root, fp)).ready, [])
-  await writeFile(join(root, 'source.flac'), 'original-source')
-  const source = join(root, 'selected.flac')
-  await writeFile(source, 'replacement-source')
-  assert.equal((await validate(root, fp, source)).sourceChanged, true)
-  assert.equal(await readFile(join(root, 'source.flac'), 'utf8'), 'original-source')
+  return {root,result,validate:createStudyCacheValidator(),close:()=>rm(root,{recursive:true,force:true})}
+}
+
+test('audio corruption invalidates its group while canonical chords and vocal scores remain usable offline',async t=>{
+  const f=await fixture();t.after(f.close)
+  assert.deepEqual((await f.validate(f.root,{},'missing-source.flac',f.result,true)).ready,['six','chords','melody'])
+  await writeFile(join(f.root,'vocals.wav'),'damage') // same size, different PCM content
+  const ready=(await f.validate(f.root,{},undefined,f.result,true)).ready
+  assert.deepEqual(ready,['chords','melody'])
+})
+
+test('pronunciation algorithm changes require inference; engraving changes require only layout',async t=>{
+  const f=await fixture();t.after(f.close)
+  f.result.cache!.signatures.score='lyric-phrase-v1|notes'
+  let checked=await f.validate(f.root,{},undefined,f.result)
+  assert.equal(checked.notesReady,true);assert(!checked.ready.includes('melody'))
+  f.result.melody!.algorithm='vocal2midi-tifa-game-medium-rhythm-v1'
+  checked=await f.validate(f.root,{},undefined,f.result)
+  assert.equal(checked.notesReady,false);assert(!checked.ready.includes('melody'))
+})
+
+test('a chord model update preserves the independent vocal result and six-track group',async t=>{
+  const f=await fixture();t.after(f.close)
+  const checked=await f.validate(f.root,{'sheetsage2/model.safetensors':'changed'},undefined,f.result)
+  assert.deepEqual(checked.ready,['six','melody'])
+  assert.equal(checked.notesReady,true)
 })

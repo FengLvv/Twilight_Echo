@@ -47,6 +47,13 @@ def language_for(text):
     if re.search(r'[\u3400-\u9fff]',text): return 'zh'
     return 'en'
 
+
+def languages_for(text, song_language):
+    primary = language_for(text)
+    if primary == 'zh' and song_language == 'ja':
+        primary = 'ja'
+    return [primary, 'en'] if primary != 'en' and re.search(r'[A-Za-z]', text) else [primary]
+
 def validate_lines(serialized, duration):
     lyrics_key(serialized)
     rows=json.loads(serialized)
@@ -61,7 +68,11 @@ def validate_lines(serialized, duration):
         if row['end']-row['start']>55:
             raise ValueError('单行歌词超过 55 秒，请使用逐行或逐字时间歌词')
         previous=row['id']
-    return rows
+    from vocal_lyrics import is_credit
+    selected=[row for row in rows if not is_credit(row['text'])]
+    if not selected:
+        raise ValueError('没有可用于对齐的演唱歌词')
+    return selected
 
 def normalized_text(text):
     return ''.join(c for c in unicodedata.normalize('NFKC',text).casefold() if c.isalnum())
@@ -180,8 +191,9 @@ def run(request, progress):
         groups=lyric_groups(lines)
         for index,group in enumerate(groups):
             text='\n'.join(line['text'] for line in group)
-            lang=song_language if song_language=='ja' else language_for(text)
-            key = group_key(group, lang)
+            languages=languages_for(text,song_language)
+            lang=languages[0]
+            key = group_key(group, languages)
             group_info = dict(key=key, lineIds=[line['id'] for line in group], wordBase=index*10000)
             cached_groups.append(group_info)
             reused = reuse_group(previous, key, group, index*10000)
@@ -199,13 +211,12 @@ def run(request, progress):
             (work/'chunk_0.txt').write_text(text,encoding='utf-8')
             progress(.1+.7*index/len(groups),f'对齐歌词 {index+1}/{len(groups)}')
             tick = time.perf_counter()
-            pred,display=run_tifa_fa(tifa,work,language=lang,g2p_pipeline=g2p,japanese_g2p_engine='pyopenjtalk')
+            pred,display=run_tifa_fa(tifa,work,language=lang,languages=languages,g2p_pipeline=g2p,japanese_g2p_engine='pyopenjtalk')
             metrics['alignmentMs'] += round((time.perf_counter() - tick) * 1000)
             if 'chunk_0' not in pred: raise ValueError('歌词无法对齐：'+text[:60])
             words=list(pred['chunk_0'][2])
             owners,word_starts=source_owners(words,group)
-            chars=([r for r,k in display['chunk_0']] if lang=='ja' else
-                   [w.text for w in words if hasattr(w,'source_word')])
+            chars=[w.text for w in words if hasattr(w,'source_word')]
             if sr!=game.samplerate: wave=librosa.resample(wave,orig_sr=sr,target_sr=game.samplerate)
             tick = time.perf_counter()
             notes,processed=extract_pitches_and_align([{'waveform':wave,'offset':0.0}],game.samplerate,

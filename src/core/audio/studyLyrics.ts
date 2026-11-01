@@ -1,5 +1,11 @@
 import type { CoreLyricsContent } from '../../shared/coreLyrics.ts'
 import { buildLyricLines } from '../../shared/lyrics/lyricLineBuilder.ts'
+import credits from '../../../resources/music-study/lyric_credits.json' with { type: 'json' }
+
+const role = '(?:' + [...credits.roles].sort((a,b) => b.length-a.length)
+  .map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')'
+const credit = new RegExp('^' + role + '(?:\\s*(?:[&＆/／、+]|及|与)\\s*' + role + ')*\\s*[:：]', 'i')
+export const isStudyCredit = (text: string): boolean => credit.test(text.trim().replace(/\s+/g, ' '))
 
 /** Freeze the selected original lyrics in audio seconds before the job is queued. */
 export function studyLyrics(content: CoreLyricsContent, songId: string, duration?: number): string {
@@ -11,7 +17,7 @@ export function studyLyricsFromText(original: Parameters<typeof buildLyricLines>
   const lines = buildLyricLines(original, null)
   const selected = lines.flatMap((line, id) => {
     if (!line.timed || line.time === null || !/[\p{L}\p{N}]/u.test(line.text) ||
-      /^(?:作词|作曲|编曲|制作人|词|曲|混音|录音|演唱|词曲|lyricist|composer|arranger)\s*[:：]/i.test(line.text.trim())) return []
+      isStudyCredit(line.text)) return []
     if (line.voices?.some(v => v.role !== 'lead'))
       throw new Error('多人重叠歌词暂不支持逐词简谱，请选择主唱歌词')
     const start = Math.max(0, line.time - offsetSeconds)

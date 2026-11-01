@@ -80,6 +80,7 @@ def _build_word_list(
     language: str,
     timestep: float,
     duration: float,
+    word_languages: list[str] | None = None,
 ) -> tuple[WordList, list[tuple[str, str]]]:
     """Group aligned tokens into words matching the HubertFA WordList contract.
 
@@ -98,6 +99,9 @@ def _build_word_list(
             j += 1
         word_index = word_ids[i] - 1
         text = texts[word_index] if 0 <= word_index < len(texts) else f"word{word_index}"
+        word_language = word_languages[word_index] if word_languages and 0 <= word_index < len(word_languages) else language
+        if word_language not in ('zh', 'ja', 'en', 'yue'):
+            word_language = language
         choice = int(choices[word_index])
         candidate = lexicon[word_index][choice - 1] if choice > 0 and lexicon else None
         candidate_phonemes = list(candidate["phonemes"]) if candidate else []
@@ -108,9 +112,9 @@ def _build_word_list(
             if symbol is None:
                 symbols = vocabulary.decode(int(tokens[k]))
                 symbol = symbols[0] if symbols else str(int(tokens[k]))
-            return _strip_language_prefix(symbol, language)
+            return _strip_language_prefix(symbol, word_language)
 
-        if language != "ja":
+        if word_language != "ja":
             phonemes = []
             for k in range(i, j):
                 onset = float(spans[k, 0]) * timestep
@@ -123,6 +127,7 @@ def _build_word_list(
             end = max(phonemes[-1].end, start + _EPSILON)
             word = Word(start, end, text)
             word.source_text, word.source_word = text, int(word_index)
+            word.source_language = word_language
             for phoneme in phonemes:
                 word.append_phoneme(phoneme)
             word_list.append(word)
@@ -157,6 +162,7 @@ def _build_word_list(
             end = max(phonemes[-1].end, start + _EPSILON)
             word = Word(start, end, romaji or kana or text)
             word.source_text, word.source_word = text, int(word_index)
+            word.source_language = word_language
             for phoneme in phonemes:
                 word.append_phoneme(phoneme)
             word_list.append(word)
@@ -177,16 +183,17 @@ def run_tifa_fa(
     g2p_pipeline=None,
     japanese_g2p_engine: str = "kashi-g2p-onnx",
     kashi_g2p_model_dir=None,
+    languages: list[str] | None = None,
 ) -> tuple[dict, dict[str, list[tuple[str, str]]]]:
     """Align every chunk_N.wav/.txt pair in temp_dir.
 
     Returns ``(pred_dict, display)`` where pred_dict matches the HubertFA
     contract and ``display[stem]`` carries per-mora ``(romaji, kana)`` lyric
-    tokens for ja chunks (empty for other languages). Chunks whose text
-    cannot be converted or encoded are skipped with a warning; the pipeline
-    treats missing predictions as pitch-only fallbacks.
+    tokens for Japanese words. Conversion/encoding/inference failures propagate
+    with their cause; supplied lyrics must never silently become pitch-only.
     """
     language = (language or "zh").strip().lower()
+    active_languages = languages or [language]
     g2p = g2p_pipeline or build_g2p_pipeline(
         model.model_dir,
         japanese_g2p_engine=japanese_g2p_engine,
@@ -219,25 +226,22 @@ def run_tifa_fa(
             continue
 
         try:
-            g2p_words = g2p.convert(text, languages=[language])
+            g2p_words = g2p.convert(text, languages=active_languages)
         except Exception as e:
-            logger.warning(f"[TiFA] {stem}: G2P failed ({e}); chunk falls back to pitch-only")
-            continue
+            raise ValueError(f"歌词发音转换失败：{e}") from e
         try:
             data, lexicon, texts = encode_paths(
                 g2p_words,
                 model.vocabulary,
                 "discard",
-                languages=[language],
+                languages=active_languages,
                 global_symbols=GLOBAL_SYMBOLS,
                 stop_symbols=STOP_SYMBOLS,
             )
         except G2PEncodingError as e:
-            logger.warning(f"[TiFA] {stem}: {e}; chunk falls back to pitch-only")
-            continue
+            raise ValueError(f"歌词发音编码失败：{e}") from e
         if not data["paths"].any():
-            logger.warning(f"[TiFA] {stem}: no valid token sequence; chunk falls back to pitch-only")
-            continue
+            raise ValueError('歌词发音编码失败：没有有效的音素序列')
 
         paths = data["paths"][None].astype(np.int64)  # [1,P,C]
         words = data["words"][None].astype(np.int64)  # [1,P]
@@ -256,8 +260,7 @@ def run_tifa_fa(
             })
             spectrogram, mask_t = spec_out["spectrogram"], spec_out["maskT"]
             if not mask_t.any():
-                logger.warning(f"[TiFA] {stem}: no valid audio frames; chunk falls back to pitch-only")
-                continue
+                raise ValueError('音频片段缺少有效帧')
 
             prepared = model.run("prepare", {
                 "paths": paths, "words": words, "candidates": candidates,
@@ -301,8 +304,7 @@ def run_tifa_fa(
             token_count = int(mask_n.sum())
             frame_count = int(mask_t.sum())
             if token_count == 0 or frame_count == 0:
-                logger.warning(f"[TiFA] {stem}: empty alignment; chunk falls back to pitch-only")
-                continue
+                raise ValueError('没有有效的歌词或音频帧')
 
             align_out = model.run("model", {
                 "spectrogram": spectrogram,
@@ -320,8 +322,7 @@ def run_tifa_fa(
                 skip_penalty=DEFAULT_SKIP_PENALTY,
             )
         except Exception as e:
-            logger.warning(f"[TiFA] {stem}: alignment failed ({e}); chunk falls back to pitch-only")
-            continue
+            raise ValueError(f"歌词时间对齐失败：{e}") from e
 
         valid_spans = spans[0, :token_count]
         valid_tokens = best_tokens[0, :token_count]
@@ -330,6 +331,7 @@ def run_tifa_fa(
         word_list, mora_display = _build_word_list(
             valid_spans, valid_tokens, valid_words, valid_groups,
             choices[0], lexicon, texts, model.vocabulary, language, timestep, duration,
+            word_languages=[word.language for word in g2p_words],
         )
         pred_dict[stem] = (wav_path, duration, word_list)
         if mora_display:

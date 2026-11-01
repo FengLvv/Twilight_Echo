@@ -266,7 +266,7 @@ test('vocal melody is opt-in, prepares six without chords and is reused when com
     notes: [{ start: 0, end: 1, midi: 60 }],
     key: null,
     source: 'vocals',
-    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v1'
+    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v2'
   }
   f.workerStatus({ running: false, progress: 1, stage: 'done', result: withMelody })
   await f.tick()

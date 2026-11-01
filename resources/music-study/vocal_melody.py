@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 
-ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v1'
+ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v2'
 
 
 def model_keys():

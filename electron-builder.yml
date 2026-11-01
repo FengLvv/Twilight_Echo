@@ -49,6 +49,8 @@ extraResources:
       - vocal_pipeline.py
       - vocal_residency.py
       - vocal_cache.py
+      - vocal_lyrics.py
+      - lyric_credits.json
       - vocal_score.py
       - vocal_models.json
       - models.json

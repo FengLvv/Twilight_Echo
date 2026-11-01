@@ -40,7 +40,7 @@ class WorkerStageTests(unittest.TestCase):
             return dict(segments=[dict(start=0, end=.1, label='C', confidence='unrated', candidates=[])], tuningCents=None, algorithm='test')
         def melody(**kwargs):
             calls.append('notes')
-            return dict(algorithm='vocal2midi-tifa-game-medium-rhythm-v1', notes=[dict(start=0, end=.1, midi=60)], key=None, source='vocals')
+            return dict(algorithm='vocal2midi-tifa-game-medium-rhythm-v2', notes=[dict(start=0, end=.1, midi=60)], key=None, source='vocals')
         def score(*args, **kwargs):
             calls.append('score')
             return [dict(lineId=0, text='test', svg='<svg/>')]

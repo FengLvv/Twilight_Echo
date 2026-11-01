@@ -185,7 +185,7 @@ test('analysis changes refresh desktop annotations independently of lyric text, 
           chordsBusy: false,
           chords: [],
           melody: {
-            algorithm: 'vocal2midi-tifa-game-medium-rhythm-v1',
+            algorithm: 'vocal2midi-tifa-game-medium-rhythm-v2',
             source: 'vocals',
             key: { tonic: 0, mode: 'major' },
             notes: [{ start: 1, end: 1.5, midi: 60, lineId: 0 }],

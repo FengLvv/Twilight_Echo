@@ -1,5 +1,8 @@
 import type { CoreQueueTrackInput } from './coreQueueSubmission.ts'
 
+export const STUDY_MELODY_ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v2'
+export const STUDY_SCORE_LAYOUT = 'lyric-phrase-v2'
+
 export const STUDY_STEMS = [
   'drums',
   'bass',
@@ -323,7 +326,7 @@ export const validStudyTrack = (x: unknown): x is StudyTrack =>
   x === 'original' || STUDY_STEMS.includes(x as StudyStem)
 export function studyReady(result: StudyResult | undefined, stage: StudyStage): boolean {
   return !!result?.ready.includes(stage) &&
-    (stage !== 'melody' || result.melody?.algorithm === 'vocal2midi-tifa-game-medium-rhythm-v1')
+    (stage !== 'melody' || result.melody?.algorithm === STUDY_MELODY_ALGORITHM)
 }
 export function validStudyPayload(name: string, p: unknown): boolean {
   if (!object(p)) return false

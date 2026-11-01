@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { type StudyResult, type StudyStage, type StudyTrack } from '../../shared/musicStudy.ts'
+import { STUDY_MELODY_ALGORITHM, STUDY_SCORE_LAYOUT, type StudyResult, type StudyStage, type StudyTrack } from '../../shared/musicStudy.ts'
 import { VOCAL_MODEL_HASHES } from './studyModelRegistry.ts'
 
 export const studySignature = (keys: string[], parent: string, fingerprints: Record<string, string>) =>
@@ -52,9 +52,9 @@ export function createStudyCacheValidator() {
     const chordKeys = ['sheetsage2-mert2-chord-full-paper-v1', 'sheetsage2/model.safetensors', 'mert2/model.safetensors']
     if (result.harmonicStems.length && signatures.chords === signature(chordKeys, six + '|' + result.harmonicStems.join('|'))) ready.push('chords')
     if (signatures.originalChords === signature(chordKeys, result.sourceSha256)) ready.push('originalChords')
-    const notesReady = result.melody?.algorithm === 'vocal2midi-tifa-game-medium-rhythm-v1' &&
-        signatures.notes === signature(['vocal2midi-tifa-game-medium-rhythm-v1', ...Object.keys(VOCAL_MODEL_HASHES).sort()], six + '|' + result.melody.lyricsKey)
-    if (notesReady && result.cache.notesHash && signatures.score === 'lyric-phrase-v1|' + result.cache.notesHash)
+    const notesReady = result.melody?.algorithm === STUDY_MELODY_ALGORITHM &&
+        signatures.notes === signature([STUDY_MELODY_ALGORITHM, ...Object.keys(VOCAL_MODEL_HASHES).sort()], six + '|' + result.melody.lyricsKey)
+    if (notesReady && result.cache.notesHash && signatures.score === STUDY_SCORE_LAYOUT + '|' + result.cache.notesHash)
       ready.push('melody')
     return { ready, notesReady }
   }

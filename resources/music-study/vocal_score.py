@@ -9,11 +9,13 @@ import re
 import subprocess
 import xml.etree.ElementTree as ET
 import time
+import copy
+from fractions import Fraction
 from runtime_context import check_cancel
 from vocal_cache import score_key, reuse_score
 
 SVG='http://www.w3.org/2000/svg'
-SCORE_LAYOUT_KEY='lyric-phrase-v1'
+SCORE_LAYOUT_KEY='lyric-phrase-v2'
 ET.register_namespace('',SVG)
 
 def inert_svg(source):
@@ -78,6 +80,29 @@ def phrase_part(rows):
     return part,events
 
 
+def engraving_part(part):
+    """Translate clipped edge measures to exact local meters for jianpu-ly.
+
+    Its MusicXML importer recognizes only simple/dotted pickups, not 7/8 or
+    arbitrary 1/32-grid lengths. Local render-only meters retain every duration
+    and tie without padding audible/visible rests or weakening bar checks.
+    Source exports keep the original pickup and meter from phrase_part.
+    """
+    from music21 import stream,meter
+    rendered=copy.deepcopy(part)
+    previous=None
+    for measure in rendered.getElementsByClass(stream.Measure):
+        value=Fraction(float(measure.highestTime)/4).limit_denominator(32)
+        signature='4/4' if value==1 else f'{value.numerator}/{value.denominator}'
+        for old in list(measure.getElementsByClass(meter.TimeSignature)):
+            measure.remove(old)
+        if signature!=previous:
+            measure.insert(0,meter.TimeSignature(signature))
+        measure.paddingLeft=measure.paddingRight=0
+        previous=signature
+    return rendered
+
+
 def compile_batch(lily, paths, out):
     """One native parser per bounded batch; cancellation kills only this child."""
     command=[str(lily),'-dbackend=svg','-dcrop','-dno-point-and-click','-o',str(out.resolve())+'/',
@@ -126,7 +151,7 @@ def engrave(notes,lines,directory,home,progress,previous=None):
             # jianpu-ly handles quoted tokens; exclude executable LilyPond syntax.
             text=text.replace('\\','').replace('"',"'").replace('\n',' ')
             lyric_tokens.append('"'+text+'"' if text else '_')
-        score.append(part)
+        score.append(engraving_part(part))
         xml=out/f'line-{line["id"]}.layout.musicxml';score.write('musicxml',fp=str(xml))
         jly=jianpu_ly.xml2jianpu(xml.read_text(encoding='utf-8'))
         jly=re.sub(r'(?m)^L:.*$', '',jly)
@@ -148,7 +173,7 @@ def engrave(notes,lines,directory,home,progress,previous=None):
             return f'\\once \\override NoteHead.output-attributes = #\'((data-note . "{event[2]}"){held}) '+match.group(0)
         source=re.sub(r'\\note-mod "([^"\n]+)" (c\x27|r)(\d+)(\.*)',mark,source)
         source=source.replace('\\mark \\markup{1=C}','')
-        source+='\n\\header { tagline = ##f }\n\\layout { \\context { \\RhythmicStaff \\omit TimeSignature \\omit BarLine } }\n\\paper { indent = 0\\mm\n ragged-right = ##t\n page-breaking = #ly:one-line-breaking\n #(define fonts (set-global-fonts #:roman "Microsoft YaHei" #:sans "Microsoft YaHei")) }\n'
+        source+='\n\\header { tagline = ##f }\n\\layout { \\context { \\RhythmicStaff \\omit TimeSignature \\omit BarLine } \\context { \\Staff \\omit TimeSignature } }\n\\paper { indent = 0\\mm\n ragged-right = ##t\n page-breaking = #ly:one-line-breaking\n #(define fonts (set-global-fonts #:roman "Microsoft YaHei" #:sans "Microsoft YaHei")) }\n'
         ly=xml.with_suffix('.ly');ly.write_text(source,encoding='utf-8')
         pending.append((ly,scores[-1]))
     for offset in range(0,len(pending),16):
