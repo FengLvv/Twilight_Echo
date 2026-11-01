@@ -1,7 +1,7 @@
 # Twilight Echo CLI-Anything
 
 Control the real Twilight Echo application from an agent or terminal. The harness
-exposes all 387 registered Core operations across 52 domains, plus background
+exposes all 392 registered Core operations across 52 domains, plus background
 analysis, batch processing, native score exports and preview bundles.
 
 Python is a client of the running application. Playback, provider credentials,
@@ -82,6 +82,29 @@ Login, purchases and availability follow the app. Account mutations are real
 actions; a successful CLI transport is not permission to publish or send content.
 
 ## Analyze, retrieve and export
+
+Analysis models remain loaded between songs. Audio has a default 2 GiB LRU
+budget; clearing it retains compressed chords, raw notes and final scores.
+Cached annotation queries need no stem audio. Missing stems are regenerated
+when playback or audio export requests them. Only the actual next queue item
+is prefetched, after the playback session enables an analysis capability.
+
+After 30 seconds with no queued analysis or runtime work, chord weights move
+to CPU memory while the six-stem model stays on CUDA. They return automatically
+before chord inference. `study runtime` reports `devices`, CUDA allocated and
+reserved bytes, `idleOffloadSeconds`, and the most recent transfer times.
+`loaded` includes models parked in CPU memory. Cached score/chord reads leave
+placement unchanged. CUDA cache pools are released after warmup and analysis.
+
+```powershell
+cli-anything-twilightecho --json study runtime
+cli-anything-twilightecho --json study cache
+cli-anything-twilightecho --json study set-cache-policy --limit-bytes 2147483648 --preload-next true
+cli-anything-twilightecho --json study clear-audio-cache
+```
+
+Active playback, inference, exports and the prepared next song retain leases;
+clearing audio skips those resources and reports the remaining real usage.
 
 ```powershell
 cli-anything-twilightecho --json music analyze --file D:/Music/song.flac --lyrics D:/Music/song.lrc --wait

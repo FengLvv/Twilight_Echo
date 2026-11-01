@@ -1803,10 +1803,25 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
           track.source && track.source!=='local' ? (input?.kind==='network'||input?.kind==='stream'?input:
             {kind:'provider',track:{id:track.id,title:track.title,artist:track.artist,album:track.album,duration:track.duration,source:track.source,ncmSongId:track.ncmSongId}}) :
             {kind:'local',id:track.id,fallback:{filePath:track.filePath,title:track.title,artist:track.artist,album:track.album,duration:track.duration,...(track.cueRange?{cueRange:track.cueRange}:{})}}
-        return {title:track.title,source:{path:'',input:stableInput,identity:track.id,...range}}
+        return {title:track.title,source:{path:'',input:stableInput,identity:track.id,
+          versionHint:JSON.stringify([track.source,track.duration,track.source==='ncm'?settings.read().ncmPlaybackQuality:null]),...range}}
       },
       environment:()=>platform!.call('study.environment',{}),
-      validate:(record,source)=>platform!.call('study.validateCache',{id:record.id,...(source.path?{source:source.path}:{})}),
+      runtime:()=>platform!.call('study.runtime',{}),
+      runtimeActivity:busy=>platform!.call('study.runtimeActivity',{busy}),
+      audioInventory:()=>platform!.call('study.audioInventory',{}),
+      removeAudio:group=>platform!.call('study.removeAudio',{id:group.id,kind:group.kind}),
+      exportSources:(record,outputDirectory)=>platform!.call('study.exportSources',{id:record.id,outputDirectory,melody:record.result!.melody!,lyrics:record.lyrics!}),
+      next:async()=>{
+        const value=playback.studyNextTrack()
+        if(!value)return null
+        const track=value.track
+        const input:import('../../shared/coreQueueSubmission.ts').CoreQueueTrackInput = !track.source||track.source==='local'
+          ? {kind:'local',id:track.id,fallback:{filePath:track.filePath,title:track.title,artist:track.artist,album:track.album,duration:track.duration,...(track.cueRange?{cueRange:track.cueRange}:{})}}
+          : {kind:'provider',track:{id:track.id,title:track.title,artist:track.artist,album:track.album,duration:track.duration,source:track.source,ncmSongId:track.ncmSongId}}
+        return {key:value.key,input}
+      },
+      validate:(record,source,verifyAudio)=>platform!.call('study.validateCache',{id:record.id,result:record.result,...(source.path?{source:source.path}:{}),...(verifyAudio?{verifyAudio:true}:{})}),
       choosePack:()=>platform!.call('study.choosePack',{}),
       lyrics:async(songId,input)=>{
         const track = input ? (await createPlaylistInputResolver(resolveQueueInput,database!)([input],new AbortController().signal))[0] : playback.studySourceTrack()
@@ -1819,7 +1834,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
         let source=record.source.path
         const cached=await platform!.call('study.hasSource',{id:record.id},signal)
         if(cached)source=''
-        else if(record.source.input){
+        else if(record.source.input && !(record.operation==='melody'&&record.notesReady)){
           const track=(await createPlaylistInputResolver(resolveQueueInput,database!)([record.source.input],signal))[0]
           const resolved=await resolver.resolve(track,signal)
           if(!resolved)throw new Error('音源已失效，请检查登录状态并重试')
@@ -1828,7 +1843,7 @@ async function initialize(config: CoreProcessConfiguration): Promise<void> {
         signal.throwIfAborted()
         const release=sourceResources.pin([source]);studySourcePins.set(record.id,release)
         try{await platform!.call('study.startWorker',{id:record.id,source,
-          start:record.source.start,end:record.source.end,expectedDuration:record.source.duration,virtualPregapSeconds:record.source.virtualPregapSeconds,leadBacking:false,twoSingers:false,operation:record.operation,harmonicStems:record.harmonicStems,lyrics:record.lyrics})}
+          start:record.source.start,end:record.source.end,expectedDuration:record.source.duration,virtualPregapSeconds:record.source.virtualPregapSeconds,leadBacking:false,twoSingers:false,operation:record.operation,harmonicStems:record.harmonicStems,lyrics:record.lyrics,previous:record.result,budgetBytes:record.budgetBytes})}
         catch(error){release();studySourcePins.delete(record.id);throw error}
       }),
       worker:async id=>{const status=await platform!.call('study.workerStatus',{id});if(!status.running){studySourcePins.get(id)?.();studySourcePins.delete(id)}return status},

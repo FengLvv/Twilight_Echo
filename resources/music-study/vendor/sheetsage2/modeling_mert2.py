@@ -141,6 +141,10 @@ class RotaryEmbedding(nn.Module):
         original = self.inv_freq
         super()._apply(fn, recurse=recurse)
         self.inv_freq = original.to(device=self.inv_freq.device, dtype=torch.float32)
+        self._cos = None
+        self._sin = None
+        self._cache_device = None
+        self._sequence_length = 0
         return self
 
     def forward(self, hidden_states):

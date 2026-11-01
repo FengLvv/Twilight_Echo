@@ -8,7 +8,7 @@ const { execFile } = require('node:child_process')
 const { promisify } = require('node:util')
 
 test(
-  'concurrent environment checks share one real probe and shutdown joins its child',
+  'concurrent checks share a resident runtime and shutdown joins it before reuse',
   {
     skip: !process.env.TWILIGHT_MUSIC_STUDY_HOME,
     timeout: 180000
@@ -59,7 +59,7 @@ test(
 const runtime = String.raw`
 const {app}=require('electron'),cp=require('node:child_process'),assert=require('node:assert/strict'),path=require('node:path')
 const [bundle,root,directory]=process.argv.slice(2);app.setPath('userData',path.join(directory,'profile'));app.getAppPath=()=>root
-const children=[],spawn=cp.spawn;cp.spawn=(...args)=>{const child=spawn(...args);if(args[1]?.[1]==='probe')children.push(child);return child}
+const children=[],spawn=cp.spawn;cp.spawn=(...args)=>{const child=spawn(...args);if(args[1]?.some(value=>String(value).endsWith('worker.py')))children.push(child);return child}
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),signal=new AbortController().signal
 app.whenReady().then(async()=>{const create=require(bundle).createMusicStudyPlatform;let warm,cold;try{
  warm=create(path.join(directory,'warm'));const [a,b]=await Promise.all([warm.operations['study.environment']({},signal),warm.operations['study.environment']({},signal)])

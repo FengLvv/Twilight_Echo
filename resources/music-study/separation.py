@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import soundfile as sf
 import librosa
+from functools import lru_cache
+from runtime_context import CooperativePool, check_cancel
 
 
 def read_audio(path, sr=44100):
@@ -18,12 +20,21 @@ def read_audio(path, sr=44100):
     return data[:, :2].T.copy()
 
 
-def six_stems(audio, pack, device, report):
+@lru_cache(maxsize=1)
+def six_model(pack, device):
     import os
     os.environ["TORCH_HOME"] = str(Path(pack) / "torch")
     from demucs.pretrained import get_model
+    from model_residency import register_model, ensure_model
+    model = get_model("htdemucs_6s").eval()
+    register_model('six', model, device)
+    # The cache owns the object after return; keep it alive while admitting.
+    return ensure_model('six')
+
+
+def six_stems(audio, pack, device, report):
     from demucs.apply import apply_model
-    model = get_model("htdemucs_6s").to(device).eval()
+    model = six_model(str(pack), device)
     # Match Demucs' reference normalization, with silence guarded explicitly.
     ref = torch.from_numpy(audio).mean(0)
     mean, std = ref.mean(), ref.std().clamp_min(1e-6)
@@ -31,19 +42,24 @@ def six_stems(audio, pack, device, report):
     report(.04, "六轨分离")
     with torch.inference_mode():
         result = apply_model(model, wave[None], device=device, shifts=1,
-                             split=True, overlap=.25, progress=False)[0]
+                             split=True, overlap=.25, progress=False, pool=CooperativePool())[0]
     result = result.cpu().numpy() * float(std)
     # Share the DC offset instead of adding it six times.
     result += float(mean) / len(model.sources)
     return dict(zip(model.sources, result))
 
 
-def lead_backing(vocals, pack, report):
-    """UVR MDX KARA 2 predicts Instrumental (here backing), NOT lead vocals."""
+@lru_cache(maxsize=1)
+def lead_session(pack):
     import onnxruntime as ort
     options=ort.SessionOptions();options.intra_op_num_threads=8;options.inter_op_num_threads=1
-    session = ort.InferenceSession(str(Path(pack) / "UVR_MDXNET_KARA_2.onnx"),sess_options=options,
-                                  providers=["CPUExecutionProvider"])
+    return ort.InferenceSession(str(Path(pack) / "UVR_MDXNET_KARA_2.onnx"), sess_options=options,
+                               providers=["CPUExecutionProvider"])
+
+
+def lead_backing(vocals, pack, report):
+    """UVR MDX KARA 2 predicts Instrumental (here backing), NOT lead vocals."""
+    session = lead_session(str(pack))
     n_fft, hop, bins, frames, trim = 5120, 1024, 2048, 256, 2560
     chunk = hop * (frames - 1)
     stride = chunk - 2 * trim
@@ -52,6 +68,7 @@ def lead_backing(vocals, pack, report):
     window = torch.hann_window(n_fft)
     pieces = []
     for start in range(0, length, stride):
+        check_cancel()
         wave = torch.from_numpy(padded[:, start:start + chunk])
         stft = torch.stft(wave, n_fft, hop, window=window, return_complex=True)
         spec = torch.view_as_real(stft).permute(0, 3, 1, 2).reshape(1, 4, n_fft // 2 + 1, frames)
@@ -68,6 +85,7 @@ def lead_backing(vocals, pack, report):
     return {"lead": vocals - backing, "backing": backing}
 
 
+@lru_cache(maxsize=1)
 def duet_model(pack, device):
     from audio_diffusion_pytorch import AudioDiffusionModel, LogNormalDistribution
     from safetensors.torch import load_file
@@ -81,7 +99,8 @@ def duet_model(pack, device):
         diffusion_sigma_distribution=LogNormalDistribution(mean=-3, std=1),
         diffusion_sigma_data=.2)
     model.unet.load_state_dict(load_file(str(Path(pack) / "duet.safetensors")),strict=True)
-    return model.to(device).eval()
+    from model_residency import register_model
+    return register_model('duet', model.eval(), device)
 
 
 class SingerIdentity:
@@ -158,6 +177,8 @@ def two_singers(vocals, pack, device, report, steps=100, seed=42, identity_repor
     if device != "cuda":
         raise RuntimeError("双歌手分离需要 CUDA GPU；可先完成六轨和主唱／和声任务")
     model = duet_model(pack, device)
+    from model_residency import ensure_model
+    model = ensure_model('duet')
     identity = SingerIdentity(pack,device)
     mono = librosa.resample(vocals.mean(0), orig_sr=44100, target_sr=24000)
     length, hop = 131072, 65536

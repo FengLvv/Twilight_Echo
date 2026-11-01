@@ -25,7 +25,7 @@ from .tokenization_sheetsage2 import SheetSage2Tokenizer
 PROJECTIONS = ("query_proj", "key_proj", "value_proj", "out_proj")
 BASE_CODE_HASHES = {
     "configuration_mert2.py": "77b53ec9d7ee31a599d744fb006e812c7eeaf7390deb46e2f460cf8c17b00bd6",
-    "modeling_mert2.py": "b1a3174e5649c4b26b0c90d8626f0adacfbbba111a58ed3bb72ad651945a2f5c",
+    "modeling_mert2.py": "cc56a4aa7621e45344d35911eb73543438b9e9fab8b90ebd9505ff5212b2d481",
 }
 
 

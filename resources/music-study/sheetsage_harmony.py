@@ -63,8 +63,9 @@ def load_model(pack):
     torch.set_num_threads(min(4,torch.get_num_threads()))
     model=SheetSage2Model.from_pretrained(str(Path(pack)/'sheetsage2'),
         base_model_path=str(Path(pack)/'mert2'),local_files_only=True,
-        attn_implementation='sdpa',torch_dtype=torch.float32).eval().to(device)
-    return model
+        attn_implementation='sdpa',torch_dtype=torch.float32).eval()
+    from model_residency import register_model
+    return register_model('chords', model, device)
 
 
 def recognize(audio,sample_rate,*,model_pack,progress=None):
@@ -78,7 +79,11 @@ def recognize(audio,sample_rate,*,model_pack,progress=None):
         metadata={'warnings':[],'device':'none (silence)'}
     else:
         model=load_model(str(Path(model_pack).resolve()))
+        from model_residency import ensure_model
+        model=ensure_model('chords')
         def report(event):
+            from runtime_context import check_cancel
+            check_cancel()
             if progress:
                 window=event.get('window',1);windows=event.get('windows',1)
                 progress(min(.98,(window-1+.5)/windows),f'高精度和弦分析 {window}/{windows}')

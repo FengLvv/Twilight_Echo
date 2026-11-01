@@ -56330,6 +56330,20 @@
       "inputType": "{ id: string; stems: StudyTrack[]; }"
     },
     {
+      "name": "study.cache",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>",
+      "outputType": "StudyCacheStatus"
+    },
+    {
       "name": "study.cancel",
       "domain": "study",
       "kind": "command",
@@ -56385,6 +56399,19 @@
         "additionalProperties": false
       },
       "inputType": "{ id: string; visible: boolean; }"
+    },
+    {
+      "name": "study.clearAudioCache",
+      "domain": "study",
+      "kind": "command",
+      "permission": "library:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>"
     },
     {
       "name": "study.create",
@@ -56814,6 +56841,30 @@
       "inputType": "StudyExport"
     },
     {
+      "name": "study.exportSources",
+      "domain": "study",
+      "kind": "command",
+      "permission": "library:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "outputDirectory": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "outputDirectory"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ id: string; outputDirectory: string; }"
+    },
+    {
       "name": "study.lyricsDisplay",
       "domain": "study",
       "kind": "query",
@@ -57145,6 +57196,49 @@
         "additionalProperties": false
       },
       "inputType": "{ id: string; }"
+    },
+    {
+      "name": "study.runtime",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>",
+      "outputType": "StudyRuntimeStatus"
+    },
+    {
+      "name": "study.setCachePolicy",
+      "domain": "study",
+      "kind": "command",
+      "permission": "library:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limitBytes": {
+            "type": "number"
+          },
+          "preloadNext": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "const": false
+              },
+              {
+                "type": "boolean",
+                "const": true
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "inputType": "Partial<StudyCachePolicy>"
     },
     {
       "name": "study.setLyricsDisplay",

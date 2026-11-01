@@ -14,6 +14,21 @@ export const STUDY_STEMS = [
 ] as const
 export type StudyStem = (typeof STUDY_STEMS)[number]
 export type StudyTrack = StudyStem | 'original'
+export interface StudyCachePolicy { limitBytes: number; preloadNext: boolean }
+export const DEFAULT_STUDY_CACHE_POLICY: StudyCachePolicy = { limitBytes: 2 * 1024 ** 3, preloadNext: true }
+export interface StudyAudioGroup { id: string; kind: 'six' | 'leadBacking' | 'twoSingers'; bytes: number }
+export interface StudyCacheStatus extends StudyCachePolicy {
+  usedBytes: number; reservedBytes: number; protectedBytes: number; resultBytes: number
+}
+export interface StudyRuntimeStatus {
+  state: 'stopped' | 'warming' | 'ready' | 'failed'; pid: number | null
+  loaded: string[]; error?: string; sixLoadMs?: number; chordLoadMs?: number
+  devices?: Partial<Record<'six' | 'chords' | 'duet' | 'beat' | 'tifa' | 'game', 'cpu' | 'cuda' | 'dml' | 'mixed'>>
+  cudaAllocatedBytes?: number; cudaReservedBytes?: number
+  modelBudgetBytes?: number; activationReserveBytes?: number
+  residentWeightBytes?: number; estimatedDirectMLBytes?: number
+  lastChordRestoreMs?: number; lastOffloadMs?: number; idleOffloadSeconds?: number
+}
 export const STUDY_OPERATIONS = [
   'six',
   'analyze',
@@ -103,10 +118,19 @@ export interface StudyResult {
     source: 'vocals'
     tempo?: number
     lyricsKey?: string
-    scores: Array<{ lineId: number; text: string; svg: string }>
+    reuse?: { parent: string; beats: number[]; downbeats: number[]; groups: Array<{
+      key: string; lineIds: number[]; wordBase: number; noteIndices: number[]
+    }> }
+    scores: Array<{ lineId: number; text: string; svg: string; key?: string; noteIndices?: number[] }>
   }
   waveforms: Partial<Record<StudyTrack, number[]>>
   sourceSha256: string
+  cache?: {
+    signatures: Record<string, string>
+    notesHash?: string
+    files: Partial<Record<StudyTrack, { sha256: string; bytes: number }>>
+    input?: { path: string; size: number; mtimeMs: number; sha256: string }
+  }
   modelFingerprints?: Record<string, string>
   ready: StudyStage[]
   timings?: Partial<Record<StudyStage, { elapsedMs: number; cacheHit: boolean }>>
@@ -198,6 +222,9 @@ export interface StudyExport {
   stems: StudyTrack[]
 }
 export interface StudyCommands {
+  'study.setCachePolicy': Partial<StudyCachePolicy>
+  'study.clearAudioCache': Record<string, never>
+  'study.exportSources': { id: string; outputDirectory: string }
   'study.submit': StudySubmit
   'study.setLyricsDisplay': StudyLyricDisplayPatch
   'study.analyze': { songId: string }
@@ -216,6 +243,8 @@ export interface StudyCommands {
   'study.analyzeChords': { id: string; stems: StudyTrack[] }
 }
 export interface StudyQueries {
+  'study.cache': { input: Record<string, never>; output: StudyCacheStatus }
+  'study.runtime': { input: Record<string, never>; output: StudyRuntimeStatus }
   'study.lyricsDisplay': { input: { songId: string }; output: StudyLyricDisplay }
   'study.song': { input: { songId: string }; output: StudyProject | null }
   'study.state': { input: { offset?: number; limit?: number }; output: StudyState }
@@ -241,13 +270,23 @@ export interface StudyPlatformOperations {
       harmonicStems?: StudyTrack[]
       operation?: StudyOperation
       lyrics?: string
+      previous?: StudyResult
+      budgetBytes?: number
     }
     output: void
   }
   'study.hasSource': { input: { id: string }; output: boolean }
   'study.validateCache': {
-    input: { id: string; source?: string }
-    output: { ready: StudyStage[]; sourceChanged?: boolean }
+    input: { id: string; source?: string; result?: StudyResult; verifyAudio?: boolean }
+    output: { ready: StudyStage[]; sourceChanged?: boolean; notesReady?: boolean }
+  }
+  'study.runtime': { input: Record<string, never>; output: StudyRuntimeStatus }
+  'study.audioInventory': { input: Record<string, never>; output: StudyAudioGroup[] }
+  'study.runtimeActivity': { input: { busy: boolean }; output: void }
+  'study.removeAudio': { input: { id: string; kind: StudyAudioGroup['kind'] }; output: void }
+  'study.exportSources': {
+    input: { id: string; outputDirectory: string; melody: NonNullable<StudyResult['melody']>; lyrics: string }
+    output: number
   }
   'study.captureLocal': { input: { id: string; path: string }; output: string }
   'study.workerStatus': {
@@ -289,6 +328,16 @@ export function studyReady(result: StudyResult | undefined, stage: StudyStage): 
 export function validStudyPayload(name: string, p: unknown): boolean {
   if (!object(p)) return false
   switch (name) {
+    case 'study.runtime':
+    case 'study.cache':
+    case 'study.clearAudioCache':
+      return !Object.keys(p).length
+    case 'study.setCachePolicy':
+      return keys(p, ['limitBytes', 'preloadNext']) && Object.keys(p).length > 0 &&
+        (p.limitBytes === undefined || number(p.limitBytes, 128 * 1024 ** 2, 1024 ** 4) && Number.isSafeInteger(p.limitBytes)) &&
+        (p.preloadNext === undefined || typeof p.preloadNext === 'boolean')
+    case 'study.exportSources':
+      return keys(p, ['id', 'outputDirectory']) && id(p.id) && typeof p.outputDirectory === 'string' && p.outputDirectory.length > 0 && p.outputDirectory.length <= 32768
     case 'study.submit':
       return keys(p, ['input', 'current', 'stages', 'lyrics']) &&
         (p.input === undefined || object(p.input)) &&

@@ -12,8 +12,35 @@ import re
 import sys
 import tempfile
 import unicodedata
+import time
+from functools import lru_cache
 
 from vocal_melody import ALGORITHM, lyrics_key
+
+
+@lru_cache(maxsize=1)
+def resident_models(pack_path, device):
+    import torch
+    from beat_this.inference import File2Beats
+    from inference.TiFA.runtime import load_tifa_model
+    from inference.TiFA.g2p_pipeline import build_g2p_pipeline
+    from inference.API.game_api import load_game_model
+    pack = Path(pack_path)
+    registry = json.loads(Path(__file__).with_name('vocal_models.json').read_text(encoding='utf-8'))
+    for name, expected in registry['files'].items():
+        with (pack / name).open('rb') as file:
+            if hashlib.file_digest(file, 'sha256').hexdigest() != expected:
+                raise ValueError('简谱模型校验失败：' + name)
+    predictor = File2Beats(checkpoint_path=str(pack / 'vocal2midi/beat_this-final0.ckpt'), device='cpu', dbn=False)
+    from vocal_residency import register_beat, register_onnx
+    predictor.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    register_beat(predictor)
+    tifa = load_tifa_model(pack / 'vocal2midi/tifa', device='cpu')
+    game = load_game_model(str(pack / 'vocal2midi/game'), device='cpu')
+    register_onnx('tifa', tifa, 'sessions', device, pack / 'vocal2midi/tifa')
+    register_onnx('game', game, '_sessions', device, pack / 'vocal2midi/game')
+    g2p = build_g2p_pipeline(tifa.model_dir, japanese_g2p_engine='pyopenjtalk')
+    return predictor, tifa, game, g2p
 
 def language_for(text):
     if re.search(r'[\u3040-\u30ff]',text): return 'ja'
@@ -81,6 +108,7 @@ def lyric_groups(lines):
     return groups
 
 def run(request, progress):
+    begin = time.perf_counter()
     import numpy as np
     import soundfile as sf
     import librosa
@@ -100,11 +128,6 @@ def run(request, progress):
     if isinstance(dictionary,bytes): dictionary=os.fsdecode(dictionary)
     if not (Path(dictionary)/'sys.dic').is_file():
         raise ValueError('发音词典未安装，请先运行 install-music-study.ps1')
-    registry=json.loads(Path(__file__).with_name('vocal_models.json').read_text(encoding='utf-8'))
-    for name,expected in registry['files'].items():
-        with (pack/name).open('rb') as f:
-            if hashlib.file_digest(f,'sha256').hexdigest()!=expected:
-                raise ValueError('简谱模型校验失败：'+name)
     waveform,sr=sf.read(root/'vocals.wav',dtype='float32',always_2d=True)
     waveform=waveform.mean(axis=1)
     duration=len(waveform)/sr
@@ -113,18 +136,34 @@ def run(request, progress):
     progress(.02,'载入人声简谱模型')
     import onnxruntime as ort
     device='dml' if 'DmlExecutionProvider' in ort.get_available_providers() else 'cpu'
-    # Beat inference is on the mixture, where percussion is still present.
-    predictor=File2Beats(checkpoint_path=str(pack/'vocal2midi/beat_this-final0.ckpt'),
-                        device='cuda' if torch.cuda.is_available() else 'cpu',dbn=False)
+    metrics = {'importsAndModelMs': round((time.perf_counter() - begin) * 1000), 'alignmentMs': 0, 'pitchMs': 0}
+    from vocal_cache import group_key, reuse_group
+    from model_residency import ensure_model
+    previous = request.get('previous') or {}
+    if previous.get('reuse', {}).get('parent') != request['parent']:
+        previous = {}
+    models = None
+    def get_models():
+        nonlocal models
+        if models is None:
+            model_started = time.perf_counter()
+            models = resident_models(str(pack), device)
+            metrics['importsAndModelMs'] += round((time.perf_counter()-model_started)*1000)
+        return models
     progress(.06,'识别节拍')
-    beats,downbeats=predictor(str(root/'original.wav'))
-    del predictor
-    if torch.cuda.is_available(): torch.cuda.empty_cache()
+    tick = time.perf_counter()
+    if previous.get('reuse', {}).get('beats'):
+        beats, downbeats = previous['reuse']['beats'], previous['reuse']['downbeats']
+        metrics['beatReused'] = True
+    else:
+        predictor, _, _, _ = get_models()
+        ensure_model('beat')
+        # Beat inference is on the mixture, where percussion is still present.
+        beats,downbeats=predictor(str(root/'original.wav'))
+    metrics['beatMs'] = round((time.perf_counter() - tick) * 1000)
     beats=np.asarray(beats,dtype=float)
     if len(beats)<4 or not np.isfinite(beats).all() or np.any(np.diff(beats)<=0):
         raise ValueError('未检测到稳定节拍，无法生成带时值简谱')
-    tifa=load_tifa_model(pack/'vocal2midi/tifa',device=device)
-    game=load_game_model(str(pack/'vocal2midi/game'),device=device)
     tempo=float(60/np.median(np.diff(beats)))
     phase=0
     if len(downbeats): phase=(-int(np.argmin(abs(beats-downbeats[0]))))%4
@@ -132,32 +171,47 @@ def run(request, progress):
         if t<beats[0]: return (t-beats[0])/(beats[1]-beats[0])+phase
         if t>beats[-1]: return len(beats)-1+(t-beats[-1])/(beats[-1]-beats[-2])+phase
         return float(np.interp(t,beats,np.arange(len(beats))))+phase
-    all_notes=[]
+    all_notes=[]; cached_groups=[]; reused_lines=set()
+    metrics.update(reusedGroups=0, processedGroups=0)
     # Use the song's language for kanji-only Japanese lines too.
     song_language=language_for(''.join(row['text'] for row in lines))
-    from inference.TiFA.g2p_pipeline import build_g2p_pipeline
-    g2p=build_g2p_pipeline(tifa.model_dir,japanese_g2p_engine='pyopenjtalk')
     with tempfile.TemporaryDirectory(prefix='vocal-align-',dir=root) as work:
         work=Path(work)
         groups=lyric_groups(lines)
         for index,group in enumerate(groups):
+            text='\n'.join(line['text'] for line in group)
+            lang=song_language if song_language=='ja' else language_for(text)
+            key = group_key(group, lang)
+            group_info = dict(key=key, lineIds=[line['id'] for line in group], wordBase=index*10000)
+            cached_groups.append(group_info)
+            reused = reuse_group(previous, key, group, index*10000)
+            if reused is not None:
+                all_notes.extend(reused)
+                reused_lines.update(group_info['lineIds'])
+                metrics['reusedGroups'] += 1
+                continue
+            _, tifa, game, g2p = get_models()
+            ensure_model('tifa'); ensure_model('game')
+            metrics['processedGroups'] += 1
             start,end=max(0,group[0]['start']-.25),min(duration,group[-1]['end']+.25)
             wave=waveform[round(start*sr):round(end*sr)]
             sf.write(work/'chunk_0.wav',wave,sr,subtype='FLOAT')
-            text='\n'.join(line['text'] for line in group)
             (work/'chunk_0.txt').write_text(text,encoding='utf-8')
-            lang=song_language if song_language=='ja' else language_for(text)
             progress(.1+.7*index/len(groups),f'对齐歌词 {index+1}/{len(groups)}')
+            tick = time.perf_counter()
             pred,display=run_tifa_fa(tifa,work,language=lang,g2p_pipeline=g2p,japanese_g2p_engine='pyopenjtalk')
+            metrics['alignmentMs'] += round((time.perf_counter() - tick) * 1000)
             if 'chunk_0' not in pred: raise ValueError('歌词无法对齐：'+text[:60])
             words=list(pred['chunk_0'][2])
             owners,word_starts=source_owners(words,group)
             chars=([r for r,k in display['chunk_0']] if lang=='ja' else
                    [w.text for w in words if hasattr(w,'source_word')])
             if sr!=game.samplerate: wave=librosa.resample(wave,orig_sr=sr,target_sr=game.samplerate)
+            tick = time.perf_counter()
             notes,processed=extract_pitches_and_align([{'waveform':wave,'offset':0.0}],game.samplerate,
                 pred,{'chunk_0':chars},game,ts=[i/8 for i in range(8)],seg_threshold=.2,
                 seg_radius=.02,est_threshold=.2,batch_size=1,language=lang)
+            metrics['pitchMs'] += round((time.perf_counter() - tick) * 1000)
             if processed!={0}: raise ValueError('未生成逐词音符：'+text[:60])
             seen=set();word_cursor=0;current_word=None;group_notes=[]
             lexical=[w for w in words if getattr(w,'source_word',-1) in owners]
@@ -187,6 +241,8 @@ def run(request, progress):
     # Quantization works in the detected (possibly varying) beat grid, not a fake
     # constant-speed audio clock. Keep raw start/end unchanged.
     for line in lines:
+        if line['id'] in reused_lines:
+            continue
         notes=[n for n in all_notes if n['lineId']==line['id']]
         normalized=[NoteInfo(n['beat']/2,(n['beat']+n['durationBeats'])/2,n['midi'],n['lyric']) for n in notes]
         quantize_notes(normalized,120,120,mode='smart',simplicity=0)
@@ -196,23 +252,8 @@ def run(request, progress):
     for n in all_notes: pitches.append(m21note.Note(n['midi'],quarterLength=n['durationBeats']))
     key=pitches.analyze('key')
     key_data={'tonic':key.tonic.pitchClass,'mode':key.mode}
-    (root/'notation').mkdir(exist_ok=True)
-    _save_midi([NoteInfo(n['start'],n['end'],n['midi'],n['lyric']) for n in all_notes],root/'notation/vocal-raw.mid',tempo=tempo)
+    for group in cached_groups:
+        group['noteIndices'] = [i for i,n in enumerate(all_notes) if n['lineId'] in group['lineIds']]
     return {'algorithm':ALGORITHM,'source':'vocals','notes':all_notes,'key':key_data,
-            'tempo':tempo,'lyricsKey':lyrics_key(request['lyrics'])}
-
-if __name__=='__main__':
-    request=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-    root=Path(request['directory'])
-    def progress(value,stage):
-        print(json.dumps({'kind':'progress','progress':value,'stage':stage},ensure_ascii=False),flush=True)
-    try:
-        result=run(request,progress)
-        path=root/'vocal-notes-result.json';tmp=path.with_suffix('.part')
-        tmp.write_text(json.dumps(result,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-        tmp.replace(path)
-    except Exception as error:
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        (root/'vocal-notes-error.txt').write_text(str(error),encoding='utf-8')
-        sys.exit(1)
+            'tempo':tempo,'lyricsKey':lyrics_key(request['lyrics']), 'timings': metrics,
+            'reuse': dict(parent=request['parent'], beats=beats.tolist(), downbeats=list(map(float,downbeats)), groups=cached_groups)}

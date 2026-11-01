@@ -5,6 +5,7 @@ import { useSettingsDisclosure } from './settingsDisclosureRegistry.ts'
 import { storeToRefs } from 'pinia'
 import AudioDeviceProfilesPanel from '@renderer/components/settings-page/AudioDeviceProfilesPanel.vue'
 import AudioTroubleshootingPanel from './AudioTroubleshootingPanel.vue'
+import SongAnalysisSettings from './SongAnalysisSettings.vue'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAudioOutputDspStore } from '../../stores/useAudioOutputDspStore'
 import { useCoreConnection } from '../../stores/coreConnection.ts'
@@ -1147,6 +1148,7 @@ function setContinuitySampleRate(event: Event): void {
       </SettingsGroup>
     </div>
     <AudioTroubleshootingPanel @export-diagnostics="emit('exportAudioDiagnostics')" />
+    <SongAnalysisSettings />
     <SettingsGroup
       id="playback-transitions"
       title="歌曲衔接"

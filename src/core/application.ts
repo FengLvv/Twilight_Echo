@@ -142,7 +142,7 @@ export interface CoreApplicationDependencies {
     | 'setSleepTimerGain'
     | 'applyBpm'
     | 'clearBpm'
-    | 'studySourceTrack' | 'beginStudyAudition' | 'replaceStudyAudition' | 'studyAuditionState' | 'controlStudyAudition' | 'updateStudyMixGains'
+    | 'studySourceTrack' | 'studyNextTrack' | 'beginStudyAudition' | 'replaceStudyAudition' | 'studyAuditionState' | 'controlStudyAudition' | 'updateStudyMixGains'
   >
   library: Pick<LibraryDatabaseApi, 'getMetadata' | 'queryTracks' | 'readLibraryQueue'> &
     CoreLibraryReadDatabase
@@ -259,6 +259,7 @@ export class CoreApplication {
       await this.dependencies.dsp?.activate()
       this.dependencies.autoMix?.activate()
       this.dependencies.analysis?.activate()
+      this.dependencies.musicStudy?.activate()
       this.dependencies.sleepTimer?.activate()
       await this.dependencies.streams?.activate()
       if (this.shuttingDown || this.phase === 'stopped') return
@@ -562,6 +563,11 @@ export class CoreApplication {
       if (!study) throw failure('NOT_READY', '分轨工作台尚未就绪')
       switch (request.name) {
         case 'study.state': return study.state(request.payload)
+        case 'study.cache': return study.cache()
+        case 'study.runtime': return study.runtime()
+        case 'study.setCachePolicy': return study.setCachePolicy(request.payload)
+        case 'study.clearAudioCache': return study.clearAudioCache()
+        case 'study.exportSources': return study.exportSources(request.payload.id, request.payload.outputDirectory)
         case 'study.submit': return study.submit(request.payload)
         case 'study.song': return study.song(request.payload.songId)
         case 'study.lyricsDisplay': return study.lyricsDisplay(request.payload.songId)

@@ -33,6 +33,33 @@ import { CoreSleepTimer } from './sleepService.ts'
 import { createPlaybackSourceRecovery } from './sourceRecovery.ts'
 import { createLogicalTrackModel } from '../../shared/logicalTrackModel.ts'
 
+test('analysis prefetch reads the committed next occurrence without moving or reshuffling the queue', async t => {
+  const f = await fixture(t)
+  await f.session.fromQuery({ ids: ['a', 'b', 'c'], sort: 'playlist' }, 'a')
+  const before = f.session.snapshot().queue
+  const next = f.session.studyNextTrack()
+  assert.equal(next?.track.id, 'b')
+  assert.deepEqual(f.session.studyNextTrack(), next)
+  assert.deepEqual(f.session.snapshot().queue, before)
+  await f.session.setMode('repeat')
+  assert.equal(f.session.studyNextTrack(), null)
+  await f.session.setMode('shuffle')
+  const shuffled = f.session.studyNextTrack()
+  assert(shuffled)
+  assert.deepEqual(f.session.studyNextTrack(), shuffled)
+  await f.session.navigate(1)
+  assert.equal(f.session.snapshot().queue?.occurrenceId, shuffled.track.queueEntryId)
+})
+
+test('analysis prefetch can read the next item of a committed paused streamed queue', async t => {
+  const f = await fixture(t, undefined, undefined, undefined, {
+    supportedMethods: () => ['fetchPersonalFm'],
+    call: async () => { assert.fail('ordinary prefetch must not request recommendations') }
+  })
+  await f.session.fromPages(async append => append([{ id: 'a' }, { id: 'b' }]), { play: false })
+  assert.equal(f.session.studyNextTrack()?.track.id, 'b')
+})
+
 test('song mix shares ordinary transport and clock, preserves identity and returns at the latest position',async t=>{
   const observed:Array<{id:string|undefined;source:string;position:number;state:string}>=[]
   const f=await fixture(t,undefined,undefined,(track,info)=>observed.push({id:track?.id,source:info.source,position:info.position,state:info.state}))

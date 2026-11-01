@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { createHash } from 'node:crypto'
-import { copyFile, lstat, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, relative, resolve } from 'node:path'
 import { parseFile } from 'music-metadata'
 import type { CoreApplicationRuntime } from '../app/coreApplication.ts'
@@ -30,7 +30,7 @@ export function createAgentActions(profile: string, application: CoreApplication
   const directory = (id: unknown) => join(profile, 'music-study', recordId(id))
   async function files(root: string, folder = root): Promise<Array<{ path: string; relativePath: string; bytes: number }>> {
     const output: Array<{ path: string; relativePath: string; bytes: number }> = []
-    for (const entry of await readdir(folder, { withFileTypes: true })) {
+    for (const entry of await readdir(folder, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return []; throw error })) {
       const path = join(folder, entry.name), info = await lstat(path)
       if (info.isSymbolicLink()) continue
       if (info.isDirectory()) output.push(...await files(root, path))
@@ -85,7 +85,9 @@ export function createAgentActions(profile: string, application: CoreApplication
       kind:'query', description:'Inspect verified native analysis artifacts without copying audio.', inputSchema:idSchema,
       async run(payload) {
         const value = await project(payload.id)
-        return { id:value.id, title:value.title, status:value.status, sourceSha256:value.result?.sourceSha256, files:await files(directory(value.id)) }
+        return { id:value.id, title:value.title, status:value.status, sourceSha256:value.result?.sourceSha256,
+          artifacts:{sixAvailable:value.sixReady,chords:value.result?.chords.segments.length??0,notes:value.result?.melody?.notes.length??0,scores:value.result?.melody?.scores.length??0},
+          files:await files(directory(value.id)) }
       }
     },
     'agent.music.context': {
@@ -110,13 +112,12 @@ export function createAgentActions(profile: string, application: CoreApplication
         const key = parseKey(String(setting)) ?? inferChordKey(value.result?.chords.segments ?? []) ?? melody.key
         const rows = melody.scores.flatMap(row => { const score = rhythmicLyricScore(melody,row.lineId,row.text); return score ? [{...score,lineId:row.lineId}] : [] })
         const exported = await exporter.export({ id:value.id,title:value.title,notation:payload.notation as 'numbered'|'staff',key,rows },resolve(payload.directory))
-        const native = (await files(directory(value.id))).filter(file=>/\.(mid|musicxml)$/i.test(file.path) && !file.path.endsWith('.layout.musicxml'))
         const source = join(exported.directory,'source')
         await mkdir(source)
-        for (const [index,file] of native.entries()) await copyFile(file.path,join(source,String(index).padStart(4,'0')+'-'+basename(file.path)))
+        const sourceArtifacts = await application.request('study.exportSources',{id:value.id,outputDirectory:await grantUserSelectedDownloadRoot(source)})
         await writeFile(join(exported.directory,'analysis.json'),JSON.stringify({ id:value.id, title:value.title, sourceSha256:value.result?.sourceSha256,
           key, melody:{...melody,scores:undefined}, chords:value.result?.chords },null,2))
-        return { ...exported, sourceArtifacts:native.length, analysis:join(exported.directory,'analysis.json') }
+        return { ...exported, sourceArtifacts, analysis:join(exported.directory,'analysis.json') }
       }
     },
     'agent.music.exportAudio': {

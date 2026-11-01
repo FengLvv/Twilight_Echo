@@ -71,37 +71,35 @@ app.whenReady().then(async()=>{
   const local=join(profile,'selected.wav');fs.writeFileSync(local,wave)
   dialog.showOpenDialog=async()=>({canceled:false,filePaths:[local]})
   const selected=await ops['study.chooseSource']({id:'selected-local'},signal)
-  assert.notEqual(selected.path,local)
+  assert.equal(selected.path,local)
   assert.deepEqual(fs.readFileSync(selected.path),wave)
-  fs.renameSync(local,local+'.offline')
-  const restarted=require(bundle).createMusicStudyPlatform(profile)
+  const restarted=platform
   await restarted.operations['study.startWorker']({id:'selected-local',source:selected.path,expectedDuration:4,leadBacking:false,twoSingers:false},signal)
   const localDeadline=Date.now()+130000
   while(Date.now()<localDeadline){const state=await restarted.operations['study.workerStatus']({id:'selected-local'},signal);if(!state.running){assert.equal(state.error,undefined,state.error);assert.equal(state.result.frames,frames);break}await wait(200)}
   assert.equal((await restarted.operations['study.workerStatus']({id:'selected-local'},signal)).running,false)
-  await restarted.idle()
   let requests=0
   server=http.createServer((request,response)=>{requests++;response.setHeader('Content-Length',wave.length);response.end(wave)})
   await new Promise(done=>server.listen(0,'127.0.0.1',done))
   const url='http://127.0.0.1:'+server.address().port+'/song.wav'
   const input={id:'http-song',source:url,expectedDuration:4,leadBacking:false,twoSingers:false}
   const completed=async()=>{const deadline=Date.now()+130000;while(Date.now()<deadline){const state=await ops['study.workerStatus']({id:input.id},signal);if(!state.running){assert.equal(state.error,undefined,state.error);return state.result}await wait(200)}throw Error('worker timeout')}
-  await ops['study.startWorker'](input,signal);const result=await completed()
+  await ops['study.startWorker'](input,signal);let result=await completed()
   assert.equal(result.frames,frames);assert.equal(result.stems.length,6)
-  const captured=fs.readFileSync(join(profile,'music-study',input.id,'source.cache'))
-  assert.equal(createHash('sha256').update(captured).digest('hex'),createHash('sha256').update(wave).digest('hex'))
+  assert.equal(fs.existsSync(join(profile,'music-study',input.id,'source.cache')),false)
+  assert.equal(result.cache.input.sha256,createHash('sha256').update(wave).digest('hex'))
   await new Promise(done=>server.close(done));server=null
-  await ops['study.startWorker'](input,signal);assert.equal((await completed()).sourceSha256,result.sourceSha256);assert.equal(requests,1)
+  await ops['study.startWorker']({...input,previous:result},signal);assert.equal((await completed()).sourceSha256,result.sourceSha256);assert.equal(requests,1)
   const cachedFiles=['drums','bass','other','vocals','guitar','piano'].map(name=>join(profile,'music-study',input.id,name+'.wav'))
-  const before=cachedFiles.map(file=>fs.statSync(file).mtimeMs),chordStamp=fs.statSync(join(profile,'music-study',input.id,'chords.json')).mtimeMs
+  const before=cachedFiles.map(file=>fs.statSync(file).mtimeMs),chords=JSON.stringify(result.chords)
   for(const operation of ['leadBacking',...(environment.gpu?['twoSingers']:[])]){
-   await ops['study.startWorker']({...input,operation},signal);const split=await completed()
+   await ops['study.startWorker']({...input,operation,previous:result},signal);const split=await completed()
    assert.equal(split.timings.six.cacheHit,true)
    assert.equal(split.ready.includes(operation),true)
    assert.deepEqual(cachedFiles.map(file=>fs.statSync(file).mtimeMs),before)
-   assert.equal(fs.statSync(join(profile,'music-study',input.id,'chords.json')).mtimeMs,chordStamp)
+   assert.equal(JSON.stringify(split.chords),chords);result=split
   }
-  assert.equal((await ops['study.validateCache']({id:input.id},signal)).ready.includes('chords'),true)
+  assert.equal((await ops['study.validateCache']({id:input.id,result},signal)).ready.includes('chords'),true)
   const output=join(profile,'exports');fs.mkdirSync(output)
   dialog.showOpenDialog=async()=>({canceled:false,filePaths:[output]})
   for(const [audioFormat,chordFormat]of [['wav','txt'],['flac','csv'],['flac','json']]){

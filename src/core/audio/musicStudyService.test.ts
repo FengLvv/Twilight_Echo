@@ -131,6 +131,83 @@ function fixture(initial: StudyRecord[] = []) {
     }
   }
 }
+test('prefetch only follows the actual next input after analysis is enabled and foreground demand survives queue changes', async () => {
+  const f = fixture()
+  const timers = new Map<() => void, number>()
+  f.ports.schedule = (cb, delay) => { timers.set(cb, delay); return () => { timers.delete(cb) } }
+  let nextId = 'next'
+  f.ports.next = async () => ({ key: nextId, input: { kind: 'local', id: nextId } })
+  f.ports.source = async input => ({ title: input?.kind === 'local' ? input.id : 'current', source: {
+    identity: input?.kind === 'local' ? input.id : 'current', path: '/source.wav', duration: 10
+  } })
+  const run = async (delay: number) => {
+    for (const [cb, d] of [...timers]) if (d === delay) { timers.delete(cb); cb(); break }
+    await f.settle()
+  }
+  f.service.bindLyrics('current', 'occurrence-1')
+  await run(1200)
+  assert.equal(f.saved.size, 0)
+  const current = (await f.service.analyze('current'))!
+  await f.settle()
+  await run(1200)
+  const next = [...f.saved.values()].find(r => r.source.identity === 'next')!
+  assert(next.prefetch)
+  assert.deepEqual(next.pending, ['analyze'])
+  assert.equal(f.launched.length, 1)
+  // Explicit demand promotes the same durable record, instead of duplicating it.
+  const explicit = await f.service.create({ input: { kind: 'local', id: 'next' } })
+  assert.equal(explicit?.id, next.id)
+  assert.equal(f.saved.get(next.id)?.prefetch, false)
+  nextId = 'replacement'
+  await run(1200)
+  assert(!f.cancelled.includes(next.id))
+  assert.equal(f.saved.get(current.id)?.status, 'running')
+  assert.equal(f.saved.size, 3)
+  await f.service.shutdown()
+})
+
+test('audio-free chord export keeps cached results and does not start a model job', async () => {
+  const f = fixture()
+  const created = (await f.service.create({ current: true }))!
+  await f.settle(); f.complete(); await f.tick()
+  const launched = f.launched.length
+  let groups = [{ id: created.id, kind: 'six' as const, bytes: 100 }]
+  f.ports.audioInventory = async () => groups
+  f.ports.removeAudio = async () => { groups = [] }
+  await f.service.clearAudioCache()
+  const cached = (await f.service.project(created.id)).result!
+  assert(!cached.ready.includes('six'))
+  assert(cached.ready.includes('chords'))
+  assert.equal(await f.service.export({ id: created.id, stems: [], audioFormat: 'wav', chordFormat: 'json' }), '/export')
+  assert.equal(f.launched.length, launched)
+  await f.service.shutdown()
+})
+
+test('playback and export acquire leases before awaiting validation', async () => {
+  const f = fixture()
+  const created = (await f.service.create({ current: true }))!
+  await f.settle(); f.complete(); await f.tick()
+  let removed = 0, entered!: () => void, resume!: () => void
+  let gate = new Promise<void>(done => { resume = done })
+  let checking = new Promise<void>(done => { entered = done })
+  f.ports.audioInventory = async () => [{ id: created.id, kind: 'six', bytes: 100 }]
+  f.ports.removeAudio = async () => { removed++ }
+  f.ports.validate = async (_record, _source, verify) => { assert(verify); entered(); await gate; return { ready: result.ready } }
+  const mixing = f.service.setMix({ id: created.id, mode: 'instruments', tracks: {} })
+  await checking
+  await f.service.clearAudioCache(); assert.equal(removed, 0)
+  resume(); await mixing
+  await f.service.transport({ id: created.id, action: 'exit' })
+  gate = new Promise<void>(done => { resume = done })
+  checking = new Promise<void>(done => { entered = done })
+  const exporting = f.service.export({ id: created.id, stems: ['vocals'], audioFormat: 'wav', chordFormat: 'json' })
+  await checking
+  await f.service.clearAudioCache(); assert.equal(removed, 0)
+  resume(); await exporting
+  await f.service.clearAudioCache(); assert.equal(removed, 1)
+  await f.service.shutdown()
+})
+
 test('background submit keeps explicit sources and voice splitting opt-in',async()=>{
   const f=fixture()
   let selected: unknown
@@ -145,6 +222,20 @@ test('background submit keeps explicit sources and voice splitting opt-in',async
   assert(!f.saved.get(project.id)?.stages?.twoSingers)
   await f.service.shutdown()
 })
+
+test('Core keeps runtime demand across queued stages and releases it after the final stage', async () => {
+  const f = fixture(), demand: boolean[] = []
+  f.ports.runtimeActivity = async busy => { demand.push(busy) }
+  const project = (await f.service.create({ current: true }))!
+  await f.settle()
+  await f.service.splitVocals(project.id, 'leadBacking')
+  assert.deepEqual(demand, [true])
+  f.complete(); await f.tick()
+  assert.deepEqual(demand, [true], 'the queued vocal stage must retain GPU placement')
+  await f.tick()
+  assert.deepEqual(demand, [true, false])
+  await f.service.shutdown()
+})
 test('supplied timed lyrics validate before any background job is launched',async()=>{
   const f=fixture()
   await assert.rejects(f.service.submit({input:{kind:'local',id:'background'},stages:['six','chords','melody'],lyrics:'No timestamps'}),/时间/)
@@ -153,9 +244,9 @@ test('supplied timed lyrics validate before any background job is launched',asyn
   const project=await f.service.submit({input:{kind:'local',id:'background'},stages:['six','chords','melody'],lyrics:'[00:00.00]First line\n[00:05.00]Second line'})
   await f.settle()
   const saved=f.saved.get(project.id)!
-  assert.equal(saved.operation,'melody')
+  assert.equal(saved.operation,'analyze')
   assert.equal(JSON.parse(saved.lyrics!)[0].text,'First line')
-  assert(saved.pending?.includes('chords'))
+  assert(saved.pending?.includes('melody'))
   assert(!saved.pending?.includes('twoSingers'))
   await f.service.shutdown()
 })
@@ -189,7 +280,10 @@ test('vocal melody is opt-in, prepares six without chords and is reused when com
   f.ports.lyrics = () => '[{"id":0,"start":0,"end":10,"text":"changed lyrics"}]'
   const changed = await f.service.transcribeMelody('logical-song')
   assert.equal(changed?.id, p!.id)
-  assert.equal(changed?.result?.melody, undefined)
+  assert.equal(changed?.result?.melody?.notes[0].midi, 60)
+  assert(!changed?.result?.ready.includes('melody'))
+  assert.equal((await f.service.lyricsProjection('logical-song')).melody, undefined)
+  await assert.rejects(f.service.exportSources(p!.id, 'unused'), /原始数据不可用/)
   assert.equal(f.saved.get(p!.id)?.stages?.melody?.status, 'queued')
   assert(validStudyPayload('study.transcribeMelody', { songId: 'logical-song' }))
   assert(
@@ -314,7 +408,7 @@ test('lyric display shares controls between windows, persists mode and key, and 
   })
   assert.equal((await f.service.lyricsDisplay('logical-song')).notationVisible, false)
   assert.equal(f.launched.length, 1)
-  assert.deepEqual(preferences, { mode: 'degrees', notationMode: 'staff' })
+  assert.deepEqual(preferences, { mode: 'degrees', notationMode: 'staff', cachePolicy: { limitBytes: 2 * 1024 ** 3, preloadNext: true } })
   f.service.bindLyrics('logical-song', 'second')
   assert.deepEqual(await f.service.lyricsDisplay('logical-song'), {
     notationMode: 'staff',

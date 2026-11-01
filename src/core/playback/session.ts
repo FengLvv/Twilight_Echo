@@ -148,6 +148,14 @@ export class CorePlaybackSession {
   private studyAudition: { source: string; intent: number; position: number; resume: boolean; loop: {start:number;end:number}|null; songId:string; occurrenceId?:string; ended?:boolean; originalSource:string; originalQueue:AudioEngineQueueItem[]; originalIndex:number; originalRevision?:number } | null = null
   /** Private Core source access; renderer snapshots still never expose URL grants. */
   studySourceTrack(): TrackData | null { return this.currentTrack ? structuredClone(this.currentTrack) : null }
+  studyNextTrack(): { key: string; track: TrackData } | null {
+    if (this.mode === 'repeat' || this.mode === 'heart' || this.personalized?.state() || this.detachedHeartTrack) return null
+    const window = this.controller.window.value, reference = this.controller.reference()
+    if (!window || !reference || window.queue.revision !== reference.revision || window.items[0]?.queueEntryId !== reference.entryId) return null
+    const next = window.items[1]
+    return next?.track ? { key: JSON.stringify([reference.id, reference.revision, reference.entryId, next.queueEntryId]),
+      track: libraryQueueTrack(next.track, next.queueEntryId) } : null
+  }
   async beginStudyAudition(source: string, binding?: {songId:string;occurrenceId?:string}): Promise<void> {
     if (this.options.cast?.active()) throw new Error('请先结束投放再试听分轨')
     const matches=()=>!binding || binding.songId===this.currentTrack?.id&&(!binding.occurrenceId||binding.occurrenceId===this.controller.reference()?.entryId)

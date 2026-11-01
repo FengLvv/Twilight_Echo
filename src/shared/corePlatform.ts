@@ -175,14 +175,19 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
   if (request.name.startsWith('study.')) {
     const p=payload as Record<string, unknown>
     if (!isBoundedStudyJson(p)) return false
-    if (['study.environment','study.choosePack'].includes(request.name)) return Object.keys(p).length===0
+    if (['study.environment','study.choosePack','study.runtime','study.audioInventory'].includes(request.name)) return Object.keys(p).length===0
+    if (request.name==='study.runtimeActivity') return Object.keys(p).length===1 && typeof p.busy==='boolean'
     if (typeof p.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(p.id)) return false
-    if(request.name==='study.validateCache')return Object.keys(p).every(k=>['id','source'].includes(k))&&(p.source===undefined||typeof p.source==='string'&&p.source.length<32768&&!p.source.includes('\0'))
+    if(request.name==='study.validateCache')return Object.keys(p).every(k=>['id','source','result','verifyAudio'].includes(k))&&(p.source===undefined||typeof p.source==='string'&&p.source.length<32768&&!p.source.includes('\0')) && (p.result===undefined || !!p.result && typeof p.result==='object') && (p.verifyAudio===undefined || typeof p.verifyAudio==='boolean')
+    if(request.name==='study.removeAudio')return Object.keys(p).every(k=>['id','kind'].includes(k))&&['six','leadBacking','twoSingers'].includes(String(p.kind))
+    if(request.name==='study.exportSources')return Object.keys(p).every(k=>['id','outputDirectory','melody','lyrics'].includes(k))&&typeof p.outputDirectory==='string'&&p.outputDirectory.length>0&&p.outputDirectory.length<32768&&!p.outputDirectory.includes('\0')&&!!p.melody&&typeof p.melody==='object'&&typeof p.lyrics==='string'&&p.lyrics.length<=1024*1024
     if(request.name==='study.captureLocal')return Object.keys(p).length===2&&typeof p.path==='string'&&p.path.length<32768&&!p.path.includes('\0')
     if (request.name==='study.startWorker') return typeof p.source==='string' && p.source.length<32768 && !p.source.includes('\0') &&
       typeof p.leadBacking==='boolean' && typeof p.twoSingers==='boolean' &&
       (p.lyrics===undefined || typeof p.lyrics==='string' && p.lyrics.length<=1024*1024 && !p.lyrics.includes('\0')) &&
       (p.operation===undefined || STUDY_OPERATIONS.some(operation => operation === p.operation)) &&
+      (p.previous===undefined || !!p.previous && typeof p.previous==='object') &&
+      (p.budgetBytes===undefined || Number.isSafeInteger(p.budgetBytes) && Number(p.budgetBytes)>0 && Number(p.budgetBytes)<=1024**4) &&
       (p.start===undefined || (typeof p.start==='number' && Number.isFinite(p.start) && p.start>=0)) &&
       (p.end===undefined || (typeof p.end==='number' && Number.isFinite(p.end) && p.end>Number(p.start??0)))
     if (request.name==='study.exportFiles') return validStudyPayload('study.export',{id:p.id,audioFormat:p.audioFormat,chordFormat:p.chordFormat,stems:p.stems}) && !!p.chords

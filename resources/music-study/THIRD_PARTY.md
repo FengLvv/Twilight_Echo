@@ -57,8 +57,9 @@ https://huggingface.co/m-a-p/SheetSage2 at b83c3d79a6d98bcffaf8f9ed112c90aa88788
 https://huggingface.co/m-a-p/MERT-v2-FullSong at d8ba1c745e733b3908ce6ad16ebeb17ac7600a42.
 Code and model weights are CC-BY-NC-4.0 (noncommercial use only). The fixed
 inference source, full license, upstream notices and source hashes are in
-vendor/sheetsage2. Our only upstream source change loads the parent through
-the bundled MERT2Model class, retaining its integrity checks; model folders
+vendor/sheetsage2. Local changes load the parent through the bundled MERT2Model
+class, retain integrity checks, and clear derived rotary caches when moving
+the model between CPU and CUDA. Model folders
 contain weights and configuration only. No trust_remote_code runs at inference.
 Weights remain outside the application and are downloaded by the installer.
 Paper: https://arxiv.org/abs/2610.05336 . Measured with paper preset and prompts

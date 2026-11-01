@@ -780,6 +780,11 @@ const OPERATIONS: Record<
 > = {
   'study.submit': { kind: 'command', permission: 'library:write' },
   'study.state': { kind: 'query', permission: 'playback:read' },
+  'study.cache': { kind: 'query', permission: 'playback:read' },
+  'study.runtime': { kind: 'query', permission: 'playback:read' },
+  'study.setCachePolicy': { kind: 'command', permission: 'library:write' },
+  'study.clearAudioCache': { kind: 'command', permission: 'library:write' },
+  'study.exportSources': { kind: 'command', permission: 'library:read' },
   'study.song': { kind: 'query', permission: 'playback:read' },
   'study.lyricsDisplay': { kind: 'query', permission: 'playback:read' },
   'study.setLyricsDisplay': { kind: 'command', permission: 'library:write' },

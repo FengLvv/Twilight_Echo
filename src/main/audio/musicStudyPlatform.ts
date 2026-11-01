@@ -1,486 +1,309 @@
 import { app, dialog } from 'electron'
-import { spawn, execFile, type ChildProcess } from 'node:child_process'
 import { createReadStream, createWriteStream, existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile, rename, rm, stat, realpath, copyFile } from 'node:fs/promises'
-import { join, resolve, relative, basename, extname } from 'node:path'
+import { mkdir, readFile, writeFile, rename, rm, stat, realpath, readdir } from 'node:fs/promises'
+import { join, resolve, relative, basename, isAbsolute } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { pipeline } from 'node:stream/promises'
-import { Readable } from 'node:stream'
+import { Readable, Transform } from 'node:stream'
 import { STUDY_MODEL_HASHES } from './studyModelRegistry.ts'
 import { createStudyCacheValidator } from './studyCache.ts'
-import {
-  grantCompletedDownloadAudioFile,
-  resolveAuthorizedAudioFile,
-  resolveConfiguredDownloadRoot
-} from '../security/localPaths.ts'
-import { validStudyTrack, STUDY_STAGES, type StudyPlatformOperations, type StudyResult, type StudyState, type StudyStage } from '../../shared/musicStudy.ts'
+import { StudyResidentProcess } from './studyResidentProcess.ts'
+import { StudyRuntimeResidency, STUDY_GPU_IDLE_MS } from './studyRuntimeResidency.ts'
+import { grantCompletedDownloadAudioFile, resolveAuthorizedAudioFile, resolveConfiguredDownloadRoot } from '../security/localPaths.ts'
+import { validStudyTrack, STUDY_STAGES, type StudyPlatformOperations, type StudyResult, type StudyState, type StudyRuntimeStatus, type StudyAudioGroup } from '../../shared/musicStudy.ts'
 
-type Operations = {
-  [K in keyof StudyPlatformOperations]: (
-    input: StudyPlatformOperations[K]['input'],
-    signal: AbortSignal
-  ) => Promise<StudyPlatformOperations[K]['output']>
-}
-type Job = {
-  child?: ChildProcess
-  controller: AbortController
-  done: Promise<void>
-  running: boolean
-  progress: number
-  stage: string
-  error?: string
-  phase?: StudyStage
-  resultRevision?: number
-  result?: StudyResult
-  loadedRevision?: number
-}
+type Operations = { [K in keyof StudyPlatformOperations]: (input: StudyPlatformOperations[K]['input'], signal: AbortSignal) => Promise<StudyPlatformOperations[K]['output']> }
+type Job = { controller: AbortController; done: Promise<void>; running: boolean; progress: number; stage: string; error?: string;
+  phase?: import('../../shared/musicStudy.ts').StudyStage; resultRevision?: number; result?: StudyResult }
+const coreModels = ['torch/hub/checkpoints/5c90dfd2-34c22ccb.th', 'sheetsage2/model.safetensors', 'sheetsage2/config.json', 'mert2/model.safetensors', 'mert2/config.json']
+
 export function createMusicStudyPlatform(profile: string) {
-  const root = join(profile, 'music-study'),
-    jobs = new Map<string, Job>(),
-    activeRuns = new Set<Promise<void>>()
-  const validateCache = createStudyCacheValidator()
-  let lifetime = new AbortController(),
-    draining: Promise<void> | null = null
-  const worker = join(
-    app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
-    'music-study',
-    'worker.py'
-  )
+  const root = join(profile, 'music-study'), jobs = new Map<string, Job>(), validateCache = createStudyCacheValidator()
+  const script = join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'music-study', 'worker.py')
   const configured = join(root, 'environment.json')
-  let home =
-    process.env.TWILIGHT_MUSIC_STUDY_HOME || join(app.getPath('exe'), '..', 'music-study-runtime')
-  let selected: Promise<void> | null = null,
-    environmentCache: StudyState['environment'] | null = null,
-    environmentPending: Promise<StudyState['environment']> | null = null,
-    mixSequence = 0
-  const init = () =>
-    (selected ??= (async () => {
-      await mkdir(root, { recursive: true })
-      try {
-        const data = JSON.parse(await readFile(configured, 'utf8'))
-        home = data.home
-      } catch {}
-    })())
-  const python = () =>
-    join(
-      home,
-      'runtime',
-      process.platform === 'win32' ? 'Scripts' : 'bin',
-      process.platform === 'win32' ? 'python.exe' : 'python'
-    )
+  let home = process.env.TWILIGHT_MUSIC_STUDY_HOME || join(app.getPath('exe'), '..', 'music-study-runtime')
+  let selected: Promise<void> | null = null, environmentCache: StudyState['environment'] | null = null,
+    environmentPending: Promise<StudyState['environment']> | null = null, lifetime = new AbortController(), draining: Promise<void> | null = null
+  let runtimeState: StudyRuntimeStatus = { state: 'stopped', pid: null, loaded: [] }
+  const verified = new Map<string, string>()
+  const mixSlots = new Map<string, number>()
+  const python = () => join(home, 'runtime', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python')
+  const runtime = new StudyResidentProcess(python, script)
+  const residency = new StudyRuntimeResidency({
+    call: (method, params, signal, event) => runtime.call(method, params, signal, event),
+    alive: () => runtime.pid !== null,
+    changed: value => { runtimeState = { ...runtimeState, ...value } },
+    failed: error => console.warn('[study.residency]', String(error)),
+    schedule: (callback, delay) => { const timer = setTimeout(callback, delay); timer.unref(); return () => clearTimeout(timer) }
+  })
+  const init = () => selected ??= (async () => {
+    await mkdir(root, { recursive: true })
+    try { home = JSON.parse(await readFile(configured, 'utf8')).home } catch {}
+    const trash = join(root, '.trash')
+    if (existsSync(trash)) {
+      const boundary = await realpath(root), target = await realpath(trash), child = relative(boundary, target)
+      if (!child || isAbsolute(child) || child.startsWith('..')) throw new Error('Invalid cache recovery path')
+      await rm(target, { recursive: true, force: true })
+    }
+    // Only recover our own generated workspace, never user music or exports.
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !/^[a-zA-Z0-9-]{1,80}$/.test(entry.name)) continue
+      const dir = await owned(entry.name)
+      for (const file of await readdir(dir, { withFileTypes: true })) {
+        if (file.isSymbolicLink() || !(/\.part(?:\.wav)?$|\.tmp$|\.temix$/.test(file.name) || file.name === 'source.cache' || file.name.startsWith('vocal-align-'))) continue
+        const target = await realpath(join(dir, file.name)), child = relative(dir, target)
+        if (!child || isAbsolute(child) || child.startsWith('..')) throw new Error('Invalid temporary audio path')
+        await rm(target, { recursive: file.isDirectory(), force: true })
+      }
+    }
+  })()
   const directory = (id: string) => {
     if (!/^[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error('Invalid project ID')
     return join(root, id)
   }
   const atomic = async (path: string, data: string) => {
     const temp = path + '.' + randomUUID() + '.tmp'
-    await writeFile(temp, data, 'utf8')
-    await rename(temp, path)
+    await writeFile(temp, data, 'utf8'); await rename(temp, path)
   }
-  async function verify() {
+  async function digest(path: string, signal?: AbortSignal) {
+    const hash = createHash('sha256')
+    for await (const block of createReadStream(path)) { signal?.throwIfAborted(); hash.update(block) }
+    return hash.digest('hex')
+  }
+  async function verify(names = coreModels) {
     await init()
-    lifetime.signal.throwIfAborted()
-    if (!existsSync(python())) throw new Error('请选择包含 runtime 和 models 的完整分析环境目录')
-    for (const [file, expected] of Object.entries(STUDY_MODEL_HASHES)) {
-      const path = join(home, 'models', file),
-        hash = createHash('sha256')
-      for await (const block of createReadStream(path)) {
-        lifetime.signal.throwIfAborted()
-        hash.update(block)
-      }
-      if (hash.digest('hex') !== expected) throw new Error('模型校验失败: ' + file)
-    }
-  }
-  async function run(
-    operation: 'probe' | 'analyze' | 'export',
-    request: object,
-    dir: string,
-    signal: AbortSignal,
-    onEvent: (value: any) => void,
-    assign?: (child: ChildProcess) => void
-  ) {
-    signal = AbortSignal.any([signal, lifetime.signal])
-    await mkdir(dir, { recursive: true })
-    const requestFile = join(dir, 'request-' + randomUUID() + '.json')
-    await writeFile(requestFile, JSON.stringify(request), 'utf8')
-    try {
-      const completion = new Promise<void>((done, reject) => {
-        signal.throwIfAborted()
-        const child = spawn(python(), [worker, operation, requestFile], {
-          windowsHide: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            PYTHONUTF8: '1',
-            PYTHONNOUSERSITE: '1',
-            HF_HUB_OFFLINE: '1',
-            TRANSFORMERS_OFFLINE: '1',
-            OMP_NUM_THREADS: '8',
-            TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD: '1'
-          }
-        })
-        assign?.(child)
-        let pending = '',
-          error = '',
-          failure = ''
-        const abort = () => {
-          if (process.platform === 'win32' && child.pid)
-            execFile(
-              join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'),
-              ['/PID', String(child.pid), '/T', '/F'],
-              { windowsHide: true },
-              () => {
-                if (child.exitCode === null) child.kill()
-              }
-            )
-          else child.kill()
-        }
-        signal.addEventListener('abort', abort, { once: true })
-        child.stdout?.setEncoding('utf8')
-        child.stdout?.on('data', (block) => {
-          pending += block.toString('utf8')
-          if (pending.length > 128 * 1024) {
-            failure = '分析进程输出超出限制'
-            child.kill()
-            return
-          }
-          let index: number
-          while ((index = pending.indexOf('\n')) >= 0) {
-            const line = pending.slice(0, index)
-            pending = pending.slice(index + 1)
-            try {
-              const value = JSON.parse(line)
-              if (value.kind === 'error') failure = value.message
-              onEvent(value)
-            } catch {}
-          }
-        })
-        child.stderr?.on('data', (block) => {
-          error = (error + block.toString('utf8')).slice(-6000)
-        })
-        child.on('error', reject)
-        child.on('close', (code) => {
-          signal.removeEventListener('abort', abort)
-          if (signal.aborted) reject(new Error('任务已取消'))
-          else if (code !== 0) reject(new Error(failure || error || '分析进程退出'))
-          else done()
-        })
-      })
-      activeRuns.add(completion)
-      try {
-        await completion
-      } finally {
-        activeRuns.delete(completion)
-      }
-    } finally {
-      await rm(requestFile, { force: true })
+    if (!existsSync(python())) throw new Error('请选择包含 runtime 和 models 的分析环境')
+    for (const name of names) {
+      const path = join(home, 'models', name), info = await stat(path), version = `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
+      if (verified.get(path) === version) continue
+      if (await digest(path, lifetime.signal) !== STUDY_MODEL_HASHES[name]) throw new Error('模型校验失败：' + name)
+      verified.set(path, version)
     }
   }
   async function environment(): Promise<StudyState['environment']> {
-    if (environmentCache) return environmentCache
+    if (environmentCache?.ready && runtime.pid) return environmentCache
     if (environmentPending) return environmentPending
-    environmentPending = checkEnvironment().finally(() => {
-      environmentPending = null
-    })
+    environmentPending = (async () => {
+      try {
+        runtimeState = { state: 'warming', pid: runtime.pid, loaded: [] }
+        await verify()
+        const value = await residency.run('warm', { pack: join(home, 'models') }, lifetime.signal)
+        runtimeState = { ...value, state: 'ready', pid: runtime.pid }
+        return environmentCache = { ready: true, gpu: !!value.gpu, gpuName: value.gpuName }
+      } catch (error) {
+        runtimeState = { state: 'failed', pid: runtime.pid, loaded: [], error: String(error) }
+        return environmentCache = { ready: false, gpu: false, gpuName: '', error: String(error) }
+      }
+    })().finally(() => { environmentPending = null })
     return environmentPending
   }
-  async function checkEnvironment(): Promise<StudyState['environment']> {
-    try {
-      await verify()
-      let result: StudyState['environment'] = { ready: false, gpu: false, gpuName: '' }
-      await run(
-        'probe',
-        { pack: join(home, 'models') },
-        root,
-        AbortSignal.timeout(120000),
-        (event) => {
-          if (event.kind === 'probe')
-            result = { ready: true, gpu: !!event.gpu, gpuName: String(event.gpuName || '') }
-        }
-      )
-      environmentCache = result
-      return result
-    } catch (error) {
-      return { ready: false, gpu: false, gpuName: '', error: String(error) }
-    }
-  }
   const chooseDirectory = async (title: string) => {
-    const result = await dialog.showOpenDialog({ title, properties: ['openDirectory'] })
-    return result.canceled ? null : (result.filePaths[0] ?? null)
+    const value = await dialog.showOpenDialog({ title, properties: ['openDirectory'] })
+    return value.canceled ? null : value.filePaths[0] ?? null
+  }
+  const cacheDestination = (target: string) => {
+    const path = relative(resolve(root), resolve(target))
+    return !path || !isAbsolute(path) && path !== '..' && !path.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'))
+  }
+  const kindOf = (name: string): StudyAudioGroup['kind'] =>
+    /^(lead|backing)(\.|$)/.test(name) ? 'leadBacking' : /^(singerA|singerB)(\.|$)/.test(name) ? 'twoSingers' : 'six'
+  async function files(path: string): Promise<Array<{ path: string; bytes: number; top: string }>> {
+    const output: Array<{ path: string; bytes: number; top: string }> = []
+    for (const entry of await readdir(path, { withFileTypes: true }).catch(() => [])) {
+      if (entry.isSymbolicLink()) continue
+      const target = join(path, entry.name)
+      if (entry.isDirectory()) for (const value of await files(target)) output.push({ ...value, top: entry.name })
+      else if (entry.isFile()) output.push({ path: target, bytes: (await stat(target)).size, top: entry.name })
+    }
+    return output
+  }
+  async function owned(id: string) {
+    const target = await realpath(directory(id)), boundary = await realpath(root), child = relative(boundary, target)
+    if (!child || child.startsWith('..') || resolve(boundary, child) !== target) throw new Error('Invalid cache path')
+    return target
   }
   const operations: Operations = {
-    'study.captureLocal': async ({ id, path }) => {
-      const source = await resolveAuthorizedAudioFile(path),
-        dir = directory(id)
-      await mkdir(dir, { recursive: true })
-      const partial = join(dir, 'capture.part'),
-        target = join(dir, 'source' + extname(source).toLowerCase())
-      try {
-        await copyFile(source, partial)
-        await rename(partial, target)
-        const info = await stat(source)
-        await atomic(join(dir, 'source-info.json'), JSON.stringify({ path: source, size: info.size, mtimeMs: info.mtimeMs }))
-      } catch (error) {
-        await rm(partial, { force: true })
-        throw error
-      }
-      return target
-    },
+    'study.captureLocal': async ({ path }) => resolveAuthorizedAudioFile(path),
     'study.environment': async () => environment(),
+    'study.runtime': async () => ({ idleOffloadSeconds: STUDY_GPU_IDLE_MS / 1000, ...runtimeState, pid: runtime.pid,
+        ...(!runtime.pid && runtimeState.state === 'ready' ? { state: 'stopped' as const, loaded: [], devices: {}, cudaAllocatedBytes: 0, cudaReservedBytes: 0,
+          residentWeightBytes: 0, estimatedDirectMLBytes: 0 } : {}) }),
+    'study.runtimeActivity': async ({ busy }) => { residency.setDemand(busy) },
     'study.choosePack': async () => {
-      if ([...jobs.values()].some((job) => job.running)) throw new Error('请等待或取消当前分析任务')
-      await init()
-      await environmentPending
-      const path = await chooseDirectory('选择分轨分析环境（包含 runtime、models）')
-      if (!path) return
+      if ([...jobs.values()].some(job => job.running)) throw new Error('请先结束当前分析任务')
+      const value = await chooseDirectory('选择分析环境（包含 runtime、models）')
+      if (!value) return
+      residency.suspend(); await runtime.close(); await environmentPending
       const previous = home
-      home = await realpath(path)
-      try {
-        await verify()
-        environmentCache = null
-        const result = await environment()
-        if (!result.ready) throw new Error(result.error || '环境不可用')
-        await atomic(configured, JSON.stringify({ home }))
-      } catch (error) {
-        home = previous
-        environmentCache = null
-        throw error
-      }
+      home = await realpath(value); verified.clear(); environmentCache = null
+      residency.resume()
+      const result = await environment()
+      if (!result.ready) { residency.suspend(); await runtime.close(); home = previous; environmentCache = null; residency.resume(); throw new Error(result.error) }
+      await atomic(configured, JSON.stringify({ home }))
     },
-    'study.chooseSource': async ({ id }, signal) => {
-      const result = await dialog.showOpenDialog({
-        title: '选择完整歌曲进行分轨',
-        properties: ['openFile'],
-        filters: [
-          {
-            name: '音频',
-            extensions: ['wav', 'flac', 'mp3', 'm4a', 'aac', 'ogg', 'opus', 'aiff', 'alac', 'wma']
-          }
-        ]
-      })
+    'study.chooseSource': async () => {
+      const result = await dialog.showOpenDialog({ title: '选择歌曲', properties: ['openFile'],
+        filters: [{ name: '音频', extensions: ['wav', 'flac', 'mp3', 'm4a', 'aac', 'ogg', 'opus', 'aiff', 'alac', 'wma'] }] })
       const path = result.canceled ? null : result.filePaths[0]
-      return path
-        ? {
-            path: await operations['study.captureLocal'](
-              { id, path: await grantCompletedDownloadAudioFile(path) },
-              signal
-            ),
-            title: basename(path)
-          }
-        : null
+      return path ? { path: await grantCompletedDownloadAudioFile(path), title: basename(path) } : null
     },
-    'study.startWorker': async (request) => {
+    'study.startWorker': async request => {
       await init()
       if (jobs.get(request.id)?.running) throw new Error('项目正在运行')
-      const dir = directory(request.id),
-        controller = new AbortController()
-      const job: Job = {
-        controller,
-        done: Promise.resolve(),
-        running: true,
-        progress: 0,
-        stage: '完整缓存音频'
-      }
+      const dir = directory(request.id), controller = new AbortController()
+      const releaseRuntime = residency.retain()
+      const signal = AbortSignal.any([controller.signal, lifetime.signal])
+      const job: Job = { controller, done: Promise.resolve(), running: true, progress: 0, stage: '准备音频', result: request.previous }
       jobs.set(request.id, job)
       job.done = (async () => {
         const env = await environment()
-        if (!env.ready) throw new Error(env.error || '环境不可用')
+        if (!env.ready) throw new Error(env.error)
+        await verify()
+        const voiceModels = request.operation === 'leadBacking' ? ['UVR_MDXNET_KARA_2.onnx'] : request.operation === 'twoSingers' ? ['duet.safetensors', 'speaker/embedding_model.ckpt'] : []
+        if (voiceModels.length) await verify(voiceModels)
         await mkdir(dir, { recursive: true })
-        let source = request.source
-        if (!existsSync(join(dir, 'original.wav')) && !/^https?:\/\//i.test(source)) {
-          const canonicalSource = await realpath(source)
-          const ownedSource = relative(await realpath(dir), canonicalSource)
-          source = /^source\.[a-z0-9]+$/i.test(ownedSource)
-            ? canonicalSource
-            : await operations['study.captureLocal'](
-                { id: request.id, path: canonicalSource },
-                controller.signal
-              )
+        let source = request.source, input = request.previous?.cache?.input
+        const metadata = await validateCache(dir, STUDY_MODEL_HASHES, undefined, request.previous)
+        const notesOnly = request.operation === 'melody' && metadata.notesReady
+        const budget = request.budgetBytes ?? 2 * 1024 ** 3
+        if (!notesOnly && !existsSync(join(dir, 'original.wav')) && source) {
+          if (/^https?:\/\//i.test(source)) {
+            const response = await fetch(source, { signal, headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' } })
+            if (!response.ok || !response.body) throw new Error('音源不可用（HTTP ' + response.status + '）')
+            const partial = join(dir, 'source.part'), complete = join(dir, 'source.cache')
+            const declared = Number(response.headers.get('content-length') || 0)
+            if (declared > budget) throw new Error('音频缓存容量不足')
+            let bytes = 0
+            const hash = createHash('sha256'), body = Readable.fromWeb(response.body as any)
+            const limiter = new Transform({ transform(block, _encoding, callback) {
+              if (bytes + block.length > budget) return callback(new Error('音频缓存容量不足'))
+              bytes += block.length; hash.update(block); callback(null, block)
+            } })
+            try {
+              await pipeline(body, limiter, createWriteStream(partial), { signal })
+              if (!bytes || declared && bytes !== declared) throw new Error('音源下载不完整')
+              await rename(partial, complete)
+              source = complete
+              input = { path: '', size: bytes, mtimeMs: 0, sha256: hash.digest('hex') }
+            } finally { await rm(partial, { force: true }) }
+          } else {
+            source = await resolveAuthorizedAudioFile(source)
+            const info = await stat(source)
+            input = { path: source, size: info.size, mtimeMs: info.mtimeMs, sha256: await digest(source, signal) }
+          }
         }
-        if (/^https?:\/\//i.test(source) && !existsSync(join(dir, 'original.wav'))) {
-          const response = await fetch(source, {
-            signal: controller.signal,
-            headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' }
-          })
-          if (!response.ok || !response.body)
-            throw new Error('音源无法完整缓存（HTTP ' + response.status + '）')
-          const declared = Number(response.headers.get('content-length') || 0)
-          if (declared > 2 * 1024 ** 3) throw new Error('缓存文件超过 2 GB')
-          const partial = join(dir, 'source.part'),
-            complete = join(dir, 'source.cache')
-          let bytes = 0
-          const body = Readable.fromWeb(response.body as any)
-          body.on('data', (chunk) => {
-            bytes += chunk.length
-            if (bytes > 2 * 1024 ** 3) body.destroy(new Error('缓存文件超过 2 GB'))
-          })
-          await pipeline(body, createWriteStream(partial), { signal: controller.signal })
-          if (!bytes || (declared && bytes !== declared)) throw new Error('音频未完整下载')
-          await rename(partial, complete)
-          source = complete
-        }
-        await run(
-          'analyze',
-          {
-            ...request,
-            source,
-            directory: dir,
-            pack: join(home, 'models'),
-            modelFingerprints: STUDY_MODEL_HASHES
-          },
-          dir,
-          controller.signal,
-          (event) => {
-            if (event.kind === 'progress') {
-              job.progress = Number(event.progress) || 0
-              job.stage = String(event.stage).slice(0, 200)
-              if (STUDY_STAGES.some(stage => stage === event.phase)) job.phase = event.phase
-            } else if (event.kind === 'stageReady') {
-              job.resultRevision = Number(event.resultRevision)
-            }
-          },
-          (child) => (job.child = child)
-        )
-        job.stage = '分析完成'
-        job.progress = 1
-      })()
-        .catch((error) => {
-          job.error = String(error).slice(-2000)
-          job.stage = controller.signal.aborted ? '任务已取消' : '分析失败'
+        const previous = request.previous ? structuredClone(request.previous) : undefined
+        if (previous) previous.ready = notesOnly ? metadata.ready : (await validateCache(dir, STUDY_MODEL_HASHES, undefined, previous, true)).ready
+        await residency.run('analyze', { ...request, previous, source, directory: dir, pack: join(home, 'models'), modelFingerprints: STUDY_MODEL_HASHES }, signal, event => {
+          if (event.kind === 'runtime' && event.releasedOptional) {
+            runtimeState.loaded = runtimeState.loaded.filter(name => name === 'six' || name === 'chords')
+          } else if (event.kind === 'runtime' && ['melody', 'leadBacking', 'twoSingers'].includes(event.loadedOptional)) {
+            runtimeState.loaded = [...new Set([...runtimeState.loaded, event.loadedOptional])]
+          } else if (event.kind === 'progress') {
+            job.progress = Number(event.progress) || 0; job.stage = String(event.stage).slice(0, 200)
+            if (STUDY_STAGES.includes(event.phase)) job.phase = event.phase
+          } else if (event.kind === 'stageReady') {
+            const result = event.result as StudyResult
+            if (result?.version !== 1 || !result.cache || !Number.isSafeInteger(result.frames) || result.frames <= 0 || result.sampleRate !== 44100 || result.stems.some(stem => !validStudyTrack(stem))) throw new Error('无效分析结果')
+            if (input) result.cache.input = input
+            job.result = result; job.resultRevision = Number(event.resultRevision); job.phase = event.phase
+          }
         })
-        .finally(() => {
-          job.running = false
-          job.child = undefined
+        job.stage = '分析完成'; job.progress = 1
+      })().catch(error => { job.error = String(error).slice(-2000); job.stage = signal.aborted ? '任务已取消' : '分析失败' })
+        .finally(async () => {
+          try {
+            if (runtime.pid && !lifetime.signal.aborted) await residency.run('residency', {}, lifetime.signal)
+          } catch { /* Process failures remain on the job; metadata never restarts it. */ }
+          finally { job.running = false; releaseRuntime() }
         })
     },
     'study.hasSource': async ({ id }) => existsSync(join(directory(id), 'original.wav')),
-    'study.validateCache': async ({ id, source }) => validateCache(directory(id), STUDY_MODEL_HASHES, source ? await resolveAuthorizedAudioFile(source).catch(() => undefined) : undefined),
+    'study.validateCache': async ({ id, source, result, verifyAudio }) => validateCache(directory(id), STUDY_MODEL_HASHES, source, result, verifyAudio),
     'study.workerStatus': async ({ id }) => {
       const job = jobs.get(id)
-      if (!job)
-        return {
-          running: false,
-          progress: 0,
-          stage: '任务中断',
-          error: '分析进程已重启，请继续任务'
-        }
-      const { running, progress, stage, error, phase, resultRevision } = job
-      let result: StudyResult | undefined
-      if (resultRevision || !running && !error) {
-        const path = join(directory(id), 'result.json')
-        if ((await stat(path)).size > 32 * 1024 ** 2) throw new Error('结果超出限制')
-        if (job.loadedRevision !== resultRevision || !job.result) {
-          const parsed = JSON.parse(await readFile(path,'utf8')) as StudyResult
-          if (parsed.version !== 1 || !Number.isSafeInteger(parsed.frames) || parsed.frames <= 0 || parsed.sampleRate !== 44100 || !Array.isArray(parsed.stems) || parsed.stems.some(s=>!validStudyTrack(s))) throw new Error('无效的分轨结果')
-          const checkpoint = JSON.parse(await readFile(join(directory(id),'stages.json'),'utf8'))
-          for (const name of parsed.stems) {
-            const expected = Object.values(checkpoint).map((entry:any)=>entry.files?.[name]).find(Boolean)
-            const hash = createHash('sha256')
-            if (!expected) throw new Error('分轨校验信息缺失')
-            for await (const chunk of createReadStream(join(directory(id),name+'.wav'))) hash.update(chunk)
-            if (hash.digest('hex') !== expected) throw new Error('分轨文件校验失败')
-          }
-          job.result = parsed
-          job.loadedRevision = resultRevision
-        }
-        result = job.result
-      }
-      return { running, progress, stage, error, result, phase, resultRevision }
+      if (!job) return { running: false, progress: 0, stage: '任务中断', error: '分析进程已重启' }
+      const { running, progress, stage, error, phase, resultRevision, result } = job
+      return { running, progress, stage, error, phase, resultRevision, result }
     },
-    'study.cancelWorker': async ({ id }) => {
-      const job = jobs.get(id)
-      if (job?.running) {
-        job.controller.abort()
-        await job.done
+    'study.cancelWorker': async ({ id }) => { const job = jobs.get(id); if (job?.running) { job.controller.abort(); await job.done } },
+    'study.audioInventory': async () => {
+      await init()
+      const groups: StudyAudioGroup[] = []
+      for (const entry of await readdir(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || !/^[a-zA-Z0-9-]{1,80}$/.test(entry.name)) continue
+        const totals = new Map<StudyAudioGroup['kind'], number>()
+        for (const file of await files(await owned(entry.name))) {
+          const kind = kindOf(file.top); totals.set(kind, (totals.get(kind) ?? 0) + file.bytes)
+        }
+        for (const [kind, bytes] of totals) if (bytes) groups.push({ id: entry.name, kind, bytes })
+      }
+      return groups
+    },
+    'study.removeAudio': async ({ id, kind }) => {
+      if (jobs.get(id)?.running) throw new Error('音频正在分析中')
+      if (!existsSync(directory(id))) return
+      const dir = await owned(id)
+      const entries = (await readdir(dir, { withFileTypes: true })).filter(entry => kindOf(entry.name) === kind)
+      const trash = join(root, '.trash', id + '-' + kind + '-' + randomUUID())
+      await mkdir(trash, { recursive: true })
+      const actualTrash = await realpath(trash), trashChild = relative(await realpath(root), actualTrash)
+      if (!trashChild || isAbsolute(trashChild) || trashChild.startsWith('..')) throw new Error('Invalid cache deletion path')
+      const moved: string[] = []
+      try {
+        for (const entry of entries) { await rename(join(dir, entry.name), join(trash, entry.name)); moved.push(entry.name) }
+        await rm(trash, { recursive: true, force: true })
+      } catch (error) {
+        for (const name of moved) if (existsSync(join(trash, name))) await rename(join(trash, name), join(dir, name))
+        throw error
       }
     },
-    'study.removeFiles': async ({ id }) => {
-      if (jobs.get(id)?.running) throw new Error('请先取消任务')
-      const target = resolve(directory(id)),
-        boundary = resolve(root)
-      if (!relative(boundary, target) || relative(boundary, target).startsWith('..'))
-        throw new Error('Invalid cache path')
-      await rm(target, { recursive: true, force: true })
+    'study.removeFiles': async ({ id }, signal) => {
+      for (const kind of ['six', 'leadBacking', 'twoSingers'] as const) await operations['study.removeAudio']({ id, kind }, signal)
+      if (existsSync(directory(id))) await rm(await owned(id), { recursive: true, force: true })
       jobs.delete(id)
     },
     'study.writeMix': async ({ id, gains, frames }) => {
-      const dir = directory(id),
-        entries = Object.entries(gains)
-      for (const [stem] of entries)
-        if (!existsSync(join(dir, stem + '.wav'))) throw new Error('分轨文件缺失，请重新分析')
-      // Immutable manifests ensure an acknowledged reopen flushes decoded samples.
-      const path = join(dir, 'mix-' + ++mixSequence + '-' + randomUUID() + '.temix')
-      await atomic(
-        path,
-        'TEMIX1\n44100 ' +
-          frames +
-          ' ' +
-          entries.length +
-          '\n' +
-          entries.map(([stem, gain]) => gain + '\n' + join(dir, stem + '.wav')).join('\n') +
-          '\n'
-      )
+      const dir = directory(id), entries = Object.entries(gains)
+      for (const [stem] of entries) if (!existsSync(join(dir, stem + '.wav'))) throw new Error('分轨音频已被淘汰，请重新生成')
+      const slot = ((mixSlots.get(id) ?? 0) + 1) % 2
+      const path = join(dir, 'mix-' + slot + '.temix')
+      const content = 'TEMIX1\n44100 ' + frames + ' ' + entries.length + '\n' + entries.map(([stem, gain]) => gain + '\n' + join(dir, stem + '.wav')).join('\n') + '\n'
+      if (Buffer.byteLength(content) > 32768) throw new Error('分轨音频路径过长')
+      await atomic(path, content); mixSlots.set(id, slot)
       return path
     },
     'study.exportFiles': async (request, signal) => {
-      const destination = request.outputDirectory
-        ? await resolveConfiguredDownloadRoot(request.outputDirectory)
-        : await chooseDirectory('选择导出位置（创建独立子目录）')
-      if (request.outputDirectory && !destination) throw new Error('导出目录未经用户授权')
+      const destination = request.outputDirectory ? await resolveConfiguredDownloadRoot(request.outputDirectory) : await chooseDirectory('选择导出位置')
       if (!destination) return null
-      await mkdir(destination, { recursive: true })
+      if (cacheDestination(destination)) throw new Error('导出位置不能位于分析缓存内')
       const output = join(destination, 'TwilightEcho-' + request.id.slice(0, 8) + '-' + Date.now())
-      await mkdir(output, { recursive: false })
+      await mkdir(output, { recursive: true })
       const segments = request.chords.segments
-      const text =
-        request.chordFormat === 'json'
-          ? JSON.stringify(request.chords, null, 2)
-          : request.chordFormat === 'csv'
-            ? 'start_seconds,end_seconds,chord,confidence,edited\r\n' +
-              segments
-                .map((s) => [s.start, s.end, s.label, s.confidence, !!s.edited].join(','))
-                .join('\r\n')
-            : segments
-                .map(
-                  (s) =>
-                    s.start.toFixed(3) +
-                    '\t' +
-                    s.end.toFixed(3) +
-                    '\t' +
-                    s.label +
-                    '\t' +
-                    s.confidence
-                )
-                .join('\n')
+      const text = request.chordFormat === 'json' ? JSON.stringify(request.chords, null, 2) : request.chordFormat === 'csv'
+        ? 'start_seconds,end_seconds,chord,confidence,edited\r\n' + segments.map(s => [s.start, s.end, s.label, s.confidence, !!s.edited].join(',')).join('\r\n')
+        : segments.map(s => [s.start.toFixed(3), s.end.toFixed(3), s.label, s.confidence].join('\t')).join('\n')
       await writeFile(join(output, 'chords.' + request.chordFormat), text, 'utf8')
-      await run(
-        'export',
-        {
-          directory: directory(request.id),
-          destination: output,
-          format: request.audioFormat,
-          stems: request.stems
-        },
-        directory(request.id),
-        signal,
-        () => {}
-      )
+      if (request.stems.length) await residency.run('export', { directory: directory(request.id), destination: output, format: request.audioFormat, stems: request.stems }, signal)
       return output
+    },
+    'study.exportSources': async (request, signal) => {
+      const target = await resolveConfiguredDownloadRoot(request.outputDirectory)
+      if (!target) throw new Error('导出目录未经授权')
+      if (cacheDestination(target)) throw new Error('导出位置不能位于分析缓存内')
+      await residency.run('notationSources', { directory: target, melody: request.melody, lines: JSON.parse(request.lyrics), pack: join(home, 'models') }, signal)
+      return (await files(target)).length
     }
   }
-  return {
-    operations,
-    idle: () =>
-      (draining ??= (async () => {
-        lifetime.abort(new Error('分析平台正在关闭'))
-        for (const job of jobs.values()) if (job.running) job.controller.abort()
-        await Promise.all([...jobs.values()].map((job) => job.done))
-        await Promise.allSettled([environmentPending, ...activeRuns])
-        // Main survives a Core restart. A drained platform must accept the next
-        // Core generation after every child of the previous one has been joined.
-        lifetime = new AbortController()
-      })().finally(() => {
-        draining = null
-      }))
-  }
+  return { operations, idle: () => draining ??= (async () => {
+    residency.suspend()
+    lifetime.abort(new Error('分析平台正在关闭'))
+    for (const job of jobs.values()) job.controller.abort()
+    await runtime.close()
+    await Promise.allSettled([...jobs.values()].map(job => job.done))
+    await environmentPending
+    jobs.clear(); environmentCache = null; runtimeState = { state: 'stopped', pid: null, loaded: [] }
+    lifetime = new AbortController()
+    residency.setDemand(false); residency.resume()
+  })().finally(() => { draining = null }) }
 }

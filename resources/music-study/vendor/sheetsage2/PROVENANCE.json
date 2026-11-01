@@ -27,6 +27,7 @@
     "__init__.py": "19539a965cabf22d08231688efc15547d005e6345745f48684c2f02d010f82fd"
   },
   "modifications": [
-    "modeling_sheetsage2.py: load parent through the bundled MERT2Model class; check bundled parent source, never execute code from a model pack."
+    "modeling_sheetsage2.py: load parent through the bundled MERT2Model class; check bundled parent source, never execute code from a model pack.",
+    "modeling_mert2.py: clear derived rotary tensors on device changes so CPU parking releases CUDA caches; keep float32 values and inference math unchanged. Update the bundled-source guard for this local modification."
   ]
 }

@@ -41,7 +41,14 @@ extraResources:
       - btc_harmony.py
       - sheetsage_harmony.py
       - vocal_melody.py
+      - runtime_context.py
+      - model_residency.py
+      - resident_protocol.py
+      - resident_child.py
+      - vocal_runtime.py
       - vocal_pipeline.py
+      - vocal_residency.py
+      - vocal_cache.py
       - vocal_score.py
       - vocal_models.json
       - models.json

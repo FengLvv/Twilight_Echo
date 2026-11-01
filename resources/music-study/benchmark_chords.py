@@ -25,7 +25,8 @@ from harmony import recognize, ROOTS
 from evaluate_harmony import label as common_label
 
 METRICS=('root','majmin','triads','sevenths','majmin_inv','sevenths_inv','mirex')
-QUALITY={'':'maj','m':'min','m7':'min7','m7b5':'hdim7','mMaj7':'minmaj7','6':'maj6','m6':'min6'}
+QUALITY={'':'maj','m':'min','m7':'min7','m7b5':'hdim7','mMaj7':'minmaj7','6':'maj6','m6':'min6',
+         '7sus4':'sus4(b7)'}
 
 
 def sha(path):
