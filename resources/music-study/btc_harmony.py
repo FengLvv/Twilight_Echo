@@ -6,6 +6,7 @@ No training code, MIDI generation, pickle loading or network requests at runtime
 """
 from functools import lru_cache
 from pathlib import Path
+from study_bootstrap import model_path
 import numpy as np
 import librosa
 import torch
@@ -32,7 +33,7 @@ def _model(path):
 
 @torch.inference_mode()
 def posterior(audio,sr,pack,states,hop):
-    model,device,mean,std=_model(str(Path(pack)/'btc.safetensors'))
+    model,device,mean,std=_model(str(model_path(pack, 'btc.safetensors')))
     y=librosa.resample(audio,orig_sr=sr,target_sr=22050).astype(np.float32)
     features=[]
     # Reproduce the reference's ten-second CQT framing, including end padding.

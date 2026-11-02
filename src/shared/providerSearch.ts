@@ -24,6 +24,10 @@ export interface MediaProviderArtistSummary {
   musicSize?: number
 }
 
+export interface MediaProviderAlbumSubscriptionState {
+  subscribed: boolean
+}
+
 export interface MediaProviderPlaylistSubscriptionState {
   owned: boolean
   subscribed: boolean

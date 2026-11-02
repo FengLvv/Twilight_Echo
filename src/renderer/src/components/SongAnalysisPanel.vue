@@ -74,7 +74,7 @@ const rows = computed<StudyTrack[]>(
     ] as StudyTrack[]
 )
 const ready = computed(() => studyReady(props.project?.result, 'six'))
-const running = computed(() => ['running', 'queued'].includes(props.project?.status ?? ''))
+const running = computed(() => ['running', 'queued', 'waiting-components'].includes(props.project?.status ?? ''))
 function setting(track: StudyTrack) {
   return props.tracks[track] ?? { gain: 1, mute: false, solo: false }
 }

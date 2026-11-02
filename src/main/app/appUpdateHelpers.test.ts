@@ -21,6 +21,17 @@ test('pickWindowsAsset prefers setup.exe over plain exe', () => {
   assert.equal(picked?.name, 'TwilightEcho-1.0.2-setup.exe')
 })
 
+test('analysis component releases never replace player updates in either channel', () => {
+  const releases = [
+    { tag_name: 'analysis-components-655be126dce399d2', prerelease: true },
+    { tag_name: 'analysis-components-1.5.0', prerelease: false },
+    { tag_name: 'v1.4.0-preview.6', prerelease: true },
+    { tag_name: 'v1.3.9', prerelease: false }
+  ]
+  assert.equal(pickLatestAvailableRelease(releases, 'preview')?.tag_name, 'v1.4.0-preview.6')
+  assert.equal(pickLatestAvailableRelease(releases, 'stable')?.tag_name, 'v1.3.9')
+})
+
 test('preview channel skips drafts and accepts a published prerelease', () => {
   const release = pickLatestAvailableRelease(
     [

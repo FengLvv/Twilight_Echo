@@ -1,6 +1,7 @@
 import type { DynamicIslandConfig } from './dynamicIsland.ts'
 import type { StudyPlatformOperations } from './musicStudy.ts'
 import { validStudyPayload, validStudyTrack, STUDY_OPERATIONS } from './musicStudy.ts'
+import { validComponentIO } from './studyComponents.ts'
 const isBoundedStudyJson = (value: unknown) => { try { return JSON.stringify(value).length <= 16*1024*1024 } catch { return false } }
 import type { ThemeAssetReference, ThemeAssetType, ThemeProfileV2 } from './theme.ts'
 import { normalizeThemeProfile } from './theme.ts'
@@ -175,7 +176,9 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
   if (request.name.startsWith('study.')) {
     const p=payload as Record<string, unknown>
     if (!isBoundedStudyJson(p)) return false
-    if (['study.environment','study.choosePack','study.runtime','study.audioInventory'].includes(request.name)) return Object.keys(p).length===0
+    if (request.name === 'study.componentIO') return validComponentIO(p)
+    if (request.name === 'study.environment') return Object.keys(p).every(key => ['operation', 'lyrics'].includes(key)) && (p.operation === undefined || STUDY_OPERATIONS.includes(p.operation as never)) && (p.lyrics === undefined || typeof p.lyrics === 'string' && p.lyrics.length <= 2 * 1024 ** 2)
+    if (['study.choosePack','study.runtime','study.audioInventory'].includes(request.name)) return Object.keys(p).length===0
     if (request.name==='study.runtimeActivity') return Object.keys(p).length===1 && typeof p.busy==='boolean'
     if (typeof p.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(p.id)) return false
     if (request.name === 'study.workerResult' || request.name === 'study.ackWorkerResult')

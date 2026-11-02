@@ -1,3 +1,15 @@
+# 分析组件按需安装与发布
+
+Windows x64 分析组件按功能下载已实现；组件协议、CLI 和发布构建见 `docs/analysis-components.md`。组件公开 Release 为 `analysis-components-acd56f96ae14d26c`，15 个逻辑组件、20 个附件，目录与 GitHub 摘要已核对。播放器版本为 `1.4.0-preview.6`，发布源码位于 `codex/analysis-components-release`，成品目录为 `dist/releases/1.4.0-preview.6`。
+
+验证：Core 2,020 项通过；安装器覆盖断点续传、重启恢复、损坏与越界归档、外部环境、迁移与依赖调度。空 profile 从真实 GitHub 附件安装六轨后完成分析；完整组件环境完成六轨、和弦、主唱／和声、双歌手与带时值曲谱。浅／深色和 390 px 窄窗口已检查。普通播放和已有结果不依赖分析环境；AMLL 跳过 MiniLM。
+
+本轮证据位于 `.local/analysis-components-release`、`.local/study-components-cold-profile`、`.local/study-components-package-final` 与 `.local/study-release-*.log`。Windows 的原生 DLL／Guile 通过经过目标校验的短路径联接访问组件；不要把路径重新 realpath 后交回原生库。PyTorch 的加载适配在固定 bootstrap 内，组件本身保持发布时的字节和校验值。发布完成状态以对应 GitHub Release 与 `publication.json` 为准。
+
+下方是前一轮架构工作的历史记录，不代表本轮的源码 HEAD 或产物版本。
+
+---
+
 # 五项架构整理交接
 
 更新时间：2026-11-02（Asia/Shanghai）

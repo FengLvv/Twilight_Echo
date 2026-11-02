@@ -143,6 +143,8 @@ export async function activate(context) {
     isTrackLiked,
     createPlaylist,
     deletePlaylist,
+    fetchAlbumSubscriptionState,
+    subscribeAlbum,
     fetchPlaylistSubscriptionState,
     subscribePlaylist,
     addTracksToPlaylist,
@@ -795,16 +797,6 @@ function getAlbumItems(data) {
   if (Array.isArray(data.albums)) return data.albums
   if (Array.isArray(data.data?.hotAlbums)) return data.data.hotAlbums
   if (Array.isArray(data.data?.albums)) return data.data.albums
-  return []
-}
-
-function getArtistItems(data) {
-  if (Array.isArray(data.artists)) return data.artists
-  if (Array.isArray(data.data?.artists)) return data.data.artists
-  if (Array.isArray(data.data)) return data.data
-  if (Array.isArray(data.data?.data)) return data.data.data
-  if (Array.isArray(data.list)) return data.list
-  if (Array.isArray(data.data?.list)) return data.data.list
   return []
 }
 
@@ -1601,7 +1593,7 @@ async function fetchCloudSongsPage(offset = 0, limit = 50, requestContext) {
 
 function assertCloudApiSuccess(data, fallback) {
   const code = Number(data?.code ?? data?.body?.code)
-  if (Number.isFinite(code) && code !== 200) {
+  if (!Number.isFinite(code) || code !== 200) {
     throw new Error(normalizeApiMessage(data?.body ?? data, fallback))
   }
 }
@@ -2400,10 +2392,19 @@ async function fetchArtistAlbums(artistId) {
   return albums.map(normalizeAlbum)
 }
 
+function checkedCollectionItems(data, candidates, label) {
+  const code = data?.code ?? data?.body?.code
+  if (code != null && Number(code) !== 200)
+    throw new Error(normalizeApiMessage(data?.body ?? data, `读取${label}失败`))
+  const items = candidates.find(Array.isArray)
+  if (!items) throw new Error(`网易云未返回有效的${label}列表，请重试`)
+  return items
+}
+
 async function fetchSavedAlbums() {
   const albums = await fetchPagedItems({
     makePath: (limit, offset) => `/album/sublist?limit=${limit}&offset=${offset}`,
-    getItems: (data) => (Array.isArray(data.data) ? data.data : []),
+    getItems: (data) => checkedCollectionItems(data, [data.data, data.body?.data], '收藏专辑'),
     limit: 100
   })
   return albums.map(normalizeAlbum)
@@ -2412,7 +2413,7 @@ async function fetchSavedAlbums() {
 async function fetchSavedArtists() {
   const artists = await fetchPagedItems({
     makePath: (limit, offset) => `/artist/sublist?limit=${limit}&offset=${offset}`,
-    getItems: getArtistItems,
+    getItems: data => checkedCollectionItems(data, [data.data?.artists, data.data, data.data?.data, data.list, data.data?.list], '收藏歌手'),
     limit: 100
   })
   return artists.map(normalizeArtist)
@@ -2687,7 +2688,7 @@ async function fetchUserPlaylistsByUid(uid, createdOnly = false) {
 
 async function fetchUserFollows(uid, limit = 30, offset = 0) {
   const data = await requestAuthed(`/artist/sublist?limit=${limit}&offset=${offset}`)
-  const artists = getArtistItems(data)
+  const artists = checkedCollectionItems(data, [data.data?.artists, data.data, data.data?.data, data.list, data.data?.list], '关注歌手')
   return artists.map((item) => {
     const artist = normalizeArtist(item)
     return {
@@ -2705,7 +2706,7 @@ async function fetchUserFollows(uid, limit = 30, offset = 0) {
 
 async function fetchUserFolloweds(uid, limit = 30, offset = 0) {
   const data = await requestAuthed(`/user/followeds?uid=${uid}&limit=${limit}&offset=${offset}`)
-  const followeds = Array.isArray(data.followeds) ? data.followeds : []
+  const followeds = checkedCollectionItems(data, [data.followeds], '粉丝')
   return followeds.map((item) => ({
     // Keep the grid thumbnail bounded while retaining the full URL for detail views.
     picUrlSmall: normalizeNcmCoverSize(item.avatarUrl || null, 140),
@@ -2714,11 +2715,13 @@ async function fetchUserFolloweds(uid, limit = 30, offset = 0) {
     picUrl: normalizeRemoteAssetUrl(item.avatarUrl || null),
     musicSize: item.playlistCount || 0,
     userType: item.userType || 0,
-    followed: normalizeFollowed(item.followed ?? item.followMe ?? item.mutual)
+    followed: normalizeFollowed(item.followed ?? item.mutual)
   }))
 }
 
 async function followArtist(artistId, follow, requestContext) {
+  artistId = requireCollectionId(artistId, '歌手')
+  if (typeof follow !== 'boolean') throw new Error('歌手关注状态无效')
   return runIdempotentProviderWrite(
     'followArtist',
     [artistId, follow],
@@ -2729,29 +2732,27 @@ async function followArtist(artistId, follow, requestContext) {
         requestContext
       )
       throwIfRequestAborted(requestContext)
-      const code = Number(data.code)
-      if (Number.isFinite(code) && code !== 200) {
-        throw new Error(normalizeApiMessage(data, follow ? '关注歌手失败' : '取消关注歌手失败'))
-      }
+      assertWriteOk(data, follow ? '关注歌手失败' : '取消关注歌手失败')
     }
   )
 }
 
 async function followUser(userId, follow, requestContext) {
+  userId = requireCollectionId(userId, '用户')
+  if (typeof follow !== 'boolean') throw new Error('用户关注状态无效')
   return runIdempotentProviderWrite('followUser', [userId, follow], requestContext, async () => {
     const data = await requestAuthed(
       `/follow?id=${encodeURIComponent(String(userId))}&t=${follow ? '1' : '0'}`,
       requestContext
     )
     throwIfRequestAborted(requestContext)
-    const code = Number(data.code)
-    if (Number.isFinite(code) && code !== 200) {
-      throw new Error(normalizeApiMessage(data, follow ? '关注用户失败' : '取消关注用户失败'))
-    }
+    assertWriteOk(data, follow ? '关注用户失败' : '取消关注用户失败')
   })
 }
 
 async function likeTrack(songId, like, requestContext) {
+  songId = requireCollectionId(songId, '歌曲')
+  if (typeof like !== 'boolean') throw new Error('歌曲喜欢状态无效')
   const updateLikedState = () => {
     if (like) {
       replaceLikedSongIds([...likedSongIds, Number(songId)])
@@ -2769,8 +2770,9 @@ async function likeTrack(songId, like, requestContext) {
     [songId, like],
     requestContext,
     async () => {
-      await requestAuthed(`/like?id=${songId}&like=${String(like)}`, requestContext)
+      const data = await requestAuthed(`/like?id=${songId}&like=${String(like)}`, requestContext)
       throwIfRequestAborted(requestContext)
+      assertWriteOk(data, like ? '喜欢歌曲失败' : '取消喜欢歌曲失败')
       updateLikedState()
     },
     updateLikedState
@@ -2837,7 +2839,7 @@ function normalizeTrackIdList(trackIds) {
 
 function assertWriteOk(data, fallback) {
   const code = Number(data?.code ?? data?.body?.code)
-  if (Number.isFinite(code) && code !== 200) {
+  if (!Number.isFinite(code) || code !== 200) {
     throw new Error(normalizeApiMessage(data?.body ?? data, fallback))
   }
 }
@@ -2898,6 +2900,32 @@ async function deletePlaylist(playlistId, requestContext) {
   })
 }
 
+function requireCollectionId(value, label) {
+  const id = Number(value)
+  if (!['number', 'string'].includes(typeof value) || !/^[1-9]\d*$/.test(String(value)) || !Number.isSafeInteger(id) || id <= 0)
+    throw new Error(`${label} ID 无效`)
+  return id
+}
+
+async function fetchAlbumSubscriptionState(albumId) {
+  const id = requireCollectionId(albumId, '专辑')
+  const data = await requestAuthedRead(`/album/detail/dynamic?id=${id}&timestamp=${Date.now()}`, { label: 'album subscription' })
+  assertWriteOk(data, '读取专辑收藏状态失败')
+  const subscribed = normalizeFollowed(data.isSub ?? data.subscribed ?? data.data?.isSub ?? data.data?.subscribed)
+  if (typeof subscribed !== 'boolean') throw new Error('网易云未返回有效的专辑收藏状态，请重试')
+  return { subscribed }
+}
+
+async function subscribeAlbum(albumId, subscribe, requestContext) {
+  const id = requireCollectionId(albumId, '专辑')
+  if (typeof subscribe !== 'boolean') throw new Error('专辑收藏状态无效')
+  return runIdempotentProviderWrite('subscribeAlbum', [id, subscribe], requestContext, async () => {
+    const data = await requestAuthed(`/album/sub?id=${id}&t=${subscribe ? 1 : 2}&timestamp=${Date.now()}`, requestContext)
+    throwIfRequestAborted(requestContext)
+    assertWriteOk(data, subscribe ? '收藏专辑失败' : '取消收藏专辑失败')
+  })
+}
+
 async function fetchPlaylistSubscriptionState(playlistId) {
   const id = requirePlaylistId(playlistId)
   const [library, data] = await Promise.all([
@@ -2951,14 +2979,7 @@ async function manipulatePlaylistTracks(playlistId, trackIds, op, requestContext
         throwIfRequestAborted(requestContext)
         code = Number(data?.code ?? data?.body?.code)
       }
-      if (Number.isFinite(code) && code !== 200) {
-        throw new Error(
-          normalizeApiMessage(
-            data?.body ?? data,
-            op === 'add' ? '添加歌曲到歌单失败' : '从歌单移除歌曲失败'
-          )
-        )
-      }
+      assertWriteOk(data, op === 'add' ? '添加歌曲到歌单失败' : '从歌单移除歌曲失败')
       invalidatePlaylistCaches(pid)
     }
   )

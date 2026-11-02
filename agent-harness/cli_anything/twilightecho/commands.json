@@ -4971,7 +4971,7 @@
                         "additionalProperties": false,
                         "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                       },
-                      "__@iterator@88": {
+                      "__@iterator@93": {
                         "type": "object",
                         "properties": {},
                         "additionalProperties": false,
@@ -5028,7 +5028,7 @@
                       "matchAll",
                       "replaceAll",
                       "at",
-                      "__@iterator@88"
+                      "__@iterator@93"
                     ],
                     "additionalProperties": false
                   }
@@ -5437,7 +5437,7 @@
                             "additionalProperties": false,
                             "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                           },
-                          "__@iterator@88": {
+                          "__@iterator@93": {
                             "type": "object",
                             "properties": {},
                             "additionalProperties": false,
@@ -5494,7 +5494,7 @@
                           "matchAll",
                           "replaceAll",
                           "at",
-                          "__@iterator@88"
+                          "__@iterator@93"
                         ],
                         "additionalProperties": false
                       }
@@ -5850,7 +5850,7 @@
                             "additionalProperties": false,
                             "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                           },
-                          "__@iterator@88": {
+                          "__@iterator@93": {
                             "type": "object",
                             "properties": {},
                             "additionalProperties": false,
@@ -5907,7 +5907,7 @@
                           "matchAll",
                           "replaceAll",
                           "at",
-                          "__@iterator@88"
+                          "__@iterator@93"
                         ],
                         "additionalProperties": false
                       }
@@ -7140,15 +7140,15 @@
             "anyOf": [
               {
                 "type": "string",
+                "const": "cancel"
+              },
+              {
+                "type": "string",
                 "const": "status"
               },
               {
                 "type": "string",
                 "const": "enrich"
-              },
-              {
-                "type": "string",
-                "const": "cancel"
               },
               {
                 "type": "string",
@@ -7217,7 +7217,7 @@
         ],
         "additionalProperties": false
       },
-      "inputType": "{ id: string; operation: \"status\" | \"enrich\" | \"cancel\" | \"import\" | \"restore\" | \"task\" | \"preview\" | \"reconcile\" | \"introductions\" | \"credits\" | \"inventory\" | \"history\" | \"history.read\" | \"provenance.list\" | \"provenance.read\" | \"provenance.review\"; args: Record<string, unknown>; }"
+      "inputType": "{ id: string; operation: \"cancel\" | \"status\" | \"enrich\" | \"import\" | \"restore\" | \"task\" | \"preview\" | \"reconcile\" | \"introductions\" | \"credits\" | \"inventory\" | \"history\" | \"history.read\" | \"provenance.list\" | \"provenance.read\" | \"provenance.review\"; args: Record<string, unknown>; }"
     },
     {
       "name": "extensions.pluginRequest",
@@ -26922,7 +26922,7 @@
                         "additionalProperties": false,
                         "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                       },
-                      "__@iterator@88": {
+                      "__@iterator@93": {
                         "type": "object",
                         "properties": {},
                         "additionalProperties": false,
@@ -26979,7 +26979,7 @@
                       "matchAll",
                       "replaceAll",
                       "at",
-                      "__@iterator@88"
+                      "__@iterator@93"
                     ],
                     "additionalProperties": false
                   }
@@ -27547,7 +27547,7 @@
                         "additionalProperties": false,
                         "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                       },
-                      "__@iterator@88": {
+                      "__@iterator@93": {
                         "type": "object",
                         "properties": {},
                         "additionalProperties": false,
@@ -27604,7 +27604,7 @@
                       "matchAll",
                       "replaceAll",
                       "at",
-                      "__@iterator@88"
+                      "__@iterator@93"
                     ],
                     "additionalProperties": false
                   }
@@ -27993,7 +27993,7 @@
                         "additionalProperties": false,
                         "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                       },
-                      "__@iterator@88": {
+                      "__@iterator@93": {
                         "type": "object",
                         "properties": {},
                         "additionalProperties": false,
@@ -28050,7 +28050,7 @@
                       "matchAll",
                       "replaceAll",
                       "at",
-                      "__@iterator@88"
+                      "__@iterator@93"
                     ],
                     "additionalProperties": false
                   }
@@ -30778,7 +30778,7 @@
                               "additionalProperties": false,
                               "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                             },
-                            "__@iterator@88": {
+                            "__@iterator@93": {
                               "type": "object",
                               "properties": {},
                               "additionalProperties": false,
@@ -30835,7 +30835,7 @@
                             "matchAll",
                             "replaceAll",
                             "at",
-                            "__@iterator@88"
+                            "__@iterator@93"
                           ],
                           "additionalProperties": false
                         }
@@ -31878,6 +31878,10 @@
                 "const": true
               }
             ]
+          },
+          "mode": {
+            "type": "string",
+            "const": "heart"
           }
         },
         "additionalProperties": false
@@ -37345,7 +37349,7 @@
                                     "additionalProperties": false,
                                     "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                                   },
-                                  "__@iterator@88": {
+                                  "__@iterator@93": {
                                     "type": "object",
                                     "properties": {},
                                     "additionalProperties": false,
@@ -37402,7 +37406,7 @@
                                   "matchAll",
                                   "replaceAll",
                                   "at",
-                                  "__@iterator@88"
+                                  "__@iterator@93"
                                 ],
                                 "additionalProperties": false
                               }
@@ -39206,7 +39210,7 @@
                                   "additionalProperties": false,
                                   "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                                 },
-                                "__@iterator@88": {
+                                "__@iterator@93": {
                                   "type": "object",
                                   "properties": {},
                                   "additionalProperties": false,
@@ -39263,7 +39267,7 @@
                                 "matchAll",
                                 "replaceAll",
                                 "at",
-                                "__@iterator@88"
+                                "__@iterator@93"
                               ],
                               "additionalProperties": false
                             }
@@ -40925,7 +40929,7 @@
                                   "additionalProperties": false,
                                   "description": "Returns a new String consisting of the single UTF-16 code unit located at the specified index."
                                 },
-                                "__@iterator@88": {
+                                "__@iterator@93": {
                                   "type": "object",
                                   "properties": {},
                                   "additionalProperties": false,
@@ -40982,7 +40986,7 @@
                                 "matchAll",
                                 "replaceAll",
                                 "at",
-                                "__@iterator@88"
+                                "__@iterator@93"
                               ],
                               "additionalProperties": false
                             }
@@ -44061,6 +44065,14 @@
               {
                 "type": "string",
                 "const": "deletePlaylist"
+              },
+              {
+                "type": "string",
+                "const": "fetchAlbumSubscriptionState"
+              },
+              {
+                "type": "string",
+                "const": "subscribeAlbum"
               },
               {
                 "type": "string",
@@ -56436,6 +56448,232 @@
       "inputType": "Record<string, never>"
     },
     {
+      "name": "study.componentDirectory",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>"
+    },
+    {
+      "name": "study.componentDismiss",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ owner: string; }"
+    },
+    {
+      "name": "study.componentImport",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>"
+    },
+    {
+      "name": "study.componentInstall",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "features": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "six"
+                },
+                {
+                  "type": "string",
+                  "const": "chords"
+                },
+                {
+                  "type": "string",
+                  "const": "leadBacking"
+                },
+                {
+                  "type": "string",
+                  "const": "twoSingers"
+                },
+                {
+                  "type": "string",
+                  "const": "melody"
+                },
+                {
+                  "type": "string",
+                  "const": "lyricFilter"
+                },
+                {
+                  "type": "string",
+                  "const": "btc"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "features"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ features: (\"six\" | \"chords\" | \"leadBacking\" | \"twoSingers\" | \"melody\" | \"lyricFilter\" | \"btc\")[]; }"
+    },
+    {
+      "name": "study.componentPlan",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "features": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "six"
+                },
+                {
+                  "type": "string",
+                  "const": "chords"
+                },
+                {
+                  "type": "string",
+                  "const": "leadBacking"
+                },
+                {
+                  "type": "string",
+                  "const": "twoSingers"
+                },
+                {
+                  "type": "string",
+                  "const": "melody"
+                },
+                {
+                  "type": "string",
+                  "const": "lyricFilter"
+                },
+                {
+                  "type": "string",
+                  "const": "btc"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "features"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ features: (\"six\" | \"chords\" | \"leadBacking\" | \"twoSingers\" | \"melody\" | \"lyricFilter\" | \"btc\")[]; }",
+      "outputType": "StudyComponentPlan"
+    },
+    {
+      "name": "study.componentRemove",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ id: string; }"
+    },
+    {
+      "name": "study.components",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>",
+      "outputType": "StudyComponentState"
+    },
+    {
+      "name": "study.componentTask",
+      "domain": "study",
+      "kind": "command",
+      "permission": "settings:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "pause"
+              },
+              {
+                "type": "string",
+                "const": "resume"
+              },
+              {
+                "type": "string",
+                "const": "cancel"
+              },
+              {
+                "type": "string",
+                "const": "retry"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ id: string; action: \"pause\" | \"resume\" | \"cancel\" | \"retry\"; }"
+    },
+    {
       "name": "study.create",
       "domain": "study",
       "kind": "command",
@@ -57776,11 +58014,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "play"
+                "const": "pause"
               },
               {
                 "type": "string",
-                "const": "pause"
+                "const": "play"
               },
               {
                 "type": "string",

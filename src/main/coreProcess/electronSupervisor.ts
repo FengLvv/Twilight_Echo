@@ -89,7 +89,7 @@ export function createElectronCoreSupervisor(
       : chromecastStopReceiver(target.host, target.port, target.receiverSessionId)
   )
   const autoMixProcesses = createAutoMixCorePlatform(configuration.root)
-  const musicStudyProcesses = createMusicStudyPlatform(configuration.root)
+  const musicStudyProcesses = createMusicStudyPlatform(configuration.root, () => configuration.plugins?.proxy)
   let musicCacheRoot = configuration.musicCachePath || join(configuration.root, 'music-cache')
   let projectedLaunchSettings = false
   let developerMode = configuration.plugins?.developerMode === true

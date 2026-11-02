@@ -1063,11 +1063,24 @@ function createLocalResult(_tracks: Track[], removedTrackIds: string[]): CoreLib
   return { revision: 1, removedTrackIds, removedFileCount: 0, failures: [] }
 }
 
-test('saved streaming scroll positions stay bounded', () => {
-  assert.match(source, /SAVED_SCROLL_POSITION_LIMIT = \d+/)
-  assert.match(source, /while \(savedScrollPositions\.size > SAVED_SCROLL_POSITION_LIMIT\)/)
+test('saved streaming scroll positions stay bounded after extracting the viewport owner', () => {
+  const viewport = readFileSync(new URL('./useStreamingViewport.ts', import.meta.url), 'utf8')
+  let cleanup = () => {}, key = ''
+  const factory = runInNewContext(
+    stripTypeScriptTypes(viewport).replace(/^import[^\n]*\n/gm, '').replace('export function', 'function') + '; useStreamingViewport',
+    { onBeforeUnmount: (callback: () => void) => { cleanup = callback } }
+  )
+  const element = { value: { scrollTop: 0 } }
+  const view = factory(element, () => key)
+  for (let index = 0; index < 50; index++) {
+    key = String(index); element.value.scrollTop = index * 10; view.saveStreamingScrollPosition()
+  }
+  key = '0'; element.value.scrollTop = -1; view.restoreStreamingScrollPosition()
+  assert.equal(element.value.scrollTop, -1)
+  key = '49'; view.restoreStreamingScrollPosition(); assert.equal(element.value.scrollTop, 490)
+  cleanup(); key = '48'; element.value.scrollTop = -1; view.restoreStreamingScrollPosition()
+  assert.equal(element.value.scrollTop, -1)
 })
-
 
 test('collection UI forwards source, bounded paging and cancellation to Core without provider fan-out', async () => {
   const requests: unknown[] = [], warnings: string[] = []

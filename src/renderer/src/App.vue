@@ -55,6 +55,7 @@ const ApplicationPlaylistsPage = defineAsyncComponent(
   () => import('@renderer/components/navigation/ApplicationPlaylistsPage.vue')
 )
 const PlayingMusic = defineAsyncComponent(() => import('./components/PlayingMusic.vue'))
+const StudyComponentsHost = defineAsyncComponent(() => import('./components/StudyComponentsHost.vue'))
 const StreamingPage = defineAsyncComponent(() => import('./components/StreamingPage.vue'))
 const RadioPodcastPage = defineAsyncComponent(() => import('./components/RadioPodcastPage.vue'))
 const NetworkSourcesPage = defineAsyncComponent(() => import('./components/NetworkSourcesPage.vue'))
@@ -924,6 +925,7 @@ onBeforeUnmount(() => onWorkshopDecorationsUnmount?.())
 </script>
 
 <template>
+  <StudyComponentsHost />
   <AppearanceLayersHost
     v-if="appearanceFullWindowPreview || (!appearancePageRetained && !appearanceEditorOpen)"
     :settings="

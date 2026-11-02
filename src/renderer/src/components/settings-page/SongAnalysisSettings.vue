@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SettingsGroup from './SettingsGroup.vue'
+import StudyComponentsSettings from './StudyComponentsSettings.vue'
 import { useCoreConnection } from '../../stores/coreConnection.ts'
 import type { StudyCacheStatus, StudyAutomationPolicy, StudyAutomaticStage } from '../../../../shared/musicStudy.ts'
 
@@ -52,6 +53,8 @@ onBeforeUnmount(() => { stopped = true; if (timer) clearTimeout(timer) })
 <template>
   <SettingsGroup id="playback-song-analysis" title="歌曲分析" :summary="summary" :attention="error">
     <div class="setting-list" :aria-busy="busy">
+      <StudyComponentsSettings />
+      <hr />
       <div class="setting-item automatic-analysis" data-setting-id="automatic-song-analysis">
         <div class="setting-copy"><strong id="analysis-automatic-label">播放时自动分析</strong></div>
         <div class="automatic-options" role="group" aria-labelledby="analysis-automatic-label">

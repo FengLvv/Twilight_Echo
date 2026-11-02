@@ -34,7 +34,8 @@ _instances = {}
 def runtime(home):
     from resident_child import ResidentChild
     home = Path(home)
-    python = home / 'runtime-vocal2midi' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+    from study_bootstrap import paths
+    python = Path(paths().get('vocalPython') or home / 'runtime-vocal2midi' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python'))
     if not python.is_file():
         raise ValueError('人声简谱环境未安装')
     identifier = str(home)
@@ -59,7 +60,7 @@ def existing_runtime_call(method):
 
 def invoke(phase, *, model_pack, progress, directory, payload):
     return runtime(str(Path(model_pack).parent)).call(phase,
-        {**payload, 'pack': str(model_pack), 'directory': str(directory)}, progress)
+        {**payload, 'pack': str(model_pack), 'directory': str(directory), 'componentPaths': __import__('study_bootstrap').paths()}, progress)
 
 
 def recognize(*, model_pack, progress, lyrics, directory, previous=None, parent=''):

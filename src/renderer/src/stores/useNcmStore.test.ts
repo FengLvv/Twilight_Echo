@@ -401,6 +401,7 @@ test('late account mutations never modify the new account collections', async ()
     ['createPlaylist', () => store.createPlaylist('A'), playlist],
     ['deletePlaylist', () => store.deletePlaylist(100), undefined],
     ['subscribePlaylist', () => store.subscribePlaylist(playlist, true), undefined],
+    ['subscribeAlbum', () => store.subscribeAlbum({ id: 123 }, true), undefined],
     ['addTracksToPlaylist', () => store.addTracksToPlaylist(100, [9]), undefined],
     ['removeTracksFromPlaylist', () => store.removeTracksFromPlaylist(100, [9]), undefined]
   ]
@@ -453,4 +454,19 @@ test('older cloud library reads cannot undo a confirmed playlist subscription', 
   handler = async () => { throw Error('服务拒绝收藏') }
   await assert.rejects(store.subscribePlaylist(playlist, false), /服务拒绝收藏/)
   assert.equal(store.userPlaylists.value[0].id, playlist.id)
+})
+
+
+test('album reads and explicit writes go to the provider without adding a local library mirror', async () => {
+  const calls: Array<[string, unknown[] | undefined]> = []
+  handler = async (method, args) => {
+    calls.push([method, args])
+    return method === 'fetchAlbumSubscriptionState' ? { subscribed: true } : undefined
+  }
+  assert.deepEqual(await store.fetchAlbumSubscriptionState(123), { subscribed: true })
+  const playlists = store.userPlaylists.value
+  await store.subscribeAlbum({ id: 123 }, true)
+  await store.subscribeAlbum({ id: 123 }, false)
+  assert.deepEqual(calls, [['fetchAlbumSubscriptionState', [123]], ['subscribeAlbum', [123, true]], ['subscribeAlbum', [123, false]]])
+  assert.equal(store.userPlaylists.value, playlists)
 })

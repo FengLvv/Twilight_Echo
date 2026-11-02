@@ -2777,8 +2777,8 @@ async function favoriteCurrentAlbum(): Promise<void> {
       albumFavoriteReadGeneration++
       albumFavoriteState.value = confirmed.count > 0 && confirmed.favoriteCount === confirmed.count
       repairMessage.value = favorite
-        ? `已收藏专辑（${changed} 首）`
-        : `已取消收藏专辑（${changed} 首）`
+        ? `已收藏专辑内 ${changed} 首歌曲`
+        : `已取消收藏专辑内 ${changed} 首歌曲`
     })
     return
   }
@@ -2787,8 +2787,8 @@ async function favoriteCurrentAlbum(): Promise<void> {
   const nextFavorite = !tracks.every((track) => isFavoriteTrack(track))
   setFavoriteTracks(tracks, nextFavorite)
   repairMessage.value = nextFavorite
-    ? `已收藏专辑（${tracks.length} 首）`
-    : `已取消收藏专辑（${tracks.length} 首）`
+    ? `已收藏专辑内 ${tracks.length} 首歌曲`
+    : `已取消收藏专辑内 ${tracks.length} 首歌曲`
 }
 
 function addCurrentAlbumToPlaylist(): void {

@@ -1080,6 +1080,15 @@ test('Core builds the authenticated liked queue in bounded pages, uses the provi
   assert.equal(f.session.snapshot().queue?.id, before.queue?.id)
 })
 
+test('one liked playback request establishes the authenticated heart context and starts heart mode', async (t) => {
+  const f = await heartFixture(t)
+  await f.session.startLiked({ mode: 'heart', play: true })
+  assert.equal(f.session.snapshot().playback?.playMode, 'heart')
+  assert.equal(f.session.snapshot().heart?.active, true)
+  assert.equal(f.session.snapshot().playback?.state, 'playing')
+  assert.equal(f.saved?.data?.heart?.likedPlaylistId, 123)
+})
+
 test('heart entry and exit preserve the seed decoder, position and occurrence without Pause, Play, Seek or LoadQueue', async (t) => {
   const seeds: unknown[] = []
   const f = await heartFixture(

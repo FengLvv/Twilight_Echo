@@ -9,6 +9,9 @@ import { STUDY_MODEL_HASHES } from './studyModelRegistry.ts'
 import { createStudyCacheValidator } from './studyCache.ts'
 import { StudyResidentProcess } from './studyResidentProcess.ts'
 import { StudyRuntimeResidency, STUDY_GPU_IDLE_MS } from './studyRuntimeResidency.ts'
+import { StudyComponentsPlatform } from './studyComponentsPlatform.ts'
+import type { StudyRuntimePaths } from '../../shared/studyComponents.ts'
+import { buildPluginProxyEnv, detectProxy, installProxyFetch, type PluginProxySettings, type InstalledProxyFetch } from '../plugins/proxyBootstrap.ts'
 import {
   grantCompletedDownloadAudioFile,
   resolveAuthorizedAudioFile,
@@ -52,7 +55,7 @@ const coreModels = [
   'mert2/config.json'
 ]
 
-export function createMusicStudyPlatform(profile: string) {
+export function createMusicStudyPlatform(profile: string, proxySettings?: () => PluginProxySettings | undefined) {
   const root = join(profile, 'music-study'),
     jobs = new Map<string, Job>(),
     validateCache = createStudyCacheValidator()
@@ -72,17 +75,31 @@ export function createMusicStudyPlatform(profile: string) {
   let runtimeState: StudyRuntimeStatus = { state: 'stopped', pid: null, loaded: [] }
   const verified = new Map<string, string>()
   const mixSlots = new Map<string, number>()
-  const python = () =>
-    join(
+  let componentPaths: StudyRuntimePaths = { models: {} }
+  const proxyFetches = new Map<string, Promise<InstalledProxyFetch | null>>()
+  const componentFetch: typeof fetch = async (input, init) => {
+    const settings = proxySettings?.()
+    if (!settings || settings.proxyMode === 'off') return fetch(input, init)
+    const key = JSON.stringify(settings)
+    if (!proxyFetches.has(key)) proxyFetches.set(key, (async () => {
+      const env = buildPluginProxyEnv(settings), proxy = await detectProxy(settings.proxyMode, env)
+      return proxy ? installProxyFetch(proxy.url, fetch, settings.proxyAllowDirectFallback, env.NO_PROXY || '') : null
+    })())
+    const installed = await proxyFetches.get(key)
+    return (installed?.fetch ?? fetch)(input, init)
+  }
+  const components = new StudyComponentsPlatform(profile, () => [...jobs.values()].some(job => job.running), componentFetch, () => home)
+  let runtimeSignature = ''
+  const python = () => componentPaths.python || join(
       home,
       'runtime',
       process.platform === 'win32' ? 'Scripts' : 'bin',
       process.platform === 'win32' ? 'python.exe' : 'python'
     )
-  const runtime = new StudyResidentProcess(python, script)
+  const runtime = new StudyResidentProcess(python, script, message => console.warn('[study.runtime]', message), () => componentPaths)
   powerMonitor.on('resume', () => runtime.resumeWatchdog())
   const residency = new StudyRuntimeResidency({
-    call: (method, params, signal, event) => runtime.call(method, params, signal, event),
+    call: (method, params, signal, event) => runtime.call(method, { ...params, componentPaths }, signal, event),
     alive: () => runtime.pid !== null,
     changed: (value) => {
       runtimeState = { ...runtimeState, ...value }
@@ -150,25 +167,46 @@ export function createMusicStudyPlatform(profile: string) {
   }
   async function verify(names = coreModels) {
     await init()
-    if (!existsSync(python())) throw new Error('请选择包含 runtime 和 models 的分析环境')
+    if (!componentPaths.python || !componentPaths.sharedPython || !existsSync(python()))
+      throw new Error('请安装分析运行环境')
     for (const name of names) {
-      const path = join(home, 'models', name),
-        info = await stat(path),
-        version = `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
+      const prefix = Object.keys(componentPaths.models).sort((a, b) => b.length - a.length).find(prefix => name === prefix || name.startsWith(prefix + '/'))
+      const path = prefix ? join(componentPaths.models[prefix], name.slice(prefix.length)) : join(home, 'models', name)
+      const info = await stat(path).catch(async error => { await components.invalidate(name, error); throw error })
+      const version = `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
       if (verified.get(path) === version) continue
-      if ((await digest(path, lifetime.signal)) !== STUDY_MODEL_HASHES[name])
-        throw new Error('模型校验失败：' + name)
+      if ((await digest(path, lifetime.signal)) !== STUDY_MODEL_HASHES[name]) {
+        const error = new Error('模型校验失败：' + name)
+        await components.invalidate(name, error)
+        throw error
+      }
       verified.set(path, version)
     }
   }
-  async function environment(): Promise<StudyState['environment']> {
-    if (environmentCache?.ready && runtime.pid) return environmentCache
+  async function environment(operation?: import('../../shared/musicStudy.ts').StudyOperation, lyrics?: string): Promise<StudyState['environment']> {
+    await init()
+    componentPaths = await components.paths()
+    const signature = JSON.stringify([python(), componentPaths.sharedPython])
+    if (runtimeSignature && signature !== runtimeSignature) {
+      await runtime.close(); environmentCache = null; runtimeState = { state: 'stopped', pid: null, loaded: [] }
+    }
+    runtimeSignature = signature
+    const targets = operation === 'six' ? ['six'] : operation === 'chords' || operation === 'originalChords' ? ['chords']
+      : operation && operation !== 'analyze' ? [] : ['six', 'chords'].filter(target => {
+        const name = target === 'six' ? 'torch/hub/checkpoints/5c90dfd2-34c22ccb.th' : 'sheetsage2/model.safetensors'
+        return existsSync(join(home, 'models', name)) || !!componentPaths.models[target === 'six' ? 'torch' : 'sheetsage2']
+      })
+    if (environmentCache?.ready && runtime.pid && targets.every(target => runtimeState.loaded.includes(target))) return environmentCache
     if (environmentPending) return environmentPending
     environmentPending = (async () => {
       try {
         runtimeState = { state: 'warming', pid: runtime.pid, loaded: [] }
-        await verify()
-        const value = await residency.run('warm', { pack: join(home, 'models') }, lifetime.signal)
+        const names = targets.flatMap(target => target === 'six' ? coreModels.slice(0, 1) : coreModels.slice(1))
+        if (operation === 'leadBacking') names.push('UVR_MDXNET_KARA_2.onnx')
+        if (operation === 'twoSingers') names.push('duet.safetensors', 'speaker/embedding_model.ckpt')
+        if (operation === 'melody') names.push(...Object.keys(STUDY_MODEL_HASHES).filter(name => name.startsWith('vocal2midi/')))
+        await verify(names)
+        const value = await residency.run('warm', { pack: join(home, 'models'), features: targets, lyrics }, lifetime.signal)
         runtimeState = { ...value, state: 'ready', pid: runtime.pid }
         return (environmentCache = { ready: true, gpu: !!value.gpu, gpuName: value.gpuName })
       } catch (error) {
@@ -220,8 +258,15 @@ export function createMusicStudyPlatform(profile: string) {
     return target
   }
   const operations: Operations = {
+    'study.componentIO': async (request) => {
+      if (['remove', 'directory', 'import'].includes(request.action)) {
+        if ([...jobs.values()].some(job => job.running)) throw new Error('请先结束分析')
+        await runtime.close(); environmentCache = null
+      }
+      return components.io(request)
+    },
     'study.captureLocal': async ({ path }) => resolveAuthorizedAudioFile(path),
-    'study.environment': async () => environment(),
+    'study.environment': async ({ operation, lyrics }) => environment(operation, lyrics),
     'study.runtime': async () => ({
       idleOffloadSeconds: STUDY_GPU_IDLE_MS / 1000,
       ...runtimeState,
@@ -300,10 +345,9 @@ export function createMusicStudyPlatform(profile: string) {
       }
       jobs.set(request.id, job)
       job.done = (async () => {
-        const env = await environment()
+        const env = await environment(request.operation, request.lyrics)
         job.generation = runtime.generationId
         if (!env.ready) throw new Error(env.error)
-        await verify()
         const voiceModels =
           request.operation === 'leadBacking'
             ? ['UVR_MDXNET_KARA_2.onnx']
@@ -632,6 +676,9 @@ export function createMusicStudyPlatform(profile: string) {
         lifetime.abort(new Error('分析平台正在关闭'))
         for (const job of jobs.values()) job.controller.abort()
         await runtime.close()
+        await components.close()
+        await Promise.allSettled([...proxyFetches.values()].map(async installed => (await installed)?.close()))
+        proxyFetches.clear()
         await Promise.allSettled([...jobs.values()].map((job) => job.done))
         await environmentPending
         jobs.clear()

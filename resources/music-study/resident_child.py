@@ -14,7 +14,9 @@ from runtime_context import check_cancel, Cancelled, emit
 
 class ResidentChild:
     def __init__(self, python, script):
-        self.child = subprocess.Popen([str(python), '-X', 'utf8', '-u', str(script)], stdin=subprocess.PIPE,
+        from study_bootstrap import child_command
+        command = child_command(python, script)
+        self.child = subprocess.Popen(command, executable=command[0], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, text=True, encoding='utf-8',
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
             start_new_session=False)
@@ -42,6 +44,8 @@ class ResidentChild:
 
     def _call(self, method, params, progress):
         identifier = str(uuid.uuid4())
+        if 'componentPaths' in params:
+            os.environ['TWILIGHT_STUDY_COMPONENT_PATHS'] = json.dumps(params['componentPaths'])
         self.child.stdin.write(json.dumps(dict(id=identifier, method=method, params=params), ensure_ascii=False) + '\n')
         self.child.stdin.flush()
         cancelled = False

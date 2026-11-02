@@ -2678,6 +2678,10 @@ export class CorePlaybackSession {
         intent,
         current
       )
+      if (command.mode === 'heart') {
+        this.guard(intent, current)
+        await this.setMode('heart', signal)
+      }
     } catch (error) {
       this.guard(intent, current)
       throw error

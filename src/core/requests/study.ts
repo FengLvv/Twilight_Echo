@@ -4,6 +4,8 @@ import { failure } from './support.ts'
 import type { CoreDispatchContext } from './types.ts'
 
 export const operations = [
+  'study.components', 'study.componentPlan', 'study.componentInstall', 'study.componentTask',
+  'study.componentRemove', 'study.componentDirectory', 'study.componentImport', 'study.componentDismiss',
   'study.state',
   'study.cache',
   'study.automation',
@@ -41,6 +43,14 @@ export async function handle(request: Request, context: CoreDispatchContext): Pr
   const study = context.dependencies.musicStudy
   if (!study) throw failure('NOT_READY', '分轨工作台尚未就绪')
   switch (request.name) {
+    case 'study.components': return study.components?.state()
+    case 'study.componentPlan': return study.components?.plan(request.payload.features)
+    case 'study.componentInstall': return study.components?.install(request.payload.features)
+    case 'study.componentTask': return study.components?.action({ action: 'task', id: request.payload.id, task: request.payload.action })
+    case 'study.componentRemove': return study.components?.action({ action: 'remove', id: request.payload.id })
+    case 'study.componentDirectory': return study.components?.action({ action: 'directory' })
+    case 'study.componentImport': return study.components?.action({ action: 'import' })
+    case 'study.componentDismiss': return study.dismissComponents(request.payload.owner)
     case 'study.state':
       return study.state(request.payload)
     case 'study.cache':

@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+from study_bootstrap import model_path
 import time
 
 _instance = None
@@ -20,11 +21,11 @@ def policy_key():
 class LyricLineClassifier:
     def __init__(self, pack):
         specification = policy()
-        root = Path(pack) / specification['directory']
+        root = model_path(pack, specification['directory'])
         for name, expected in specification['files'].items():
             path = root / name
             if not path.is_file():
-                raise ValueError('网易云歌词分类模型未安装，请运行 install-lyric-line-model.ps1')
+                raise ValueError('请安装歌词过滤组件，再重试曲谱识别')
             with path.open('rb') as file:
                 if hashlib.file_digest(file, 'sha256').hexdigest() != expected:
                     raise ValueError('歌词分类模型校验失败：' + name)

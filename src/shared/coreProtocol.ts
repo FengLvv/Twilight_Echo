@@ -780,6 +780,14 @@ const OPERATIONS: Record<
   { kind: CoreRequest['kind']; permission: CoreClientIdentity['permissions'][number] }
 > = {
   'study.submit': { kind: 'command', permission: 'library:write' },
+  'study.components': { kind: 'query', permission: 'playback:read' },
+  'study.componentPlan': { kind: 'query', permission: 'playback:read' },
+  'study.componentInstall': { kind: 'command', permission: 'settings:write' },
+  'study.componentTask': { kind: 'command', permission: 'settings:write' },
+  'study.componentRemove': { kind: 'command', permission: 'settings:write' },
+  'study.componentDirectory': { kind: 'command', permission: 'settings:write' },
+  'study.componentImport': { kind: 'command', permission: 'settings:write' },
+  'study.componentDismiss': { kind: 'command', permission: 'settings:write' },
   'study.state': { kind: 'query', permission: 'playback:read' },
   'study.cache': { kind: 'query', permission: 'playback:read' },
   'study.automation': { kind: 'query', permission: 'playback:read' },

@@ -5,7 +5,7 @@ import { useCoreConnection } from './coreConnection.ts'
 import { createCoreCloudTransfers } from './coreCloudTransfers.ts'
 import type { Track } from '../types/music'
 import { syncPluginProviders, useMediaProviders } from '@renderer/providers'
-import type { MediaProviderPlaylistSubscriptionState, MediaProviderPlaylistSummary } from '../../../shared/providerSearch.ts'
+import type { MediaProviderAlbumSubscriptionState, MediaProviderPlaylistSubscriptionState, MediaProviderPlaylistSummary } from '../../../shared/providerSearch.ts'
 
 export interface NcmProfile {
   userId: number
@@ -784,6 +784,14 @@ export function useNcmStore() {
     userPlaylists.value = userPlaylists.value.filter((item) => String(item.id) !== id)
   }
 
+  async function fetchAlbumSubscriptionState(albumId: number | string): Promise<MediaProviderAlbumSubscriptionState> {
+    return callNcmProvider<MediaProviderAlbumSubscriptionState>('fetchAlbumSubscriptionState', [albumId])
+  }
+
+  async function subscribeAlbum(album: { id: number | string }, subscribe: boolean): Promise<void> {
+    await callNcmProvider<void>('subscribeAlbum', [album.id, subscribe])
+  }
+
   async function fetchPlaylistSubscriptionState(playlistId: number | string): Promise<MediaProviderPlaylistSubscriptionState> {
     return callNcmProvider<MediaProviderPlaylistSubscriptionState>('fetchPlaylistSubscriptionState', [playlistId])
   }
@@ -902,6 +910,8 @@ export function useNcmStore() {
     syncLikedIds,
     createPlaylist,
     deletePlaylist,
+    fetchAlbumSubscriptionState,
+    subscribeAlbum,
     fetchPlaylistSubscriptionState,
     subscribePlaylist,
     addTracksToPlaylist,

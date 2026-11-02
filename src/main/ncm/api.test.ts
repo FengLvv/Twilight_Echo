@@ -329,3 +329,28 @@ test('failed startup can be retried, and non-JSON errors retain the response fai
     await api.shutdown()
   }
 })
+
+
+test('account collection reads and writes bypass the gateway cache with exactly one fresh timestamp', async () => {
+  let clock = 100
+  const seen: URL[] = []
+  const api = new NcmApiService({
+    startServer: async () => createServer().listen(0, '127.0.0.1'),
+    now: () => ++clock,
+    fetch: async url => { seen.push(new URL(url)); return new Response('{"code":200}') }
+  })
+  try {
+    for (const path of ['/album/sub', '/album/sublist', '/album/detail/dynamic', '/artist/sub', '/artist/sublist', '/artist/detail/dynamic', '/playlist/subscribe', '/playlist/detail/dynamic', '/user/playlist', '/user/follows', '/user/followeds', '/likelist']) {
+      await api.request(path + '?id=123&timestamp=1', 'MUSIC_U=test')
+      await api.request(path + '?id=123&timestamp=1', 'MUSIC_U=test')
+      const [first, second] = seen.slice(-2)
+      assert.equal(first.pathname, path)
+      assert.equal(first.searchParams.get('id'), '123')
+      assert.equal(first.searchParams.getAll('timestamp').length, 1)
+      assert.notEqual(first.searchParams.get('timestamp'), '1')
+      assert.notEqual(first.href, second.href)
+    }
+    await api.request('/album?id=123')
+    assert.equal(seen.at(-1)?.searchParams.has('timestamp'), false)
+  } finally { await api.shutdown() }
+})

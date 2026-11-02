@@ -2,13 +2,15 @@ import type {
   MediaProviderAlbumSummary,
   MediaProviderArtistSummary,
   MediaProviderPlaylistSummary,
-  MediaProviderPlaylistSubscriptionState
+  MediaProviderPlaylistSubscriptionState,
+  MediaProviderAlbumSubscriptionState
 } from '../../../shared/providerSearch.ts'
 export type {
   MediaProviderAlbumSummary,
   MediaProviderArtistSummary,
   MediaProviderPlaylistSummary,
-  MediaProviderPlaylistSubscriptionState
+  MediaProviderPlaylistSubscriptionState,
+  MediaProviderAlbumSubscriptionState
 } from '../../../shared/providerSearch.ts'
 import { toRaw } from 'vue'
 import type { MediaProviderLyrics } from '../../../shared/providerLyrics.ts'
@@ -245,6 +247,8 @@ export interface MediaProvider {
     options?: { privacy?: 0 | 10 }
   ) => Promise<MediaProviderPlaylistSummary>
   deletePlaylist?: (playlistId: number | string) => Promise<void>
+  fetchAlbumSubscriptionState?: (albumId: number | string) => Promise<MediaProviderAlbumSubscriptionState>
+  subscribeAlbum?: (albumId: number | string, subscribe: boolean) => Promise<void>
   fetchPlaylistSubscriptionState?: (playlistId: number | string) => Promise<MediaProviderPlaylistSubscriptionState>
   subscribePlaylist?: (playlistId: number | string, subscribe: boolean) => Promise<void>
   addTracksToPlaylist?: (

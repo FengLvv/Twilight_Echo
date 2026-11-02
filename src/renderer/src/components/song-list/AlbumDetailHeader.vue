@@ -199,15 +199,15 @@ onBeforeUnmount(() => {
             :disabled="!canPlay || favoritePending"
             :title="
               favorited === null
-                ? '收藏状态待确认，点击切换收藏'
+                ? '歌曲收藏状态待确认，点击重新确认'
                 : favorited
-                  ? '取消收藏专辑'
-                  : '收藏专辑'
+                  ? '取消收藏全部歌曲'
+                  : '收藏全部歌曲'
             "
             @click="$emit('favorite')"
           >
             <i :class="favorited ? 'pi pi-heart-fill' : 'pi pi-heart'" aria-hidden="true"></i>
-            <span>{{ favorited ? '已收藏' : '收藏' }}</span>
+            <span>{{ favorited ? '已收藏全部' : '收藏全部歌曲' }}</span>
           </button>
           <button
             type="button"

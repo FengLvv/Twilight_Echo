@@ -17,6 +17,7 @@ export interface CoreHeartState {
 export interface CoreLikedPlayback {
   selectedId?: string
   play?: boolean
+  mode?: 'heart'
 }
 /** Private database capability; preserves holes and queue-scoped occurrence IDs. */
 export interface CoreHeartQueueApi {

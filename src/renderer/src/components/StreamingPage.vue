@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import {useStreamingViewport} from './streaming-page/useStreamingViewport.ts'
 import { usePlaylistSubscription } from './streaming-page/usePlaylistSubscription.ts'
+import { useAlbumSubscription } from './streaming-page/useAlbumSubscription.ts'
+import { useStreamingHomeEntries } from './streaming-page/useStreamingHomeEntries.ts'
+import { useLibraryRecentTracks } from '../composables/useLibraryRecentTracks.ts'
 
 import {
   computed,
@@ -503,7 +506,8 @@ async function loadRecommendations(force = false): Promise<void> {
     const [sectionResults, playlistsResult] = await Promise.all([
       Promise.allSettled(
         definitions.map((section) =>
-          section.requiresLogin && !activeLoggedIn.value
+          (section.requiresLogin && !activeLoggedIn.value) ||
+          (providerId === 'ncm' && (section.key === 'fm' || section.key === 'radar'))
             ? Promise.resolve<Track[]>([])
             : providerStore.callProvider<Track[]>(providerId, section.method, section.args)
         )
@@ -566,6 +570,19 @@ const recSections = computed<RecSection[]>(() =>
     icon: section.icon
   }))
 )
+
+const homeRecent = useLibraryRecentTracks()
+const homeEntries = useStreamingHomeEntries({
+  provider: activeProviderInfo,
+  enabled: computed(() => props.active !== false && activeTab.value === 'home' && !currentDetail.value),
+  checkLogin: providerStore.checkLogin,
+  login: id => emit('login', id),
+  openDaily: async () => {
+    const section = recSections.value.find(item => item.key === 'daily')
+    if (section) await openRecSection(section)
+  },
+  command: (name, payload, signal) => useCoreConnection().command(name, payload, signal)
+})
 
 async function openRecSection(section: RecSection): Promise<void> {
   detailLoadToken++
@@ -709,6 +726,8 @@ const {
   deletePlaylist: deleteNcmPlaylist,
   fetchPlaylistSubscriptionState,
   subscribePlaylist: subscribeNcmPlaylist,
+  fetchAlbumSubscriptionState,
+  subscribeAlbum: subscribeNcmAlbum,
   addTracksToPlaylist: addNcmTracksToPlaylist,
   removeTracksFromPlaylist: removeNcmTracksFromPlaylist,
   checkLogin
@@ -723,6 +742,17 @@ const { control: playlistSubscriptionControl, toggle: togglePlaylistSubscription
   captureSession: captureNcmSession,
   fetchState: fetchPlaylistSubscriptionState,
   subscribe: subscribeNcmPlaylist
+})
+
+const { control: albumSubscriptionControl, toggle: toggleAlbumSubscription } = useAlbumSubscription({
+  album: () => currentDetail.value?.type === 'album' ? currentDetail.value.album : null,
+  enabled: () => detailProviderId.value === NCM_PROVIDER_ID && isLoggedIn.value &&
+    !!mediaProviders.get(NCM_PROVIDER_ID)?.subscribeAlbum &&
+    !!mediaProviders.get(NCM_PROVIDER_ID)?.fetchAlbumSubscriptionState,
+  scope: () => [profile.value, mediaProviders.getGeneration(NCM_PROVIDER_ID)],
+  captureSession: captureNcmSession,
+  fetchState: fetchAlbumSubscriptionState,
+  subscribe: subscribeNcmAlbum
 })
 
 const playbackStore = usePlayerStore()
@@ -1391,17 +1421,22 @@ const detailFollowState = computed<boolean>(() => {
 })
 
 const showDetailFollowButton = computed(() => {
-  if (currentDetail.value?.type === 'user_playlists') return true
+  if (!activeLoggedIn.value) return false
+  if (currentDetail.value?.type === 'user_playlists')
+    return detailProviderId.value === NCM_PROVIDER_ID && String(currentDetail.value.user.id) !== String(activeProfile.value?.userId)
   if (currentDetail.value?.type !== 'artist') return false
   return !isExternalActive.value || Boolean(mediaProviders.get(activeProvider.value)?.followArtist)
 })
 
-const detailFollowButtonLabel = computed(() => (detailFollowState.value ? '取消关注' : '关注'))
+const detailFollowStateUnknown = computed(() => detailProviderId.value === NCM_PROVIDER_ID && currentDetail.value?.type === 'artist' && artistFollowed.value === null)
+const detailFollowButtonLabel = computed(() => detailFollowStateUnknown.value ? '重试' : detailFollowState.value ? '取消关注' : '关注')
 
 const detailFollowButtonIcon = computed(() =>
   followActionLoading.value
     ? 'pi pi-spin pi-spinner'
-    : detailFollowState.value
+    : detailFollowStateUnknown.value
+      ? 'pi pi-refresh'
+      : detailFollowState.value
       ? 'pi pi-user-minus'
       : 'pi pi-user-plus'
 )
@@ -2318,33 +2353,42 @@ async function onUserClick(user: NcmUserSummary): Promise<void> {
 
 async function toggleCurrentDetailFollow(): Promise<void> {
   const detail = currentDetail.value
-  if (!detail || followActionLoading.value) return
+  if (!detail || !showDetailFollowButton.value || followActionLoading.value) return
+  const providerId = detailProviderId.value
+  const providerGeneration = mediaProviders.getGeneration(providerId)
+  const session = providerId === NCM_PROVIDER_ID ? captureNcmSession() : () => true
+  const current = () => currentDetail.value === detail && detailProviderId.value === providerId &&
+    mediaProviders.getGeneration(providerId) === providerGeneration && session()
   const nextFollowState = !detailFollowState.value
   followActionLoading.value = true
   followActionError.value = ''
   try {
     if (detail.type === 'artist') {
-      if (isExternalActive.value) {
-        const follow = mediaProviders.get(activeProvider.value)?.followArtist
+      if (providerId === NCM_PROVIDER_ID && artistFollowed.value === null) {
+        const followed = await fetchArtistFollowState(Number(detail.artist.id))
+        if (!current()) return
+        if (typeof followed !== 'boolean') throw new Error('无法确认歌手关注状态，请重试')
+        artistFollowed.value = followed
+        return
+      }
+      if (providerId !== NCM_PROVIDER_ID) {
+        const follow = mediaProviders.get(providerId)?.followArtist
         if (!follow) return
         await follow(detail.artist.id, nextFollowState)
       } else {
         await followArtist(Number(detail.artist.id), nextFollowState)
       }
-      artistFollowed.value = nextFollowState
+      if (current()) artistFollowed.value = nextFollowState
       return
     }
     if (detail.type === 'user_playlists') {
       await followUser(detail.user.id, nextFollowState)
-      detail.user.followed = nextFollowState
+      if (current()) detail.user.followed = nextFollowState
     }
   } catch (error) {
-    followActionError.value = friendlyStreamingError(
-      error,
-      nextFollowState ? '关注失败' : '取消关注失败'
-    )
+    if (current()) followActionError.value = friendlyStreamingError(error, nextFollowState ? '关注失败' : '取消关注失败')
   } finally {
-    followActionLoading.value = false
+    if (current()) followActionLoading.value = false
   }
 }
 
@@ -3866,6 +3910,11 @@ onMounted(async () => {
             :rec-sections="recSections"
             :recommend-playlists="recommendPlaylists"
             :current-track-id="currentTrack?.id ?? null"
+            :home-entries="homeEntries.entries.value"
+            :pending-home-entry="homeEntries.pending.value"
+            :home-entry-error="homeEntries.error.value"
+            :recent-tracks="homeRecent.tracks.value"
+            @open-home-entry="homeEntries.open"
             @load-recommendations="loadRecommendations(true)"
             @open-rec-section="openRecSection"
             @open-playlist="openPlaylist"
@@ -3875,7 +3924,7 @@ onMounted(async () => {
             @open-discovery="selectTab('discover')"
           >
             <template v-if="activeProvider === 'ncm'" #rankings>
-              <NcmToplists @login="emit('login', 'ncm')" />
+              <NcmToplists compact @login="emit('login', 'ncm')" />
             </template>
           </StreamingHome>
 
@@ -4001,6 +4050,8 @@ onMounted(async () => {
                 :show-track-likes="showBilibiliTrackLikes"
                 :favorite-provider-label="showBilibiliTrackLikes ? 'Bilibili' : '网易云'"
                 :loading="detailLoading && detailTracks.length === 0"
+                :album-subscription="albumSubscriptionControl"
+                @subscribe-album="toggleAlbumSubscription"
                 :playlist-subscription="playlistSubscriptionControl"
                 @subscribe-playlist="togglePlaylistSubscription"
                 :has-selection="hasSelection"

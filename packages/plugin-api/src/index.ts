@@ -828,6 +828,15 @@ export interface TwilightMediaProviderRegistration {
     context?: TwilightProviderRequestContext
   ): Promise<void>
   /** Read current account ownership and the provider's live collection state. */
+  fetchAlbumSubscriptionState?(
+    albumId: string | number,
+    context?: TwilightProviderRequestContext
+  ): Promise<{ subscribed: boolean }>
+  subscribeAlbum?(
+    albumId: string | number,
+    subscribe: boolean,
+    context?: TwilightProviderRequestContext
+  ): Promise<void>
   fetchPlaylistSubscriptionState?(
     playlistId: number | string,
     requestContext?: TwilightProviderRequestContext

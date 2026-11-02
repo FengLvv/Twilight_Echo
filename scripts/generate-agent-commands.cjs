@@ -18,7 +18,7 @@ ts.forEachChild(source, node => {
     if (declaration.name.getText(source) === 'OPERATIONS') registry = declaration.initializer
 })
 const interactive = /(?:choose|pick|importDraft|exportDraft|restoreFrom|selectFiles)/i
-const nativeDialogs = new Set(['backup.export','backup.preview','imports.previewFile','audio.dsp.import','audio.dsp.export','themes.import','themes.export','themes.importAsset','extensions.export','ncm.cloud.download','study.export','plugins.install'])
+const nativeDialogs = new Set(['backup.export','backup.preview','imports.previewFile','audio.dsp.import','audio.dsp.export','themes.import','themes.export','themes.importAsset','extensions.export','ncm.cloud.download','study.export','study.choosePack','study.componentImport','study.componentDirectory','plugins.install'])
 function schema(type, depth = 0, ancestors = new Set()) {
   if (!type) return {}
   const flags = type.flags

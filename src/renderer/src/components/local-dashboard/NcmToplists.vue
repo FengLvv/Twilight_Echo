@@ -11,6 +11,7 @@ import { friendlyStreamingError } from '../streaming-page/friendlyStreamingError
 import { useNcmToplists } from './useNcmToplists'
 import { useDomTrackLocator } from '@renderer/composables/useDomTrackLocator'
 
+const props = defineProps<{ compact?: boolean }>()
 const emit = defineEmits<{ login: [] }>()
 const providerStore = useProviderStore()
 const player = usePlayerStore()
@@ -31,7 +32,15 @@ const {
   close
 } = useNcmToplists(providerStore)
 const expanded = ref(false)
-const visibleCharts = computed(() => (expanded.value ? charts.value : featured.value))
+const visibleCharts = computed(() =>
+  props.compact
+    ? featured.value.filter((chart) =>
+        ['19723756', '3779629', '2884035', '3778678'].includes(String(chart.id))
+      )
+    : expanded.value
+      ? charts.value
+      : featured.value
+)
 const dialog = ref<HTMLElement | null>(null)
 const dialogOpen = computed(() => selected.value !== null)
 const actionError = ref('')
@@ -82,7 +91,7 @@ async function play(track: Track, queue = tracks.value, replaceQueue = false): P
   pendingPlay.value = true
   try {
     if (!replaceQueue && currentTrack.value?.id === track.id) {
-      player.togglePlay()
+      await player.togglePlay()
       return
     }
     const state = await providerStore.checkLogin('ncm')
@@ -92,7 +101,7 @@ async function play(track: Track, queue = tracks.value, replaceQueue = false): P
       emit('login')
       return
     }
-    player.playTrack(track, queue)
+    await player.playTrack(track, queue)
   } catch (cause) {
     if (request === actionRevision)
       actionError.value = friendlyStreamingError(cause, '暂时无法播放，请稍后重试')
@@ -115,14 +124,20 @@ async function openChart(chart: MediaProviderToplistSummary, autoplay = false): 
 </script>
 
 <template>
-  <section v-if="available" class="ncm-toplists" aria-label="网易云排行榜" :aria-busy="loading">
+  <section
+    v-if="available"
+    class="ncm-toplists"
+    :class="{ 'ncm-toplists--compact': compact }"
+    aria-label="网易云排行榜"
+    :aria-busy="loading"
+  >
     <header class="toplists-heading">
       <div class="toplists-heading-copy">
-        <span class="toplists-eyebrow"
+        <span v-if="!compact" class="toplists-eyebrow"
           ><i class="ph ph-chart-line-up" aria-hidden="true"></i> NETEASE CLOUD MUSIC</span
         >
-        <h2>网易云排行榜</h2>
-        <p>听见此刻，正在流行的好音乐。</p>
+        <h2>{{ compact ? '榜单精选' : '网易云排行榜' }}</h2>
+        <p v-if="!compact">听见此刻，正在流行的好音乐。</p>
       </div>
       <div class="toplists-heading-actions">
         <button
@@ -135,7 +150,7 @@ async function openChart(chart: MediaProviderToplistSummary, autoplay = false): 
           <i :class="loading ? 'ph ph-hourglass' : 'ph ph-arrow-clockwise'" aria-hidden="true"></i>
         </button>
         <button
-          v-if="charts.length > featured.length"
+          v-if="!compact && charts.length > featured.length"
           class="toplists-text-button"
           type="button"
           :aria-expanded="expanded"
@@ -165,7 +180,7 @@ async function openChart(chart: MediaProviderToplistSummary, autoplay = false): 
         <div v-for="rank in 3" :key="rank" class="toplist-skeleton-line"></div>
       </div>
     </div>
-    <div v-else-if="charts.length" class="toplists-grid">
+    <div v-else-if="visibleCharts.length" class="toplists-grid">
       <article v-for="chart in visibleCharts" :key="chart.id" class="toplist-card">
         <button
           class="toplist-card-heading"

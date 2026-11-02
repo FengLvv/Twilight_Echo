@@ -1,4 +1,5 @@
 import type { CoreQueueTrackInput } from './coreQueueSubmission.ts'
+import { validComponentPayload, type StudyComponentCommands, type StudyComponentQueries, type StudyComponentIO, type StudyComponentState } from './studyComponents.ts'
 
 export const STUDY_MELODY_ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v10'
 export const STUDY_SCORE_LAYOUT = 'lyric-phrase-v4'
@@ -86,6 +87,7 @@ export interface StudyStageState {
   error?: string
 }
 export type StudyStatus =
+  | 'waiting-components'
   | 'queued'
   | 'running'
   | 'completed'
@@ -241,7 +243,7 @@ export interface StudyExport {
   chordFormat: 'txt' | 'csv' | 'json'
   stems: StudyTrack[]
 }
-export interface StudyCommands {
+export interface StudyCommands extends StudyComponentCommands {
   'study.setAutomation': StudyAutomationPolicy
   'study.setCachePolicy': Partial<StudyCachePolicy>
   'study.clearAudioCache': Record<string, never>
@@ -263,7 +265,7 @@ export interface StudyCommands {
   'study.choosePack': Record<string, never>
   'study.analyzeChords': { id: string; stems: StudyTrack[] }
 }
-export interface StudyQueries {
+export interface StudyQueries extends StudyComponentQueries {
   'study.automation': { input: Record<string, never>; output: StudyAutomationPolicy }
   'study.cache': { input: Record<string, never>; output: StudyCacheStatus }
   'study.runtime': { input: Record<string, never>; output: StudyRuntimeStatus }
@@ -274,7 +276,8 @@ export interface StudyQueries {
   'study.project': { input: { id: string }; output: StudyProject }
 }
 export interface StudyPlatformOperations {
-  'study.environment': { input: Record<string, never>; output: StudyState['environment'] }
+  'study.componentIO': { input: StudyComponentIO; output: StudyComponentState }
+  'study.environment': { input: { operation?: StudyOperation; lyrics?: string }; output: StudyState['environment'] }
   'study.choosePack': { input: Record<string, never>; output: void }
   'study.chooseSource': {
     input: { id: string }
@@ -362,6 +365,7 @@ export function studyReady(result: StudyResult | undefined, stage: StudyStage): 
     (stage !== 'melody' || result.melody?.algorithm === STUDY_MELODY_ALGORITHM)
 }
 export function validStudyPayload(name: string, p: unknown): boolean {
+  if (name.startsWith('study.component')) return validComponentPayload(name, p)
   if (!object(p)) return false
   switch (name) {
     case 'study.runtime':

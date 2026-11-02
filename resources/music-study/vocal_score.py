@@ -108,7 +108,7 @@ def compile_batch(lily, paths, out):
     """One native parser per bounded batch; cancellation kills only this child."""
     command=[str(lily),'-dbackend=svg','-dcrop','-dno-point-and-click','-o',str(out.resolve())+'/',
              *[str(path.resolve()) for path in paths]]
-    child=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+    child=subprocess.Popen(command,executable=command[0],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
         # GNU gettext in the Windows engraver can access-violate while loading
         # inherited translated catalogs (libintl-8.dll). Source text remains
         # UTF-8; only this external tool's diagnostics use the stable C locale.
@@ -136,8 +136,9 @@ def engrave(notes,lines,directory,home,progress,previous=None):
     from music21 import stream
     import jianpu_ly
     jianpu_ly.force_staff=False
-    lily=home/'notation-tools/lilypond-2.24.4/bin/lilypond.exe'
-    if not lily.is_file(): raise ValueError('简谱排版器未安装，请运行 install-music-study.ps1')
+    from study_bootstrap import paths, native_path
+    lily=native_path(paths().get('notationHome') or home)/'notation-tools/lilypond-2.24.4/bin/lilypond.exe'
+    if not lily.is_file(): raise ValueError('请安装排谱工具组件，再重试曲谱识别')
     out=directory/'notation';out.mkdir(exist_ok=True)
     scores=[];pending=[]
     for index,line in enumerate(lines):

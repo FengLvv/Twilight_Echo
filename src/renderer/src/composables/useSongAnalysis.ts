@@ -28,7 +28,7 @@ export function createSongAnalysis(songId: () => string, store: ReturnType<typeo
   const melodyBusy = computed(
     () =>
       melodyDisplay.starting.value ||
-      (!melodyReady.value && ['queued', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
+      (!melodyReady.value && ['queued', 'waiting-components', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
   )
   const melodyError = computed(
     () => melodyDisplay.error.value || project.value?.stages?.melody?.error || ''
@@ -37,7 +37,7 @@ export function createSongAnalysis(songId: () => string, store: ReturnType<typeo
   const chordsBusy = computed(
     () =>
       starting.value || chordDisplay.starting.value ||
-      (!chordsReady.value && ['queued', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
+      (!chordsReady.value && ['queued', 'waiting-components', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
   )
   let release: (() => void) | undefined,
     generation = 0,

@@ -10,6 +10,8 @@ import { downloadStatusLabel } from './streaming-page/streamingDownloads'
 import MetadataTaskList from './music-metadata/MetadataTaskList.vue'
 import { useMusicStudyProgress } from '../stores/musicStudy.ts'
 import type { StudyProjectSummary } from '../../../shared/musicStudy.ts'
+import { useStudyComponents, componentSize } from '../stores/studyComponents.ts'
+const studyComponents = useStudyComponents()
 const props = withDefaults(
   defineProps<{ active: boolean; filter?: 'all' | 'active' | 'attention' }>(),
   { filter: 'all' }
@@ -17,7 +19,7 @@ const props = withDefaults(
 const emit = defineEmits<{ library: []; visibleCount: [count: number] }>()
 const notices = useAppNoticeStore()
 const study = useMusicStudyProgress()
-const studyWorking = (song: StudyProjectSummary) => ['queued', 'running', 'cancelling', 'recovering'].includes(song.status)
+const studyWorking = (song: StudyProjectSummary) => ['queued', 'running', 'waiting-components', 'cancelling', 'recovering'].includes(song.status)
 const studyStatus = (song: StudyProjectSummary) => !studyWorking(song) && Object.values(song.stages ?? {}).some(stage => stage.status === 'failed') ? 'failed' : song.status
 const studyRetryable = (song: StudyProjectSummary) => ['failed', 'interrupted', 'cancelled'].includes(studyStatus(song))
 const studyError = (song: StudyProjectSummary) => song.error || Object.values(song.stages ?? {}).find(stage => stage.error)?.error
@@ -36,10 +38,17 @@ watch(studySongs, songs => {
   for (const song of songs) if (studyWorking(song)) notices.clearedTaskResultKeys.value.delete(studyKey(song))
 })
 function studyTitle(song: StudyProjectSummary) {
+  if (song.status === 'waiting-components') return '等待分析组件 · 点击安装'
   return studyWorking(song) ? '识别中 · 点击取消' : studyRetryable(song)
     ? `${studyStatus(song) === 'failed' ? '识别失败' : '识别中断'} · 点击重试` : '已识别'
 }
 async function studyAction(song: StudyProjectSummary) {
+  if (song.status === 'waiting-components') {
+    await studyComponents.refresh()
+    const request = studyComponents.state.value?.requests.find(item => item.owner === song.id)
+    if (request) studyComponents.selected.value = request.plan
+    return
+  }
   await run(`study:${song.id}`, async () => {
     await study.core.command(studyWorking(song) ? 'study.cancel' : 'study.retry', { id: song.id })
     await study.refresh()
@@ -106,6 +115,18 @@ const jobs = computed(() => {
     resume?: () => Promise<unknown>
   }[] = []
   const s = scan.value
+  for (const task of studyComponents.tasks.value) {
+    const component = studyComponents.state.value?.catalog.components.find(item => item.id === task.id)
+    result.push({
+      id: `study-component:${task.id}`, title: component?.title || task.id, state: task.phase,
+      detail: task.error || `${componentSize(task.receivedBytes)} / ${componentSize(task.totalBytes)}`,
+      value: task.totalBytes ? task.receivedBytes / task.totalBytes : undefined,
+      pause: ['queued', 'downloading', 'verifying'].includes(task.phase) ? () => studyComponents.task(task.id, 'pause') : undefined,
+      resume: ['paused', 'interrupted'].includes(task.phase) ? () => studyComponents.task(task.id, 'resume') : undefined,
+      cancel: ['queued', 'downloading', 'verifying', 'installing', 'paused', 'interrupted'].includes(task.phase) ? () => studyComponents.task(task.id, 'cancel') : undefined,
+      retry: ['failed', 'cancelled'].includes(task.phase) ? () => studyComponents.task(task.id, 'retry') : undefined
+    })
+  }
   if (s.state !== 'idle')
     result.push({
       id: 'scan',

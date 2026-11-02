@@ -1,6 +1,7 @@
 """Offline separation adapters. Models are loaded only from a verified local pack."""
 import math
 from pathlib import Path
+from study_bootstrap import model_path
 import numpy as np
 import torch
 import soundfile as sf
@@ -23,7 +24,7 @@ def read_audio(path, sr=44100):
 @lru_cache(maxsize=1)
 def six_model(pack, device):
     import os
-    os.environ["TORCH_HOME"] = str(Path(pack) / "torch")
+    os.environ["TORCH_HOME"] = str(model_path(pack, "torch"))
     from demucs.pretrained import get_model
     from model_residency import register_model, ensure_model
     model = get_model("htdemucs_6s").eval()
@@ -53,7 +54,7 @@ def six_stems(audio, pack, device, report):
 def lead_session(pack):
     import onnxruntime as ort
     options=ort.SessionOptions();options.intra_op_num_threads=8;options.inter_op_num_threads=1
-    return ort.InferenceSession(str(Path(pack) / "UVR_MDXNET_KARA_2.onnx"), sess_options=options,
+    return ort.InferenceSession(str(model_path(pack, "UVR_MDXNET_KARA_2.onnx")), sess_options=options,
                                providers=["CPUExecutionProvider"])
 
 
@@ -98,7 +99,7 @@ def duet_model(pack, device):
         use_skip_scale=True, diffusion_type="k",
         diffusion_sigma_distribution=LogNormalDistribution(mean=-3, std=1),
         diffusion_sigma_data=.2)
-    model.unet.load_state_dict(load_file(str(Path(pack) / "duet.safetensors")),strict=True)
+    model.unet.load_state_dict(load_file(str(model_path(pack, "duet.safetensors"))),strict=True)
     from model_residency import register_model
     return register_model('duet', model.eval(), device)
 
@@ -114,7 +115,7 @@ class SingerIdentity:
         self.normalize=InputNormalization(norm_type="sentence", std_norm=False).to(device)
         self.model=ECAPA_TDNN(input_size=80,channels=[1024,1024,1024,1024,3072],
                              kernel_sizes=[5,3,3,3,1],dilations=[1,2,3,4,1],attention_channels=128,lin_neurons=192).to(device).eval()
-        state=torch.load(Path(pack)/"speaker"/"embedding_model.ckpt",map_location=device,weights_only=True)
+        state=torch.load(model_path(pack, "speaker/embedding_model.ckpt"),map_location=device,weights_only=True)
         self.model.load_state_dict(state,strict=True)
         self.reference=None
 

@@ -3412,3 +3412,84 @@ test('signing in again clears resolved audio and ignores downloads from the old 
     ncmProvider.deactivate()
   }
 })
+
+
+test('album collection reads dynamic state and performs deduplicated cloud subscribe/unsubscribe', async () => {
+  const requests = []
+  let subscribed = 1
+  const provider = await activateProvider(async path => {
+    const url = parseRequest(path); requests.push(url)
+    if (url.pathname === '/album/detail/dynamic') return { code: 200, isSub: subscribed }
+    return { code: 200 }
+  })
+  try {
+    assert.deepEqual(await provider.fetchAlbumSubscriptionState(123), { subscribed: true })
+    subscribed = 0
+    assert.deepEqual(await provider.fetchAlbumSubscriptionState('123'), { subscribed: false })
+    const context = { signal: new AbortController().signal, idempotencyKey: 'album-123' }
+    await provider.subscribeAlbum(123, true, context)
+    await provider.subscribeAlbum(123, true, context)
+    await provider.subscribeAlbum(123, false)
+    assert.deepEqual(requests.filter(u => u.pathname === '/album/sub').map(u => [u.searchParams.get('id'), u.searchParams.get('t')]), [['123','1'],['123','2']])
+    await assert.rejects(provider.subscribeAlbum(123, 'true'), /状态无效/)
+    await assert.rejects(provider.subscribeAlbum(1.5, true), /ID 无效/)
+    await assert.rejects(provider.fetchAlbumSubscriptionState(-1), /ID 无效/)
+  } finally { ncmProvider.deactivate() }
+})
+
+test('unknown album state and unacknowledged account writes never become false success', async () => {
+  let response = { code: 200 }
+  const provider = await activateProvider(async () => response)
+  try {
+    await assert.rejects(provider.fetchAlbumSubscriptionState(123), /有效.*收藏状态/)
+    for (response of [{}, { code: 403, message: '无权操作' }]) {
+      await assert.rejects(provider.subscribeAlbum(123, true))
+      await assert.rejects(provider.followArtist(12, true))
+      await assert.rejects(provider.followUser(13, true))
+      await assert.rejects(provider.likeTrack(14, true))
+      await assert.rejects(provider.addTracksToPlaylist(15, [14]))
+    }
+    response = { code: 200 }
+    assert.equal(await provider.isTrackLiked(14), false)
+    await assert.rejects(provider.followArtist(-1, true), /ID 无效/)
+    await assert.rejects(provider.followUser(12, 'false'), /状态无效/)
+    await assert.rejects(provider.likeTrack(14, 'false'), /状态无效/)
+  } finally { ncmProvider.deactivate() }
+  const anonymous = await activateProvider(async () => { throw Error('Unexpected anonymous network') }, new Map())
+  try { await assert.rejects(anonymous.subscribeAlbum(123, true), /请先登录/) }
+  finally { ncmProvider.deactivate() }
+})
+
+
+test('follower rows never mistake follows-me for my own follow state', async () => {
+  const provider = await activateProvider(async path => {
+    const url = parseRequest(path)
+    if (url.pathname === '/user/followeds') return { code: 200, followeds: [
+      { userId: 1, nickname: 'one', followMe: true, mutual: false },
+      { userId: 2, nickname: 'two', followMe: true, mutual: true },
+      { userId: 3, nickname: 'three', followMe: true }
+    ] }
+    return { code: 200 }
+  })
+  try {
+    const rows = await provider.fetchUserFolloweds(123)
+    assert.deepEqual(rows.map(row => row.followed), [false, true, undefined])
+  } finally { ncmProvider.deactivate() }
+})
+
+
+test('account collection read failures stay visible instead of pretending the account has no saved items', async () => {
+  let response = { code: 403, message: '账号权限不足' }
+  const provider = await activateProvider(async () => response)
+  try {
+    for (const run of [() => provider.fetchSavedAlbums(), () => provider.fetchSavedArtists(), () => provider.fetchUserFollows(123), () => provider.fetchUserFolloweds(123)]) {
+      await assert.rejects(run(), /账号权限不足/)
+    }
+    response = { code: 200 }
+    await assert.rejects(provider.fetchSavedAlbums(), /有效.*列表/)
+    await assert.rejects(provider.fetchSavedArtists(), /有效.*列表/)
+    response = { code: 200, data: [] }
+    assert.deepEqual(await provider.fetchSavedAlbums(), [])
+    assert.deepEqual(await provider.fetchSavedArtists(), [])
+  } finally { ncmProvider.deactivate() }
+})

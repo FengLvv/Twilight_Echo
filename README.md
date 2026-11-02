@@ -11,19 +11,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/FengLvv/Twilight_Echo/releases"><img alt="最新预览版" src="https://img.shields.io/github/v/release/FengLvv/Twilight_Echo?include_prereleases&display_name=tag&style=flat-square&color=8b5cf6" /></a>
+  <a href="https://github.com/FengLvv/Twilight_Echo/releases"><img alt="最新预览版" src="https://img.shields.io/github/v/release/FengLvv/Twilight_Echo?include_prereleases&filter=v*&display_name=tag&style=flat-square&color=8b5cf6" /></a>
   <img alt="支持 Windows 10 和 11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-2563eb?style=flat-square" />
   <a href="./LICENSE"><img alt="Apache 2.0 开源许可证" src="https://img.shields.io/badge/license-Apache--2.0-64748b?style=flat-square" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4"><strong>下载 Windows 版</strong></a>
+  <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6"><strong>下载 Windows 版</strong></a>
   · <a href="#快速开始">快速开始</a>
   · <a href="#功能一览">功能一览</a>
   · <a href="#歌曲分析">歌曲分析</a>
   · <a href="#agent-与-cli">Agent / CLI</a>
   · <a href="#界面预览">界面预览</a>
-  · <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4">1.4.0-preview.4 更新说明</a>
+  · <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6">1.4.0-preview.6 更新说明</a>
   · <a href="#常见问题">常见问题</a>
   · <a href="#反馈与交流">问题反馈</a>
 </p>
@@ -32,7 +32,9 @@
 
 <p align="center"><sub>从硬盘里的珍藏，到每日推荐里的新发现，让音乐陪你度过每一个日常。</sub></p>
 
-## 1.4.0-preview.4 更新亮点
+## 1.4.0-preview.6 更新亮点
+
+- **分析组件按需安装**：首次使用时确认实际下载量，任务与通知支持暂停、续传和重试；已安装组件离线使用，已有环境可以导入复用。
 
 - **六轨混音**：分离人声、鼓、贝斯、吉他、钢琴与其他乐器，在播放页直接调节音量、独听和静音。
 - **和弦与人声曲谱**：和弦名称／罗马级数、简谱／五线谱与歌词按时间同步；桌面歌词沿用相同的显示控制与主题样式。
@@ -41,29 +43,31 @@
 - **网易云收藏与 Agent CLI**：支持歌单收藏／取消收藏、搜索结果喜欢状态，以及由 Agent 控制播放器、批量分析和导出曲谱。
 - **近期修复与完整离线包**：修复日语制谱发音转换、桌面谱面描边、封面圆角与界面交互，并提供自带全部当前模型的 Windows 完整包。
 
-完整更新记录见 **[v1.4.0-preview.4 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)**。本版为 **Windows x64 预览版**。
+完整更新记录见 **[v1.4.0-preview.6 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6)**。本版为 **Windows x64 预览版**。
 
 ## 下载与安装
 
-**[打开当前版本的 Release 附件 →](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)**
+**[打开当前版本的 Release 附件 →](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6)**
 
 | 需要什么 | 下载什么 |
 | --- | --- |
-| 只安装或更新播放器 | [TwilightEcho-1.4.0-preview.4-setup.exe](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-setup.exe)，约 133 MB，不含 Python 和分析模型 |
-| 首次使用完整分析功能、离线使用或分享给朋友 | `TwilightEcho-1.4.0-preview.4-win-x64-full.zip.001` 至 `.005` **全部五卷**，以及 [Offline-Tools.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/Offline-Tools.zip)，分卷合计约 9.31 GB |
-| 核对附件完整性 | [SHA256SUMS.txt](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/SHA256SUMS.txt)；发布页同时提供验证摘要 `Verification.json` |
-| 获取与本版对应的完整源码 | [TwilightEcho-1.4.0-preview.4-source.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-source.zip)，包含 Agent CLI 与插件协议源码，不含模型 |
+| 只安装或更新播放器 | [TwilightEcho-1.4.0-preview.6-setup.exe](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.6/TwilightEcho-1.4.0-preview.6-setup.exe)，约 136 MB，不含 Python 和分析模型 |
+| 首次使用完整分析功能、离线使用或分享给朋友 | `TwilightEcho-1.4.0-preview.6-win-x64-full.zip.001` 至 `.005` **全部五卷**，以及 [Offline-Tools.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.6/Offline-Tools.zip)，分卷合计约 9 GB |
+| 核对附件完整性 | [SHA256SUMS.txt](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.6/SHA256SUMS.txt)；发布页同时提供验证摘要 `Verification.json` |
+| 获取与本版对应的完整源码 | [TwilightEcho-1.4.0-preview.6-source.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.6/TwilightEcho-1.4.0-preview.6-source.zip)，包含 Agent CLI 与插件协议源码，不含模型 |
 
 ### 安装播放器
 
-Windows 10/11 x64：运行 `setup.exe`，按向导完成安装。已有分析环境可继续使用；首次使用分轨、和弦和制谱时，建议选择下方完整离线包。
+Windows 10/11 x64：运行 `setup.exe`，按向导完成安装。首次使用分轨、和弦或曲谱时，确认所需组件的下载量和安装位置，安装完成后自动继续分析。可在「设置 → 播放 → 歌曲分析」导入已有环境；需要完全离线安装时，使用下方完整包。
+
+首次六轨安装约下载 3.81 GB、占用 8.27 GB，主要来自共享 PyTorch/CUDA。后续功能只下载缺失组件。详见[分析组件说明](./docs/analysis-components.md)。
 
 ### 使用完整离线包
 
-1. 从 [Release 附件](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4) 下载 `.001`～`.005` 五个分卷和 `Offline-Tools.zip`。
+1. 从 [Release 附件](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6) 下载 `.001`～`.005` 五个分卷和 `Offline-Tools.zip`。
 2. 解压 `Offline-Tools.zip`，把 `Merge-Offline.cmd`、`Merge-Offline.ps1`、`offline-volumes.json` 与五个分卷放在**同一文件夹**。
 3. 双击 `Merge-Offline.cmd`。工具会逐卷校验 SHA-256、合并为普通 ZIP，并核对完整 ZIP 的校验值。
-4. 解压生成的 `TwilightEcho-1.4.0-preview.4-win-x64-full.zip`，双击其中的 `Start.cmd`。可运行 `Verify.cmd` 检查全部解压文件。
+4. 解压生成的 `TwilightEcho-1.4.0-preview.6-win-x64-full.zip`，双击其中的 `Start.cmd`。可运行 `Verify.cmd` 检查全部解压文件。
 
 **完整包已包含播放器、两套独立 Python 运行环境、全部当前分析模型与排谱工具，无需再安装 `setup.exe` 或另装 Python。** 请保留完整目录结构。
 
@@ -81,7 +85,7 @@ Windows 10/11 x64：运行 `setup.exe`，按向导完成安装。已有分析环
 在安装包所在文件夹打开 PowerShell，运行下面的命令，将引号内的名称替换为实际文件名，然后与发布页的 SHA-256 比对：
 
 ```powershell
-Get-FileHash -LiteralPath '.\TwilightEcho-1.4.0-preview.4-setup.exe' -Algorithm SHA256
+Get-FileHash -LiteralPath '.\TwilightEcho-1.4.0-preview.6-setup.exe' -Algorithm SHA256
 ```
 
 完整包的合并工具会自动核对各分卷及合并 ZIP；解压后的 `Verify.cmd` 检查包内全部文件。
@@ -188,17 +192,17 @@ Get-FileHash -LiteralPath '.\TwilightEcho-1.4.0-preview.4-setup.exe' -Algorithm 
 
 Agent 可通过 CLI 操作真实播放器、查询网易云、调节 DSP、批量分析歌曲，并读取指定时间段的和弦、音高与带时值曲谱。状态、账号与任务仍由播放器统一管理。
 
-从本版[源码包](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-source.zip)解压，或检出本仓库 `v1.4.0-preview.4` 后，在源码根目录安装客户端（Python 3.10+）：
+从本版[源码包](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.6/TwilightEcho-1.4.0-preview.6-source.zip)解压，或检出本仓库 `v1.4.0-preview.6` 后，在源码根目录安装客户端（Python 3.10+）：
 
 ```powershell
 python -m pip install -e ./agent-harness
 cli-anything-twilightecho --help
 ```
 
-首次从 CLI 启动完整包时，先指定包内的分析环境，再启动播放器。把示例路径换成自己的实际路径：
+首次从 CLI 启动完整包时，先指定包内的组件目录，再启动播放器。把示例路径换成自己的实际路径：
 
 ```powershell
-$env:TWILIGHT_MUSIC_STUDY_HOME = 'C:/Apps/TwilightEcho/music-study-runtime'
+$env:TWILIGHT_STUDY_COMPONENTS_HOME = 'C:/Apps/TwilightEcho/analysis-components'
 cli-anything-twilightecho --json app start --executable "C:/Apps/TwilightEcho/TwilightEcho.exe" --visible
 cli-anything-twilightecho --json doctor
 ```
@@ -211,7 +215,7 @@ cli-anything-twilightecho --json music export --id PROJECT_ID --directory "D:/Sc
 
 使用 `--notation numbered` 导出简谱；分析完成后的 `PROJECT_ID` 可继续用于读取结果、导出分轨和拆分多人声。导出包含 SVG、PDF、分析 JSON，以及可用的 MIDI / MusicXML。
 
-完整命令、批处理和模型配置见 **[Agent CLI 指南](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.4/agent-harness/cli_anything/twilightecho/README.md)**。默认后台启动，示例中的 `--visible` 会打开正常窗口。
+完整命令、批处理和模型配置见 **[Agent CLI 指南](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.6/agent-harness/cli_anything/twilightecho/README.md)**。默认后台启动，示例中的 `--visible` 会打开正常窗口。
 
 ## 界面预览
 
@@ -350,7 +354,7 @@ cli-anything-twilightecho --json music export --id PROJECT_ID --directory "D:/Sc
 
 打开「设置 → 系统与关于」检查更新，可选择稳定或测试频道，并查看更新说明、下载进度与安装状态。Windows 使用完整安装包升级，下载支持中断恢复，并在安装前校验文件大小和 SHA-256；任务与通知中心也能查看更新进度。后台检查只提示新版本，下载和安装由你决定。
 
-本仓库预览版请从 [Releases](https://github.com/FengLvv/Twilight_Echo/releases) 手动下载安装包；当前变化见 [v1.4.0-preview.4 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)。应用内更新渠道以实际显示的仓库和版本为准。已有模型环境可继续使用，只更新播放器无需重新下载五个完整包分卷。
+本仓库预览版请从 [Releases](https://github.com/FengLvv/Twilight_Echo/releases) 手动下载安装包；当前变化见 [v1.4.0-preview.6 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.6)。应用内更新渠道以实际显示的仓库和版本为准。已有模型环境可继续使用，只更新播放器无需重新下载五个完整包分卷。
 
 </details>
 
@@ -370,7 +374,7 @@ cli-anything-twilightecho --json music export --id PROJECT_ID --directory "D:/Sc
 <details>
 <summary>macOS 和 Linux 可以用吗？</summary>
 
-CoreAudio 与 ALSA 后端已存在，但目前没有经过与 Windows 同等级别的发布和真实设备验证。现阶段建议普通用户使用 Windows 版本；macOS / Linux 构建供开发、测试和贡献使用。
+macOS 与 Linux 后端已有实现，但尚未达到正式发布验证标准。CoreAudio 与 ALSA 后端已存在，但目前没有经过与 Windows 同等级别的发布和真实设备验证。现阶段建议普通用户使用 Windows 版本；macOS / Linux 构建供开发、测试和贡献使用。
 
 </details>
 
@@ -404,7 +408,7 @@ CoreAudio 与 ALSA 后端已存在，但目前没有经过与 Windows 同等级�
 
 第三方开发者可在自己的公开仓库发布 `.tep`，通过 GitHub Topic 和 Release 自动进入插件市场；无需把源码提交到目录仓库。发布步骤见[插件开发指南](./docs/PLUGIN_README.md#14-发布到插件市场)。
 
-当前分析版的发布源码以 [`v1.4.0-preview.4`](https://github.com/FengLvv/Twilight_Echo/tree/v1.4.0-preview.4) 为准，持续开发位于 [`codex/music-study-cli`](https://github.com/FengLvv/Twilight_Echo/tree/codex/music-study-cli)；默认分支保留原有开发线。开发环境使用项目锁定的 `pnpm@11.7.0`；依赖安装、原生音频工具链和运行步骤见开发者文档，Windows 发布流程见[发布检查](./docs/windows-release-gate.md)。
+当前分析版的发布源码以 [`v1.4.0-preview.6`](https://github.com/FengLvv/Twilight_Echo/tree/v1.4.0-preview.6) 为准，持续开发位于 [`codex/analysis-components-release`](https://github.com/FengLvv/Twilight_Echo/tree/codex/analysis-components-release)；默认分支保留原有开发线。开发环境使用项目锁定的 `pnpm@11.7.0`；依赖安装、原生音频工具链和运行步骤见开发者文档，Windows 发布流程见[发布检查](./docs/windows-release-gate.md)。
 
 ## 开源许可
 
@@ -412,6 +416,6 @@ CoreAudio 与 ALSA 后端已存在，但目前没有经过与 Windows 同等级�
 
 Twilight Echo 软件采用 [Apache License 2.0](./LICENSE) 开源。第三方依赖、字体、图标、插件和内容素材遵循各自的许可证或服务条款；相关商标归其权利人所有，Twilight Echo 与这些服务不存在官方隶属或背书关系。
 
-完整分析包中的模型另有许可：SheetSage2 / MERT-v2 权重采用 CC BY-NC 4.0，TiFA / GAME 权重采用 CC BY-NC-SA 4.0。完整模型包用于非商业分享与个人学习，详见[模型与工具许可](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.4/resources/music-study/THIRD_PARTY.md)。
+完整分析包中的模型另有许可：SheetSage2 / MERT-v2 权重采用 CC BY-NC 4.0，TiFA / GAME 权重采用 CC BY-NC-SA 4.0。完整模型包用于非商业分享与个人学习，详见[模型与工具许可](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.6/resources/music-study/THIRD_PARTY.md)。
 
 如有原项目版权或侵权问题，请联系 Pxasen@outlook.com；本分支的问题见[反馈与交流](#反馈与交流)。

@@ -29,6 +29,8 @@ import { studyLyricsFromText } from './studyLyrics.ts'
 import { CoreStudyAudioCache } from './studyAudioCache.ts'
 import { LeasedLru, estimateResultBytes } from '../../shared/leasedLru.ts'
 import { studyResultHeader } from '../../shared/studyResultHeader.ts'
+import type { CoreStudyComponentsService } from './studyComponentsService.ts'
+import type { StudyFeature } from '../../shared/studyComponents.ts'
 import type {
   StudyAudioGroup,
   StudyCachePolicy,
@@ -45,6 +47,7 @@ const operationStages = (operation: StudyOperation): StudyStage[] =>
   operation === 'analyze' ? ['six', 'chords'] : operation === 'melody' ? ['melody'] : [operation]
 
 export interface StudyRecord extends StudyProject {
+  automatic?: boolean
   resultLoaded?: boolean
   audioAccess?: Partial<Record<'six' | 'leadBacking' | 'twoSingers', number>>
   prefetch?: boolean
@@ -99,6 +102,7 @@ export interface StudyRepository {
   remove(id: string): Promise<void>
 }
 export interface StudyPorts {
+  components?: CoreStudyComponentsService
   repository: StudyRepository
   newId(): string
   now(): number
@@ -112,7 +116,7 @@ export interface StudyPorts {
     source: StudyRecord['source']
     capture?(): Promise<StudyRecord['source']>
   } | null>
-  environment(): Promise<StudyState['environment']>
+  environment(operation?: StudyOperation, lyrics?: string): Promise<StudyState['environment']>
   runtime?(): Promise<StudyRuntimeStatus>
   runtimeActivity?(busy: boolean): Promise<void>
   audioInventory?(): Promise<StudyAudioGroup[]>
@@ -145,6 +149,7 @@ export interface StudyPorts {
 
 /** Core owns durable jobs, recovery, revisions and mixer policy; host owns IO/processes. */
 export class CoreMusicStudyService {
+  get components() { return this.ports.components }
   private revision = 0
   private lyricBinding = ''
   private lyricSong = ''
@@ -188,6 +193,7 @@ export class CoreMusicStudyService {
   private mixFiles = ''
   private mixWork: Promise<unknown> = Promise.resolve()
   private creation: Promise<unknown> = Promise.resolve()
+  private admissionBatch = 0
   private queue: Array<{ id: string; operation: StudyOperation }> = []
   private launch: AbortController | null = null
   private readonly audioCache: CoreStudyAudioCache
@@ -320,12 +326,24 @@ export class CoreMusicStudyService {
   }
   async setAutomation(policy: StudyAutomationPolicy) {
     await this.init()
+    this.components?.release('automatic')
     this.automaticStages = STUDY_AUTOMATIC_STAGES.filter((stage) => policy.stages.includes(stage))
+    if (this.automaticStages.length) await this.components?.require(
+      [...new Set<StudyFeature>(['six', ...this.automaticStages])], 'automatic', '播放时自动分析', true)
     this.automaticKey = ''
     await this.persistPreferences()
     this.changed()
     this.automaticSchedule()
     return this.automation()
+  }
+  async dismissComponents(owner: string) {
+    await this.init()
+    if (owner === 'automatic') {
+      await this.setAutomation({ stages: [] })
+      for (const record of this.records.values())
+        if (record.automatic && ['running', 'queued', 'waiting-components', 'recovering'].includes(record.status)) await this.cancel(record.id)
+    } else if (this.records.has(owner)) await this.cancel(owner)
+    this.components?.dismiss(owner)
   }
   private automaticSchedule() {
     this.automaticTimer?.()
@@ -558,7 +576,7 @@ export class CoreMusicStudyService {
         preferences?.automaticStages?.includes(stage)
       )
       for (const record of await this.ports.repository.list()) {
-        if (record.status === 'running' || record.status === 'queued') {
+        if (record.status === 'running' || record.status === 'queued' || record.status === 'waiting-components') {
           record.status = 'interrupted'
           record.pending = []
           for (const phase of Object.values(record.stages ?? {}))
@@ -641,7 +659,7 @@ export class CoreMusicStudyService {
     return {
       total: records.length,
       activeCount: records.filter((r) =>
-        ['running', 'queued', 'cancelling', 'recovering'].includes(r.status)
+        ['running', 'queued', 'waiting-components', 'cancelling', 'recovering'].includes(r.status)
       ).length,
       projects: records
         .slice(query.offset ?? 0, (query.offset ?? 0) + (query.limit ?? 50))
@@ -742,6 +760,7 @@ export class CoreMusicStudyService {
     try {
       await this.init()
       const record = this.get(id)
+      record.automatic = false
       await this.hydrate(record, resultScope)
       if (kind === 'twoSingers' && this.environment.ready && !this.environment.gpu)
         throw new Error('双歌手分离需要 CUDA GPU')
@@ -761,6 +780,12 @@ export class CoreMusicStudyService {
     this.prefetchSchedule()
   }
   private async enqueue(record: StudyRecord, operation: StudyOperation) {
+    if (operation === 'analyze' && this.components) {
+      this.admissionBatch++
+      try { await this.enqueue(record, 'six'); await this.enqueue(record, 'chords') }
+      finally { this.admissionBatch--; this.kick() }
+      return
+    }
     const covered = new Set((record.pending ?? []).flatMap(operationStages))
     if (record.status === 'running' && record.operation)
       operationStages(record.operation).forEach((stage) => covered.add(stage))
@@ -872,6 +897,7 @@ export class CoreMusicStudyService {
           )
           .sort((a, b) => b.createdAt - a.createdAt)[0]
         if (existing) {
+          if (!current && !prefetch) existing.automatic = false
           await this.hydrate(existing, resultScope)
           const checked =
             existing.status !== 'running' && existing.status !== 'queued' && existing.result
@@ -934,6 +960,7 @@ export class CoreMusicStudyService {
         source: source.source,
         prefetch,
         resultLoaded: true,
+        automatic: !!current,
         lyrics,
         tonalKey: source.source.identity === this.lyricSong ? this.pendingKey : 'auto',
         status: 'queued',
@@ -956,7 +983,7 @@ export class CoreMusicStudyService {
     }
   }
   private kick() {
-    if (this.stopped || this.ticking || this.cancellations.size) return
+    if (this.stopped || this.ticking || this.cancellations.size || this.admissionBatch) return
     this.cancelTick?.()
     this.cancelTick = null
     this.ticking = this.tick()
@@ -1012,7 +1039,7 @@ export class CoreMusicStudyService {
         this.updateRuntimeDemand()
         if (
           !this.stopped &&
-          (this.running || [...this.records.values()].some((r) => r.status === 'queued'))
+          (this.running || [...this.records.values()].some((r) => r.status === 'queued' || r.status === 'waiting-components'))
         )
           this.cancelTick = this.ports.schedule(() => this.kick(), 700)
       })
@@ -1068,13 +1095,47 @@ export class CoreMusicStudyService {
 
     return true
   }
+  private componentFeatures(record: StudyRecord, operation: StudyOperation): StudyFeature[] {
+    const features: StudyFeature[] = operation === 'analyze' ? ['six', 'chords']
+      : operation === 'originalChords' ? ['chords'] : [operation]
+    if (operation !== 'originalChords' && operation !== 'six' && !studyReady(record.result, 'six')) features.unshift('six')
+    if (operation === 'melody') {
+      let structured = false
+      try { const rows = JSON.parse(record.lyrics || '[]'); structured = rows.length > 0 && rows.every((row: { origin?: { format?: string } }) => row.origin?.format === 'amll-ttml') } catch { /* Unstructured supplied lyrics use the existing cleanup. */ }
+      if (!structured) features.push('lyricFilter')
+    }
+    return [...new Set(features)]
+  }
   private async tick() {
     const resultScope = this.results.scope()
     try {
       if (!this.running) {
         let next: { id: string; operation: StudyOperation } | undefined
-        while ((next = this.queue.shift())) {
-          if (this.records.get(next.id)?.pending?.includes(next.operation)) break
+        let attempts = this.queue.length
+        while (attempts-- > 0 && (next = this.queue.shift())) {
+          const candidate = this.records.get(next.id)
+          if (!candidate?.pending?.includes(next.operation)) { next = undefined; continue }
+          if (this.components) {
+            try {
+              const features = this.componentFeatures(candidate, next.operation)
+              const all = [...new Set(candidate.pending!.flatMap(operation => this.componentFeatures(candidate, operation)))]
+              await this.components.require(all, candidate.id, candidate.title, !candidate.prefetch && !candidate.automatic)
+              if ((await this.components.plan(features)).ids.length) {
+                if (candidate.status !== 'waiting-components') {
+                  candidate.status = 'waiting-components'; candidate.stage = '等待分析组件'; await this.save(candidate)
+                }
+                this.queue.push(next); next = undefined; continue
+              }
+            } catch (error) {
+              candidate.status = 'failed'; candidate.stage = '分析组件不可用'; candidate.error = String(error)
+              for (const operation of candidate.pending ?? []) for (const stage of operationStages(operation)) {
+                candidate.stages ??= {}; candidate.stages[stage] = { status: 'failed', progress: 0, error: candidate.error }
+              }
+              candidate.pending = []; this.components.release(candidate.id)
+              await this.save(candidate); next = undefined; continue
+            }
+          }
+          break
         }
         if (!next) return
         const record = this.get(next.id)
@@ -1100,6 +1161,7 @@ export class CoreMusicStudyService {
           ])
           controller.signal.throwIfAborted()
           if (record.status !== 'running') return
+          if (this.components) this.environment = await this.ports.environment(record.operation, record.lyrics)
           if (!this.environment.ready) throw new Error(this.environment.error || '请先配置分析环境')
           if (record.operation === 'twoSingers' && !this.environment.gpu)
             throw new Error('双歌手分离需要 CUDA GPU')
@@ -1220,7 +1282,8 @@ export class CoreMusicStudyService {
   private async cancelRecord(id: string) {
     await this.init()
     const record = this.get(id)
-    if (!['running', 'queued', 'cancelling', 'recovering'].includes(record.status)) return
+    this.components?.release(id)
+    if (!['running', 'queued', 'waiting-components', 'cancelling', 'recovering'].includes(record.status)) return
     record.status = 'cancelling'
     record.pending = []
     this.queue = this.queue.filter((job) => job.id !== id)
@@ -1265,7 +1328,8 @@ export class CoreMusicStudyService {
     try {
       await this.init()
       const record = this.get(id)
-      if (['running', 'queued', 'cancelling', 'recovering'].includes(record.status)) return
+      record.automatic = false
+      if (['running', 'queued', 'waiting-components', 'cancelling', 'recovering'].includes(record.status)) return
       await this.hydrate(record, resultScope)
       const failed = STUDY_STAGES.filter(
         (stage) =>
@@ -1307,6 +1371,7 @@ export class CoreMusicStudyService {
     try {
       await this.init()
       const record = this.get(id)
+      record.automatic = false
       await this.hydrate(record, resultScope)
       if (!studyReady(record.result, 'six')) throw new Error('请等待六轨分离完成')
       if (stems.some((stem) => stem !== 'original' && !record.result!.stems.includes(stem)))
@@ -1548,6 +1613,7 @@ export class CoreMusicStudyService {
   async choosePack() {
     await this.init()
     if (this.active) throw new Error('请先结束分轨试听')
+    if (this.components) { await this.components.action({ action: 'import' }); return }
     await this.environmentCheck
     await this.ports.choosePack()
     this.environment = await this.ports.environment()

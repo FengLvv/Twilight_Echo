@@ -28,6 +28,18 @@ const TIMESTAMPED_NCM_API_PATHS = [
   '/playlist/tracks',
   '/like',
   '/follow',
+  '/album/sub',
+  '/album/sublist',
+  '/album/detail/dynamic',
+  '/artist/sub',
+  '/artist/sublist',
+  '/artist/detail/dynamic',
+  '/playlist/subscribe',
+  '/playlist/detail/dynamic',
+  '/user/playlist',
+  '/user/follows',
+  '/user/followeds',
+  '/likelist',
   '/personal_fm',
   '/personal/fm/mode'
 ]
@@ -118,11 +130,14 @@ export class NcmApiService<TServer extends Server = Server> {
       console.error('网易云音乐服务启动失败：', redactSensitiveText(message))
       return { code: -1, message }
     }
-    const separator = normalizedPath.includes('?') ? '&' : '?'
-    const timestamp = shouldTimestampNcmApiPath(normalizedPath)
-      ? `${separator}timestamp=${(this.options.now ?? Date.now)()}`
-      : ''
-    const url = `http://${NCM_API_HOST}:${port}${normalizedPath}${timestamp}`
+    let url = `http://${NCM_API_HOST}:${port}${normalizedPath}`
+    if (shouldTimestampNcmApiPath(normalizedPath)) {
+      // Account state must not reuse the gateway's two-minute response cache.
+      // Replace an existing timestamp rather than sending an ambiguous query array.
+      const fresh = new URL(url)
+      fresh.searchParams.set('timestamp', String((this.options.now ?? Date.now)()))
+      url = fresh.href
+    }
     const headers: Record<string, string> = {}
     const normalizedCookie = normalizeNcmCookie(cookie)
     if (normalizedCookie) {

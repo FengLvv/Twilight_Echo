@@ -13,6 +13,7 @@ import type {
   MediaProviderPlaylistCatalogue,
   MediaProviderPlaylistSummary,
   MediaProviderPlaylistSubscriptionState,
+  MediaProviderAlbumSubscriptionState,
   MediaProviderPlaylistTracksPage,
   MediaProviderProfile,
   MediaProviderSearchResult,
@@ -348,6 +349,12 @@ export async function syncPluginProviders(): Promise<void> {
             : undefined,
           deletePlaylist: provider.capabilities.includes('library')
             ? (playlistId) => callProvider<void>('deletePlaylist', [playlistId])
+            : undefined,
+          fetchAlbumSubscriptionState: provider.supportedMethods?.includes('fetchAlbumSubscriptionState')
+            ? (albumId) => callProvider<MediaProviderAlbumSubscriptionState>('fetchAlbumSubscriptionState', [albumId])
+            : undefined,
+          subscribeAlbum: provider.supportedMethods?.includes('subscribeAlbum')
+            ? (albumId, subscribe) => callProvider<void>('subscribeAlbum', [albumId, subscribe])
             : undefined,
           fetchPlaylistSubscriptionState: provider.supportedMethods?.includes('fetchPlaylistSubscriptionState')
             ? (playlistId) => callProvider<MediaProviderPlaylistSubscriptionState>('fetchPlaylistSubscriptionState', [playlistId])

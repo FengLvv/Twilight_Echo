@@ -4,6 +4,7 @@ Raw seconds remain authoritative for playback. Musical beats are a separate view
 All model and pronunciation resources are local; this module never invokes ASR.
 """
 from pathlib import Path
+from study_bootstrap import model_path
 import hashlib
 import json
 import math
@@ -28,17 +29,17 @@ def resident_models(pack_path, device):
     pack = Path(pack_path)
     registry = json.loads(Path(__file__).with_name('vocal_models.json').read_text(encoding='utf-8'))
     for name, expected in registry['files'].items():
-        with (pack / name).open('rb') as file:
+        with (model_path(pack, name)).open('rb') as file:
             if hashlib.file_digest(file, 'sha256').hexdigest() != expected:
                 raise ValueError('简谱模型校验失败：' + name)
-    predictor = File2Beats(checkpoint_path=str(pack / 'vocal2midi/beat_this-final0.ckpt'), device='cpu', dbn=False)
+    predictor = File2Beats(checkpoint_path=str(model_path(pack, 'vocal2midi/beat_this-final0.ckpt')), device='cpu', dbn=False)
     from vocal_residency import register_beat, register_onnx
     predictor.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     register_beat(predictor)
-    tifa = load_tifa_model(pack / 'vocal2midi/tifa', device='cpu')
-    game = load_game_model(str(pack / 'vocal2midi/game'), device='cpu')
-    register_onnx('tifa', tifa, 'sessions', device, pack / 'vocal2midi/tifa')
-    register_onnx('game', game, '_sessions', device, pack / 'vocal2midi/game')
+    tifa = load_tifa_model(model_path(pack, 'vocal2midi/tifa'), device='cpu')
+    game = load_game_model(str(model_path(pack, 'vocal2midi/game')), device='cpu')
+    register_onnx('tifa', tifa, 'sessions', device, model_path(pack, 'vocal2midi/tifa'))
+    register_onnx('game', game, '_sessions', device, model_path(pack, 'vocal2midi/game'))
     g2p = build_g2p_pipeline(tifa.model_dir, japanese_g2p_engine='pyopenjtalk')
     return predictor, tifa, game, g2p
 

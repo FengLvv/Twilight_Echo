@@ -1,0 +1,1 @@
+{"schema":1,"id":"btc","version":"c2e40ae2fa0710ecfa9a2f4062d9913a6705d35b8733ebee419ddb169e755b2a","platform":"win32-x64","files":[{"path":"models/btc.safetensors","bytes":12183776,"sha256":"468289d56a0d9932bf28f81278ad736ed881611494c019a088e94f134bf4e778"},{"path":"THIRD_PARTY.md","bytes":38840,"sha256":"2d1f7f2ea0b903090e46a1fb45d1a01824fb320501b2bfca05b02483ac1b17df"}]}

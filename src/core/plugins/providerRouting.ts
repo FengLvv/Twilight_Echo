@@ -319,6 +319,8 @@ const PROVIDER_METHOD_CAPABILITIES: Partial<
   deletePlaylist: 'library',
   fetchPlaylistSubscriptionState: 'library',
   subscribePlaylist: 'library',
+  fetchAlbumSubscriptionState: 'library',
+  subscribeAlbum: 'library',
   addTracksToPlaylist: 'library',
   removeTracksFromPlaylist: 'library'
 }

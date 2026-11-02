@@ -100,3 +100,16 @@ test('in-flight renderer write keys neither expire nor get evicted by the bounde
   const otherTarget = coordinator.begin('ncm', 'likeTrack', [43, true])
   assert.notEqual(otherTarget.idempotencyKey, first.idempotencyKey)
 })
+
+
+test('album collection retries retain their own account-write idempotency key', () => {
+  let key = 0
+  const coordinator = new ProviderWriteIdempotencyCoordinator({ createKey: () => `album-${++key}` })
+  const first = coordinator.begin('ncm', 'subscribeAlbum', [123, true])
+  first.settle(false)
+  const retry = coordinator.begin('ncm', 'subscribeAlbum', [123, true])
+  assert.ok(first.idempotencyKey)
+  assert.equal(first.idempotencyKey, retry.idempotencyKey)
+  const opposite = coordinator.begin('ncm', 'subscribeAlbum', [123, false])
+  assert.notEqual(opposite.idempotencyKey, first.idempotencyKey)
+})

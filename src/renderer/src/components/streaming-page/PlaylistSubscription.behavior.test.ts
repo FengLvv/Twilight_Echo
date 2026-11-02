@@ -23,17 +23,21 @@ import {createApp,h,ref,nextTick,effectScope} from 'vue'
 import '@renderer/assets/main.css'
 import Stage from '@renderer/components/streaming-page/StreamingDetailStage.vue'
 import {usePlaylistSubscription} from '@renderer/components/streaming-page/usePlaylistSubscription.ts'
+import {useAlbumSubscription} from '@renderer/components/streaming-page/useAlbumSubscription.ts'
+const kind=ref('playlist')
 const playlist=ref({id:7,name:'华语精选 · 夜晚',cover:null,trackCount:2}),enabled=ref(true)
 let server=false,fail=false,release=null,plays=0
 const writes=[]
 const controller=effectScope().run(()=>usePlaylistSubscription({playlist:()=>playlist.value,enabled:()=>enabled.value,scope:()=>1,captureSession:()=>()=>true,
 fetchState:async()=>({owned:false,subscribed:server}),subscribe:async(_,value)=>{writes.push(value);await new Promise(resolve=>release=resolve);if(fail)throw Error('收藏失败，请稍后重试');server=value}}))
+const albumController=effectScope().run(()=>useAlbumSubscription({album:()=>playlist.value,enabled:()=>enabled.value,scope:()=>1,captureSession:()=>()=>true,fetchState:async()=>({subscribed:server}),subscribe:async(_,value)=>{writes.push(value);await new Promise(resolve=>release=resolve);if(fail)throw Error('收藏失败，请稍后重试');server=value}}))
 const tracks=[{id:'ncm:1',title:'夜空中最亮的星',artist:'逃跑计划',album:'世界',duration:252,source:'ncm',cover:null},{id:'ncm:2',title:'晴天',artist:'周杰伦',album:'叶惠美',duration:269,source:'ncm',cover:null}]
-createApp({render:()=>h(Stage,{kind:'playlist',title:playlist.value.name,trackCountLabel:'2 首',tracks,isSelected:()=>false,isTrackLiked:()=>false,isLiking:()=>false,formatTime:()=> '4:12',playlistSubscription:controller.control.value,onSubscribePlaylist:controller.toggle,onPlayAll:()=>plays++})}).mount('#app')
+createApp({render:()=>h(Stage,{kind:kind.value,title:playlist.value.name,trackCountLabel:'2 首',tracks,isSelected:()=>false,isTrackLiked:()=>false,isLiking:()=>false,formatTime:()=> '4:12',albumSubscription:albumController.control.value,onSubscribeAlbum:albumController.toggle,playlistSubscription:controller.control.value,onSubscribePlaylist:controller.toggle,onPlayAll:()=>plays++})}).mount('#app')
 const settle=async()=>{await nextTick();await document.fonts.ready;await new Promise(resolve=>setTimeout(resolve,50));await nextTick()}
 const expect=(condition,message)=>{if(!condition)throw Error(message)}
-const button=()=>document.querySelector('.stage-playlist-subscribe')
-window.verifyPlaylist=async()=>{
+const button=()=>document.querySelector(kind.value==='album'?'.stage-album-subscribe':'.stage-playlist-subscribe')
+window.verifyPlaylist=async(nextKind='playlist')=>{
+kind.value=nextKind;fail=false;server=false;writes.length=0;plays=0;playlist.value={id:7,name:'收藏测试',cover:null,trackCount:2};enabled.value=true;
 await settle();expect(button()?.textContent.trim()==='收藏','Missing uncollected action');expect(document.querySelector('.stage-actions').textContent.includes('播放全部'),'Playback action replaced');expect(document.querySelector('.stage-actions').textContent.includes('随机'),'Shuffle action replaced');document.querySelector('.stage-btn-primary').click();expect(plays===1,'Play action broken');
 button().click();await nextTick();expect(button().disabled&&button().getAttribute('aria-busy')==='true','Write must disable button');button().click();expect(writes.length===1,'Double-click duplicated write');release();await settle();expect(button().textContent.trim()==='已收藏'&&button().getAttribute('aria-pressed')==='true','Confirmation did not update state');
 button().click();await nextTick();release();await settle();expect(button().textContent.trim()==='收藏','Unsubscribe did not update state');expect(JSON.stringify(writes)==='[true,false]','Wrong desired state');
@@ -79,7 +83,7 @@ window.capturePlaylist=async(theme)=>{document.documentElement.dataset.theme=the
     await writeFile(
       join(directory, 'runner.cjs'),
       `
-const {app,BrowserWindow}=require('electron'),fs=require('node:fs/promises'),path=require('node:path');app.setPath('userData',path.join(__dirname,'profile'));app.disableHardwareAcceleration();app.whenReady().then(async()=>{try{const win=new BrowserWindow({show:false,width:1280,height:800,webPreferences:{offscreen:true,backgroundThrottling:false}});await win.loadFile(path.join(__dirname,'index.html'));await win.webContents.executeJavaScript('window.verifyPlaylist()');const output=process.argv.at(-1);await fs.mkdir(output,{recursive:true});for(const [theme,width] of [['light',1280],['dark',780]]){win.setSize(width,800);await win.webContents.executeJavaScript('window.capturePlaylist('+JSON.stringify(theme)+')');await fs.writeFile(path.join(output,theme+'.png'),(await win.webContents.capturePage()).toPNG())}console.log('PLAYLIST_SUBSCRIPTION_OK');app.exit(0)}catch(error){console.error(error.stack);app.exit(1)}})
+const {app,BrowserWindow}=require('electron'),fs=require('node:fs/promises'),path=require('node:path');app.setPath('userData',path.join(__dirname,'profile'));app.disableHardwareAcceleration();app.whenReady().then(async()=>{try{const win=new BrowserWindow({show:false,width:1280,height:800,webPreferences:{offscreen:true,backgroundThrottling:false}});await win.loadFile(path.join(__dirname,'index.html'));await win.webContents.executeJavaScript('window.verifyPlaylist()');await win.webContents.executeJavaScript('window.verifyPlaylist("album")');const output=process.argv.at(-1);await fs.mkdir(output,{recursive:true});for(const [theme,width] of [['light',1280],['dark',780]]){win.setSize(width,800);await win.webContents.executeJavaScript('window.capturePlaylist('+JSON.stringify(theme)+')');await fs.writeFile(path.join(output,theme+'.png'),(await win.webContents.capturePage()).toPNG())}console.log('PLAYLIST_SUBSCRIPTION_OK');app.exit(0)}catch(error){console.error(error.stack);app.exit(1)}})
 `
     )
     const env = { ...process.env }
@@ -89,7 +93,7 @@ const {app,BrowserWindow}=require('electron'),fs=require('node:fs/promises'),pat
       [
         '--no-sandbox',
         join(directory, 'runner.cjs'),
-        join(root, '.local/playlist-subscription-20261102/visual')
+        join(root, '.local/collection-subscription-20261102/visual')
       ],
       { env, windowsHide: true, timeout: 60000, maxBuffer: 2 * 1024 ** 2 }
     )

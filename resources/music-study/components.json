@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "version": "acd56f96ae14d26c",
+  "repository": "FengLvv/Twilight_Echo",
+  "tag": "analysis-components-acd56f96ae14d26c",
+  "platform": "win32-x64",
+  "components": [
+    {
+      "id": "beat",
+      "title": "节拍识别",
+      "version": "faa0f194c4945e9fae2a32d4576dbea20eec0b4f2e71a404c9ec841a7318789a",
+      "platform": "win32-x64",
+      "installedBytes": 81096981,
+      "archiveBytes": 75134207,
+      "archiveSha256": "45fea545bc7391e21d8f14b8aff4e85cd642ba5d04c9218dc70a81a67034d931",
+      "parts": [
+        {
+          "name": "beat-faa0f194c4945e9f.zip",
+          "bytes": 75134207,
+          "sha256": "45fea545bc7391e21d8f14b8aff4e85cd642ba5d04c9218dc70a81a67034d931",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/beat-faa0f194c4945e9f.zip"
+        }
+      ]
+    },
+    {
+      "id": "btc",
+      "title": "轻量和弦对比",
+      "version": "c2e40ae2fa0710ecfa9a2f4062d9913a6705d35b8733ebee419ddb169e755b2a",
+      "platform": "win32-x64",
+      "installedBytes": 12222616,
+      "archiveBytes": 11249418,
+      "archiveSha256": "ac7bf60e7aca351638fdf0466575f65da0ddae4a687f9c6d4db917f1814da545",
+      "parts": [
+        {
+          "name": "btc-c2e40ae2fa0710ec.zip",
+          "bytes": 11249418,
+          "sha256": "ac7bf60e7aca351638fdf0466575f65da0ddae4a687f9c6d4db917f1814da545",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/btc-c2e40ae2fa0710ec.zip"
+        }
+      ]
+    },
+    {
+      "id": "demucs",
+      "title": "六轨分离",
+      "version": "20cf971b3ff0c1331bb3eb0524cd2aeddf97e828f037dbfa42f55f93db5f86c4",
+      "platform": "win32-x64",
+      "installedBytes": 55035167,
+      "archiveBytes": 50783177,
+      "archiveSha256": "295392469a8123d124ec89cfab4424a516d7e182aa5e27b7b789a7608fae08cb",
+      "parts": [
+        {
+          "name": "demucs-20cf971b3ff0c133.zip",
+          "bytes": 50783177,
+          "sha256": "295392469a8123d124ec89cfab4424a516d7e182aa5e27b7b789a7608fae08cb",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/demucs-20cf971b3ff0c133.zip"
+        }
+      ]
+    },
+    {
+      "id": "duet",
+      "title": "双歌手分离",
+      "version": "52bca11eb96d02e289f1ef26ea903fd92d5daee3f07cff298d5486341f9a3750",
+      "platform": "win32-x64",
+      "installedBytes": 1697773288,
+      "archiveBytes": 1566989678,
+      "archiveSha256": "afcb00fd4f0b268e82b0883ca4d6b377bdd5d2cae3e71dd2cf550a419007bb24",
+      "parts": [
+        {
+          "name": "duet-52bca11eb96d02e2.zip",
+          "bytes": 1566989678,
+          "sha256": "afcb00fd4f0b268e82b0883ca4d6b377bdd5d2cae3e71dd2cf550a419007bb24",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/duet-52bca11eb96d02e2.zip"
+        }
+      ]
+    },
+    {
+      "id": "ecapa",
+      "title": "歌手连续性",
+      "version": "80ba61ef65639f111018b656428e8c4368379756b1c29e131e5df6631263569c",
+      "platform": "win32-x64",
+      "installedBytes": 83355526,
+      "archiveBytes": 77758465,
+      "archiveSha256": "05e9e135e499cfe48b00d3b866107fb1f0f8b4427db5be705a5376c22083a971",
+      "parts": [
+        {
+          "name": "ecapa-80ba61ef65639f11.zip",
+          "bytes": 77758465,
+          "sha256": "05e9e135e499cfe48b00d3b866107fb1f0f8b4427db5be705a5376c22083a971",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/ecapa-80ba61ef65639f11.zip"
+        }
+      ]
+    },
+    {
+      "id": "engine-main",
+      "title": "分析运行环境",
+      "version": "341d04d4e2211393820bee3c559c3de1871a14cb80a3af0d92c96c81cd73dab0",
+      "platform": "win32-x64",
+      "installedBytes": 814789363,
+      "archiveBytes": 277528337,
+      "archiveSha256": "34160dbb8df29f4c0d64ebf2e0a7805f19a9d701319750582788e626a742c7ec",
+      "parts": [
+        {
+          "name": "engine-main-341d04d4e2211393.zip",
+          "bytes": 277528337,
+          "sha256": "34160dbb8df29f4c0d64ebf2e0a7805f19a9d701319750582788e626a742c7ec",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/engine-main-341d04d4e2211393.zip"
+        }
+      ]
+    },
+    {
+      "id": "engine-torch",
+      "title": "共享 PyTorch / CUDA",
+      "version": "29109c533a3861e467a7dd5f629af1d81bd037b4e93f55f752596d29bed4392f",
+      "platform": "win32-x64",
+      "installedBytes": 7400490936,
+      "archiveBytes": 3485855776,
+      "archiveSha256": "cb3f725365711a322ea79b97e4da01eeaa8c8e2dedeb3aa9ac7df06ee7669de2",
+      "parts": [
+        {
+          "name": "engine-torch-29109c533a3861e4.zip.part001",
+          "bytes": 1610612736,
+          "sha256": "4fa6c306cdee3b441ca91f4c49a1b96379132b0e2408e47106f127f7a673a55f",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/engine-torch-29109c533a3861e4.zip.part001"
+        },
+        {
+          "name": "engine-torch-29109c533a3861e4.zip.part002",
+          "bytes": 1610612736,
+          "sha256": "70bfc9ed71747027f60c0eac85742873f03392ea1c852e772c36aa0b52abe68f",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/engine-torch-29109c533a3861e4.zip.part002"
+        },
+        {
+          "name": "engine-torch-29109c533a3861e4.zip.part003",
+          "bytes": 264630304,
+          "sha256": "ceb2c8d0364f790dbccd42c3fc00a4a59700cc5567b231ab5b778cab6d6a328e",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/engine-torch-29109c533a3861e4.zip.part003"
+        }
+      ]
+    },
+    {
+      "id": "engine-vocal",
+      "title": "曲谱运行环境",
+      "version": "1b676031bee30dc0fc08ae1b4065347d564368b7270ca79f62a160dd18c202e8",
+      "platform": "win32-x64",
+      "installedBytes": 1283709119,
+      "archiveBytes": 379974351,
+      "archiveSha256": "14ca9acb18b8c00a097f05e8d368193ff58b589cf097a561eae5cde6c2c86f62",
+      "parts": [
+        {
+          "name": "engine-vocal-1b676031bee30dc0.zip",
+          "bytes": 379974351,
+          "sha256": "14ca9acb18b8c00a097f05e8d368193ff58b589cf097a561eae5cde6c2c86f62",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/engine-vocal-1b676031bee30dc0.zip"
+        }
+      ]
+    },
+    {
+      "id": "game",
+      "title": "旋律识别",
+      "version": "035cf5c8724d418f8ac50d79a10510b56a97c1ba8575e85fc1935eacecd2c349",
+      "platform": "win32-x64",
+      "installedBytes": 196016450,
+      "archiveBytes": 179766696,
+      "archiveSha256": "07f26e19104697ce46544f3a9e83668ea7f6e02985c08bbf99714d275e2a0071",
+      "parts": [
+        {
+          "name": "game-035cf5c8724d418f.zip",
+          "bytes": 179766696,
+          "sha256": "07f26e19104697ce46544f3a9e83668ea7f6e02985c08bbf99714d275e2a0071",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/game-035cf5c8724d418f.zip"
+        }
+      ]
+    },
+    {
+      "id": "lilypond",
+      "title": "排谱工具",
+      "version": "563e84ba6152411dd33c479c694b6aefb5c35d34960bf0da57083083e6111c6d",
+      "platform": "win32-x64",
+      "installedBytes": 110713528,
+      "archiveBytes": 39509711,
+      "archiveSha256": "07aed868a05fae23224ff37922ca96b7b247a8945564256e88d35f466cf0899f",
+      "parts": [
+        {
+          "name": "lilypond-563e84ba6152411d.zip",
+          "bytes": 39509711,
+          "sha256": "07aed868a05fae23224ff37922ca96b7b247a8945564256e88d35f466cf0899f",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/lilypond-563e84ba6152411d.zip"
+        }
+      ]
+    },
+    {
+      "id": "lyric",
+      "title": "歌词过滤",
+      "version": "d586d2ed4a93928312d5087d554a50217a151daf0116b9724d8cb7417efb760a",
+      "platform": "win32-x64",
+      "installedBytes": 158246080,
+      "archiveBytes": 134323635,
+      "archiveSha256": "2c8179f17483e20e882fb1faeea3ae4fa493e87a0fcdadc7e2e02aaed43af156",
+      "parts": [
+        {
+          "name": "lyric-d586d2ed4a939283.zip",
+          "bytes": 134323635,
+          "sha256": "2c8179f17483e20e882fb1faeea3ae4fa493e87a0fcdadc7e2e02aaed43af156",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/lyric-d586d2ed4a939283.zip"
+        }
+      ]
+    },
+    {
+      "id": "mdx",
+      "title": "主唱／和声",
+      "version": "95b34d99b5c2d3926c9433d2692b0e444e060a1d78f626ed5a38d0c539f3faa8",
+      "platform": "win32-x64",
+      "installedBytes": 52825566,
+      "archiveBytes": 49005594,
+      "archiveSha256": "a92e25c0f74fdb4bc493cc301086726ba6dbd17e24979a371eb0087dac93ee42",
+      "parts": [
+        {
+          "name": "mdx-95b34d99b5c2d392.zip",
+          "bytes": 49005594,
+          "sha256": "a92e25c0f74fdb4bc493cc301086726ba6dbd17e24979a371eb0087dac93ee42",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/mdx-95b34d99b5c2d392.zip"
+        }
+      ]
+    },
+    {
+      "id": "mert",
+      "title": "和弦音频编码",
+      "version": "ca0c35540e8b62f6fe2ee08910f8f12e3bc2f94b67b377e30b5c592b325c4548",
+      "platform": "win32-x64",
+      "installedBytes": 2529852570,
+      "archiveBytes": 2344799193,
+      "archiveSha256": "70c4676dcd0a255c54f85e1a9081a33db7e555381ff0c3983b1a010f773b0780",
+      "parts": [
+        {
+          "name": "mert-ca0c35540e8b62f6.zip.part001",
+          "bytes": 1610612736,
+          "sha256": "dedf4b259ab038dcf91a459ee36428efe82f315f4f5351d87ec06800316a1566",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/mert-ca0c35540e8b62f6.zip.part001"
+        },
+        {
+          "name": "mert-ca0c35540e8b62f6.zip.part002",
+          "bytes": 734186457,
+          "sha256": "747bc2caa8c7d75edfe0ffd97b4b6e3dc1f7d6e2c46e95275f895696116863c2",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/mert-ca0c35540e8b62f6.zip.part002"
+        }
+      ]
+    },
+    {
+      "id": "sheetsage",
+      "title": "和弦识别",
+      "version": "409d09f79d94d1e9ac5ca8ca37047bd2d6eb6d4c39ea481895d9f15b53c36033",
+      "platform": "win32-x64",
+      "installedBytes": 228779464,
+      "archiveBytes": 211937634,
+      "archiveSha256": "6aaa8dea39172eb3fb9ccb661c3e6b06192f974bebcceebf690e6726a7c9a0f1",
+      "parts": [
+        {
+          "name": "sheetsage-409d09f79d94d1e9.zip",
+          "bytes": 211937634,
+          "sha256": "6aaa8dea39172eb3fb9ccb661c3e6b06192f974bebcceebf690e6726a7c9a0f1",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/sheetsage-409d09f79d94d1e9.zip"
+        }
+      ]
+    },
+    {
+      "id": "tifa",
+      "title": "歌词对齐",
+      "version": "60bfc66caf50a49034c2a60c8bb237a6c65eccea6027a850d199af6f7561f7e0",
+      "platform": "win32-x64",
+      "installedBytes": 167659883,
+      "archiveBytes": 150961657,
+      "archiveSha256": "0fe47604a947e278c737131409f696e612de42409781d7fe443753eaa453a774",
+      "parts": [
+        {
+          "name": "tifa-60bfc66caf50a490.zip",
+          "bytes": 150961657,
+          "sha256": "0fe47604a947e278c737131409f696e612de42409781d7fe443753eaa453a774",
+          "url": "https://github.com/FengLvv/Twilight_Echo/releases/download/analysis-components-acd56f96ae14d26c/tifa-60bfc66caf50a490.zip"
+        }
+      ]
+    }
+  ],
+  "sourceCommit": "46785b4f867472ad4bac41c3182d320eb9d0248a"
+}

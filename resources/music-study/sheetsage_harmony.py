@@ -6,6 +6,7 @@ Keep this distinction in the UI and exports instead of inventing probabilities.
 from functools import lru_cache
 import math
 from pathlib import Path
+from study_bootstrap import model_path
 import re
 
 import numpy as np
@@ -61,8 +62,8 @@ def load_model(pack):
     from vendor.sheetsage2.modeling_sheetsage2 import SheetSage2Model
     device='cuda' if torch.cuda.is_available() else 'cpu'
     torch.set_num_threads(min(4,torch.get_num_threads()))
-    model=SheetSage2Model.from_pretrained(str(Path(pack)/'sheetsage2'),
-        base_model_path=str(Path(pack)/'mert2'),local_files_only=True,
+    model=SheetSage2Model.from_pretrained(str(model_path(pack, 'sheetsage2')),
+        base_model_path=str(model_path(pack, 'mert2')),local_files_only=True,
         attn_implementation='sdpa',torch_dtype=torch.float32).eval()
     from model_residency import register_model
     return register_model('chords', model, device)

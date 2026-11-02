@@ -259,6 +259,8 @@ const PROVIDER_METHODS: TwilightMediaProviderMethod[] = [
   'isTrackLiked',
   'createPlaylist',
   'deletePlaylist',
+  'fetchAlbumSubscriptionState',
+  'subscribeAlbum',
   'fetchPlaylistSubscriptionState',
   'subscribePlaylist',
   'addTracksToPlaylist',

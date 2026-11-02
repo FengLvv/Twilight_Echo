@@ -13,6 +13,7 @@ import type {
   ProviderHomeSectionPresentation
 } from '../../../shared/providerHome'
 import { useDomTrackLocator } from '@renderer/composables/useDomTrackLocator'
+import type { StreamingHomeEntry } from './streaming-page/useStreamingHomeEntries.ts'
 
 interface RecSection extends ProviderHomeSectionPresentation {
   key: string
@@ -38,6 +39,10 @@ const props = defineProps<{
   recSections: RecSection[]
   recommendPlaylists: MediaProviderPlaylistSummary[]
   currentTrackId?: string | null
+  homeEntries?: ReadonlyArray<{ id: StreamingHomeEntry; title: string; icon: string }>
+  pendingHomeEntry?: StreamingHomeEntry | null
+  homeEntryError?: string
+  recentTracks?: Track[]
 }>()
 useDomTrackLocator('locatorRoot', () => props.currentTrackId ?? null)
 
@@ -49,6 +54,7 @@ const emit = defineEmits<{
   requestLogin: []
   openDiscovery: []
   openArtist: [track: Track, artist: TrackArtistRef]
+  openHomeEntry: [entry: StreamingHomeEntry]
 }>()
 
 // ─── Sections ───────────────────────────────────────────────────────────────
@@ -70,6 +76,11 @@ const radarSection = computed(
     null
 )
 const heroTitle = computed(() => dailySection.value?.title ?? '为你推荐')
+const hasContent = computed(
+  () =>
+    props.recSections.some((section) => section.tracks.length) ||
+    props.recommendPlaylists.length > 0
+)
 const isDailyHero = computed(() => dailySection.value?.key === 'daily')
 const heroEnglishTitle = computed(() =>
   isDailyHero.value ? 'DAILY\u00a0MIX' : 'MADE\u00a0FOR\u00a0YOU'
@@ -228,7 +239,12 @@ function playPersonalizedStream(section: RecSection | null): void {
   >
     <template v-if="$slots.rankings" #rankings><slot name="rankings" /></template>
   </ProviderMusicHome>
-  <div v-else ref="locatorRoot" class="home-view">
+  <div
+    v-else
+    ref="locatorRoot"
+    class="home-view"
+    :class="{ 'home-view--enhanced': homeEntries?.length }"
+  >
     <!-- ── Signed-out invite ─────────────────────────────────────────── -->
     <section v-if="!isLoggedIn" class="hero-invite">
       <div class="invite-orb invite-orb-a" aria-hidden="true"></div>
@@ -245,7 +261,7 @@ function playPersonalizedStream(section: RecSection | null): void {
     </section>
 
     <!-- ── Loading skeleton ─────────────────────────────────────────── -->
-    <div v-else-if="recsLoading" class="home-skeleton" aria-label="正在加载推荐">
+    <div v-else-if="recsLoading && !hasContent" class="home-skeleton" aria-label="正在加载推荐">
       <div class="sk-hero sk-shimmer"></div>
       <div class="sk-duo">
         <div class="sk-card sk-shimmer"></div>
@@ -260,7 +276,7 @@ function playPersonalizedStream(section: RecSection | null): void {
     </div>
 
     <!-- ── Error ─────────────────────────────────────────────────────── -->
-    <div v-else-if="recsError" class="home-error">
+    <div v-else-if="recsError && !hasContent" class="home-error">
       <span class="home-error-icon"><i class="pi pi-exclamation-triangle"></i></span>
       <p class="home-error-title">推荐加载失败</p>
       <p class="home-error-hint">{{ recsError }}</p>
@@ -271,7 +287,10 @@ function playPersonalizedStream(section: RecSection | null): void {
     </div>
 
     <!-- ── Content ───────────────────────────────────────────────────── -->
-    <div v-else class="home-flow">
+    <div v-else class="home-flow" :aria-busy="recsLoading">
+      <div v-if="homeEntryError || recsError" class="home-inline-error" role="status">
+        {{ homeEntryError || recsError }}
+      </div>
       <!-- Hero: daily mix -->
       <section v-if="dailySection" class="hero" :aria-label="heroTitle">
         <div class="hero-ambient" aria-hidden="true">
@@ -344,7 +363,35 @@ function playPersonalizedStream(section: RecSection | null): void {
       </section>
 
       <!-- Duo: FM + radar -->
-      <section v-if="fmSection || radarSection" class="duo" aria-label="电台推荐">
+      <nav v-if="homeEntries?.length" class="home-entry-grid" aria-label="个性化推荐入口">
+        <button
+          v-for="entry in homeEntries"
+          :key="entry.id"
+          type="button"
+          class="duo-card home-entry"
+          :data-home-entry="entry.id"
+          :disabled="!!pendingHomeEntry || recsLoading"
+          :aria-busy="pendingHomeEntry === entry.id"
+          @click="emit('openHomeEntry', entry.id)"
+        >
+          <i
+            :class="pendingHomeEntry === entry.id ? 'pi pi-spin pi-spinner' : entry.icon"
+            aria-hidden="true"
+          />
+          <span class="duo-name">{{ entry.title }}</span>
+          <i
+            v-if="entry.id === 'daily'"
+            class="pi pi-arrow-up-right home-entry-action"
+            aria-hidden="true"
+          />
+          <PlaybackIcon v-else class="home-entry-action" name="play" aria-hidden="true" />
+        </button>
+      </nav>
+      <section
+        v-if="!homeEntries?.length && (fmSection || radarSection)"
+        class="duo"
+        aria-label="电台推荐"
+      >
         <button
           v-if="fmSection"
           type="button"
@@ -404,6 +451,65 @@ function playPersonalizedStream(section: RecSection | null): void {
         </button>
       </section>
 
+      <!-- Shelf: recommended playlists -->
+      <section class="shelf" aria-label="推荐歌单">
+        <header class="section-head">
+          <div class="section-head-copy">
+            <h3>{{ homeEntries?.length ? '推荐歌单' : `${providerLabel} 精选歌单` }}</h3>
+            <p v-if="!homeEntries?.length">为你挑选 {{ recommendPlaylists.length }} 份歌单</p>
+          </div>
+          <div v-if="homeEntries?.length" class="home-shelf-actions">
+            <button
+              v-if="supportsDiscovery"
+              type="button"
+              class="section-more"
+              @click="emit('openDiscovery')"
+            >
+              更多歌单 <i class="pi pi-chevron-right" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="section-more"
+              :disabled="recsLoading"
+              aria-label="刷新推荐歌单"
+              @click="emit('loadRecommendations')"
+            >
+              <i class="pi pi-refresh" :class="{ 'pi-spin': recsLoading }" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+        <div v-if="recommendPlaylists.length > 0" class="shelf-grid">
+          <button
+            v-for="playlist in homeEntries?.length
+              ? recommendPlaylists.slice(0, 6)
+              : recommendPlaylists"
+            :key="playlist.id"
+            type="button"
+            class="shelf-tile"
+            @click="emit('openPlaylist', playlist)"
+          >
+            <span class="shelf-cover">
+              <CoverImg
+                v-if="playlist.coverSmall || playlist.cover"
+                :cover="playlist.coverSmall || playlist.cover"
+                :cover-source="playlist.coverSmallSource || playlist.coverSource"
+                alt=""
+              />
+              <span v-else class="shelf-cover-empty"><i class="pi pi-list"></i></span>
+              <span class="shelf-scrim" aria-hidden="true"></span>
+              <span v-if="playlist.trackCount > 0" class="shelf-count"
+                >{{ playlist.trackCount }} 首</span
+              >
+              <span class="shelf-open" aria-hidden="true"><PlaybackIcon name="play" /></span>
+            </span>
+            <span class="shelf-name">{{ playlist.name }}</span>
+          </button>
+        </div>
+        <div v-else class="shelf-empty">
+          <i class="pi pi-list"></i>
+          <span>暂无推荐歌单，稍后再来看看</span>
+        </div>
+      </section>
       <section v-if="chartTracks.length > 0" class="chart" :aria-label="`${heroTitle}速览`">
         <header class="section-head">
           <div class="section-head-copy">
@@ -442,59 +548,104 @@ function playPersonalizedStream(section: RecSection | null): void {
             <span class="chart-meta">
               <span class="chart-title">{{ track.title }}</span>
               <span class="chart-artist">
-                <TrackArtistLinks
-                  :track="track"
-                  @open-artist="emit('openArtist', track, $event)"
-                />
+                <TrackArtistLinks :track="track" @open-artist="emit('openArtist', track, $event)" />
               </span>
             </span>
             <span class="chart-duration">{{ formatDuration(track.duration) }}</span>
           </div>
         </div>
       </section>
-
-      <!-- Shelf: recommended playlists -->
-      <section class="shelf" aria-label="精选歌单">
-        <header class="section-head">
-          <div class="section-head-copy">
-            <h3>{{ providerLabel }} 精选歌单</h3>
-            <p>为你挑选 {{ recommendPlaylists.length }} 份歌单</p>
-          </div>
-        </header>
-        <div v-if="recommendPlaylists.length > 0" class="shelf-grid">
-          <button
-            v-for="playlist in recommendPlaylists"
-            :key="playlist.id"
-            type="button"
-            class="shelf-tile"
-            @click="emit('openPlaylist', playlist)"
-          >
-            <span class="shelf-cover">
-              <CoverImg
-                v-if="playlist.coverSmall || playlist.cover"
-                :cover="playlist.coverSmall || playlist.cover"
-                :cover-source="playlist.coverSmallSource || playlist.coverSource"
-                alt=""
-              />
-              <span v-else class="shelf-cover-empty"><i class="pi pi-list"></i></span>
-              <span class="shelf-scrim" aria-hidden="true"></span>
-              <span class="shelf-count">{{ playlist.trackCount }} 首</span>
-              <span class="shelf-open" aria-hidden="true"><PlaybackIcon name="play" /></span>
-            </span>
-            <span class="shelf-name">{{ playlist.name }}</span>
-          </button>
-        </div>
-        <div v-else class="shelf-empty">
-          <i class="pi pi-list"></i>
-          <span>暂无推荐歌单，稍后再来看看</span>
-        </div>
-      </section>
     </div>
     <div v-if="$slots.rankings" class="home-rankings"><slot name="rankings" /></div>
+    <section v-if="recentTracks?.length" class="home-recent" aria-label="最近听过">
+      <header class="section-head">
+        <div class="section-head-copy"><h3>最近听过</h3></div>
+      </header>
+      <div class="chart-grid">
+        <button
+          v-for="track in recentTracks.slice(0, 6)"
+          :key="track.id"
+          class="chart-row"
+          type="button"
+          :data-te-track-id="track.id"
+          :class="{ 'is-playing': isPlayingTrack(track) }"
+          @click="emit('playTrack', track, recentTracks)"
+        >
+          <span class="chart-cover"
+            ><CoverImg :cover="track.cover" :cover-source="track.coverSource" alt=""
+          /></span>
+          <span class="chart-meta"
+            ><span class="chart-title">{{ track.title }}</span
+            ><span class="chart-artist">{{ track.artist }}</span></span
+          >
+          <PlaybackIcon name="play" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
+.home-view--enhanced .hero-inner {
+  min-height: 260px;
+}
+.home-view--enhanced .hero-copy {
+  padding-block: 26px;
+}
+.home-view--enhanced .hero-desc {
+  display: none;
+}
+.home-view--enhanced .home-flow {
+  gap: 32px;
+}
+.home-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.home-entry-grid .home-entry {
+  padding: 20px;
+  gap: 12px;
+  min-height: 82px;
+  box-shadow: none;
+}
+.home-entry > i:first-child {
+  font-size: 22px;
+  color: var(--te-primary-500);
+}
+.home-entry .duo-name {
+  font-size: 14px;
+}
+.home-entry-action {
+  margin-left: auto;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--home-ink-soft);
+}
+.home-shelf-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.home-inline-error {
+  color: var(--home-ink-soft);
+  font-size: 13px;
+}
+.home-recent {
+  margin-top: 36px;
+  padding-bottom: 24px;
+}
+.home-recent .chart-row {
+  text-align: left;
+  font: inherit;
+  width: 100%;
+}
+@media (max-width: 900px) {
+  .home-entry-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .home-rankings {
   margin-top: 44px;
 }

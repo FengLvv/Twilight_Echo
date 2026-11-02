@@ -62,7 +62,7 @@ def decode(source, destination, start=0, end=None, pregap=0, max_frames=None):
         command += ['-af', f'aresample=44100,adelay={round(pregap * 44100)}S:all=1']
     command += ['-vn', '-ar', '44100', '-ac', '2', '-f', 'f32le', 'pipe:1']
     with tempfile.TemporaryFile() as errors:
-        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors,
+        child = subprocess.Popen(command, executable=command[0], stdout=subprocess.PIPE, stderr=errors,
                                  creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         frames = 0
         try:
@@ -89,38 +89,40 @@ def decode(source, destination, start=0, end=None, pregap=0, max_frames=None):
             child.stdout.close()
 
 
-def warm(pack):
-    # Resolve native scientific libraries before CUDA creates its worker threads.
-    # On Windows, loading OpenBLAS after CUDA initialization can stall DLL loading.
+def warm(pack, features=None):
     import scipy.linalg
     import torch
-    from separation import six_model
-    from sheetsage_harmony import load_model
+    from model_residency import snapshot
     torch.set_num_threads(4)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    started = time.perf_counter()
-    model = load_model(str(Path(pack).resolve()))
-    from model_residency import ensure_model
-    model = ensure_model('chords')
-    chord_seconds = time.perf_counter() - started
-    started = time.perf_counter()
-    six_model(str(pack), device)
-    six_seconds = time.perf_counter() - started
-    started = time.perf_counter()
-    if device == 'cuda':
-        from demucs.apply import apply_model
-        from runtime_context import CooperativePool
-        with torch.inference_mode():
-            apply_model(six_model(str(pack), device), torch.zeros(1, 2, 343980), device=device,
-                        shifts=0, split=False, progress=False, pool=CooperativePool())
-        t = np.arange(24000 * 2, dtype=np.float32) / 24000
-        model.transcribe(np.sin(t * (2 * np.pi * 440)) * .0001, sampling_rate=24000,
-            prompts=['timestamp', 'downbeat_meter', 'chord_full'], preset='paper',
-            dtype='bf16' if torch.cuda.is_bf16_supported() else 'fp32')
-    check_cancel()
+    features = ['six', 'chords'] if features is None else features
+    times = {}
+    for name in features:
+        started = time.perf_counter()
+        if name == 'six':
+            from separation import six_model
+            model = six_model(str(pack), device)
+            if device == 'cuda':
+                from demucs.apply import apply_model
+                from runtime_context import CooperativePool
+                with torch.inference_mode():
+                    apply_model(model, torch.zeros(1, 2, 343980), device=device,
+                                shifts=0, split=False, progress=False, pool=CooperativePool())
+        elif name == 'chords':
+            from sheetsage_harmony import load_model
+            from model_residency import ensure_model
+            load_model(str(Path(pack).resolve()))
+            model = ensure_model('chords')
+            if device == 'cuda':
+                t = np.arange(24000 * 2, dtype=np.float32) / 24000
+                model.transcribe(np.sin(t * (2 * np.pi * 440)) * .0001, sampling_rate=24000,
+                    prompts=['timestamp', 'downbeat_meter', 'chord_full'], preset='paper',
+                    dtype='bf16' if torch.cuda.is_bf16_supported() else 'fp32')
+        times['sixLoadMs' if name == 'six' else 'chordLoadMs'] = round((time.perf_counter() - started) * 1000)
+        check_cancel()
+    loaded = list(snapshot().get('devices', {}))
     return dict(gpu=device == 'cuda', gpuName=torch.cuda.get_device_name(0) if device == 'cuda' else '',
-                loaded=['six', 'chords'], sixLoadMs=round(six_seconds * 1000),
-                chordLoadMs=round(chord_seconds * 1000), kernelWarmMs=round((time.perf_counter() - started) * 1000), pid=os.getpid())
+                loaded=loaded, **times, pid=os.getpid())
 
 
 def analyze(request):
@@ -361,8 +363,10 @@ def release_under_pressure():
 
 
 def execute(method, params):
+    if 'componentPaths' in params:
+        os.environ['TWILIGHT_STUDY_COMPONENT_PATHS'] = json.dumps(params['componentPaths'])
     if method == 'warm':
-        return warm(params['pack'])
+        return warm(params['pack'], params.get('features'))
     if method == 'analyze':
         release_under_pressure()
         return analyze(params)

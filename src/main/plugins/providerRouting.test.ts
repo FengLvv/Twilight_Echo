@@ -44,7 +44,7 @@ const skeleton: TestRunningProvider = {
 }
 
 test('playlist subscription methods require the advertised library capability', () => {
-  const methods = ['fetchPlaylistSubscriptionState', 'subscribePlaylist'] as const
+  const methods = ['fetchPlaylistSubscriptionState', 'subscribePlaylist', 'fetchAlbumSubscriptionState', 'subscribeAlbum'] as const
   for (const method of methods) {
     assert.equal(isTwilightMediaProviderMethod(method), true)
     assert.equal(providerSupportsMethod({ id: 'ncm', name: 'NCM', capabilities: ['library'], supportedMethods: [...methods] }, method), true)

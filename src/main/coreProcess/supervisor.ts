@@ -450,7 +450,7 @@ export class CoreSupervisor extends EventEmitter {
       }
       const aborted = () => cancel()
       const timer = setTimeout(() => cancel(true), this.options.requestTimeoutMs ??
-        (['study.choosePack', 'study.export', 'study.create'].includes(request.name) ? 200_000 : 30_000))
+        (['study.choosePack', 'study.export', 'study.create', 'study.componentImport', 'study.componentDirectory', 'study.componentInstall'].includes(request.name) ? 200_000 : 30_000))
       this.pending.set(request.requestId, {
         epoch: request.epoch,
         command: request.kind === 'command',

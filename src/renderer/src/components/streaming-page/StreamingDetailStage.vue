@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PlaybackIcon from '@renderer/components/icons/PlaybackIcon.vue'
-import type { PlaylistSubscriptionControl } from './usePlaylistSubscription.ts'
+import type { MediaSubscriptionControl } from './useMediaSubscription.ts'
 import NativeDialogTransition from '@renderer/components/NativeDialogTransition.vue'
 import TrackInfoDialog from '@renderer/components/TrackInfoDialog.vue'
 import EntityMetadataPanel from '../music-metadata/EntityMetadataPanel.vue'
@@ -67,7 +67,8 @@ const props = withDefaults(
     followLoading?: boolean
     followError?: string
     showPlayActions?: boolean
-    playlistSubscription?: PlaylistSubscriptionControl
+    playlistSubscription?: MediaSubscriptionControl
+    albumSubscription?: MediaSubscriptionControl
     hasSelection?: boolean
     selectedCount?: number
     selectionAllFavorited?: boolean
@@ -132,6 +133,7 @@ const emit = defineEmits<{
   likeTrack: [track: Track, event: MouseEvent]
   follow: []
   subscribePlaylist: []
+  subscribeAlbum: []
   batchFavorite: []
   batchAddToPlaylist: []
   batchDelete: []
@@ -140,6 +142,13 @@ const emit = defineEmits<{
   loadMoreLiked: []
   trackContextMenu: [track: Track, index: number, event: MouseEvent]
 }>()
+
+const subscription = computed(() => props.kind === 'album' ? props.albumSubscription : props.kind === 'playlist' ? props.playlistSubscription : undefined)
+const subscriptionLabel = computed(() => props.kind === 'album' ? '专辑' : '歌单')
+function subscribeCollection() {
+  if (props.kind === 'album') emit('subscribeAlbum')
+  else if (props.kind === 'playlist') emit('subscribePlaylist')
+}
 
 function trackArtists(track: Track): TrackArtistRef[] {
   if (track.artists?.length) return track.artists
@@ -386,22 +395,23 @@ const infoTrack = shallowRef<Track | null>(null)
             </button>
           </template>
           <button
-            v-if="kind === 'playlist' && playlistSubscription"
+            v-if="subscription"
             type="button"
-            class="stage-btn stage-btn-ghost stage-playlist-subscribe"
-            :aria-pressed="playlistSubscription.subscribed"
-            :aria-busy="playlistSubscription.busy"
-            :title="playlistSubscription.retry ? '重新读取收藏状态' : playlistSubscription.subscribed ? '取消收藏歌单' : '收藏歌单'"
-            :disabled="playlistSubscription.busy"
-            @click="emit('subscribePlaylist')"
+            class="stage-btn stage-btn-ghost"
+            :class="kind === 'album' ? 'stage-album-subscribe' : 'stage-playlist-subscribe'"
+            :aria-pressed="subscription.subscribed"
+            :aria-busy="subscription.busy"
+            :title="subscription.retry ? `重新读取${subscriptionLabel}收藏状态` : subscription.subscribed ? `取消收藏${subscriptionLabel}` : `收藏${subscriptionLabel}`"
+            :disabled="subscription.busy"
+            @click="subscribeCollection"
           >
-            <i :class="playlistSubscription.busy ? 'pi pi-spin pi-spinner' : playlistSubscription.retry ? 'pi pi-refresh' : playlistSubscription.subscribed ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
-            <span>{{ playlistSubscription.retry ? '重试' : playlistSubscription.subscribed ? '已收藏' : '收藏' }}</span>
+            <i :class="subscription.busy ? 'pi pi-spin pi-spinner' : subscription.retry ? 'pi pi-refresh' : subscription.subscribed ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
+            <span>{{ subscription.retry ? '重试' : subscription.subscribed ? '已收藏' : '收藏' }}</span>
           </button>
         </div>
 
         <p v-if="followError" class="stage-follow-error">{{ followError }}</p>
-        <p v-if="playlistSubscription?.error" class="stage-follow-error" role="alert">{{ playlistSubscription.error }}</p>
+        <p v-if="subscription?.error" class="stage-follow-error" role="alert">{{ subscription.error }}</p>
       </div>
     </header>
 

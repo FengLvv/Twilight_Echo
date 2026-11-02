@@ -1,0 +1,1 @@
+{"schema":1,"id":"duet","version":"52bca11eb96d02e289f1ef26ea903fd92d5daee3f07cff298d5486341f9a3750","platform":"win32-x64","files":[{"path":"models/duet.safetensors","bytes":1697734448,"sha256":"5c6a131b85fa995d5d75a09f89479bcc2fa939e42365ad6176f73cf103d34238"},{"path":"THIRD_PARTY.md","bytes":38840,"sha256":"2d1f7f2ea0b903090e46a1fb45d1a01824fb320501b2bfca05b02483ac1b17df"}]}

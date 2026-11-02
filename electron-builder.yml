@@ -36,6 +36,10 @@ extraResources:
     to: music-study
     filter:
       - worker.py
+      - study_bootstrap.py
+      - probe_cuda.py
+      - components.json
+      - component-manifests/**
       - harmony.py
       - separation.py
       - btc_harmony.py

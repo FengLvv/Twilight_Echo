@@ -1,4 +1,6 @@
 import test from 'node:test'
+import { CoreStudyComponentsService } from './studyComponentsService.ts'
+import type { StudyComponentState } from '../../shared/studyComponents.ts'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import {
@@ -135,6 +137,62 @@ function fixture(initial: StudyRecord[] = []) {
   }
 }
 
+function withComponents(f: ReturnType<typeof fixture>, ready: string[] = []) {
+  const ids = ['engine-main', 'engine-torch', 'demucs', 'sheetsage', 'mert', 'engine-vocal', 'tifa', 'game', 'beat', 'lilypond', 'lyric']
+  const state: StudyComponentState = { directory: 'D:/components', supported: true,
+    catalog: { schema: 1, version: 'test', repository: 'FengLvv/Twilight_Echo', tag: 'analysis-components-test', platform: 'win32-x64',
+      components: ids.map(id => ({ id, title: id, version: 'a'.repeat(64), platform: 'win32-x64', installedBytes: 20, archiveBytes: 10, archiveSha256: 'b'.repeat(64), parts: [{ name: id + '.zip', url: 'https://github.com/file', bytes: 10, sha256: 'c'.repeat(64) }] })) },
+    components: ids.map(id => ({ id, phase: ready.includes(id) ? 'ready' : 'missing', receivedBytes: 0, totalBytes: 10 })), requests: [] }
+  let downloads = 0
+  f.ports.components = new CoreStudyComponentsService(async request => {
+    if (request.action === 'start') downloads++
+    return structuredClone(state)
+  }, () => {})
+  return { state, ready: (...names: string[]) => { for (const id of names) state.components.find(item => item.id === id)!.phase = 'ready' }, downloads: () => downloads }
+}
+
+test('component-gated analysis returns immediately, quotes both stages, then runs six before chord download finishes', async () => {
+  const f = fixture(), c = withComponents(f)
+  const project = await f.service.create({ current: true })
+  await f.settle()
+  assert.equal(f.launched.length, 0)
+  assert.equal(c.downloads(), 0)
+  assert.equal((await f.service.project(project!.id)).status, 'waiting-components')
+  const request = (await f.ports.components!.state()).requests[0]
+  assert.deepEqual(request.plan.features, ['six', 'chords'])
+  c.ready('engine-main', 'engine-torch', 'demucs')
+  await f.tick()
+  assert.deepEqual(f.launched, [project!.id])
+  assert.equal((await f.service.project(project!.id)).operation, 'six')
+  await f.service.cancel(project!.id)
+  assert.equal((await f.ports.components!.state()).requests.length, 0)
+})
+
+test('AMLL score admission omits the classifier while NetEase score admission includes it', async () => {
+  for (const structured of [true, false]) {
+    const f = fixture(); withComponents(f)
+    f.ports.lyrics = () => JSON.stringify([{ id: 0, start: 0, end: 10, text: 'a real lyric', ...(structured ? { origin: { format: 'amll-ttml', kind: 'lyric' } } : {}) }])
+    f.service.bindLyrics('logical-song', null)
+    await f.service.transcribeMelody('logical-song')
+    await f.settle()
+    const request = (await f.ports.components!.state()).requests[0]
+    assert.equal(request.plan.ids.includes('lyric'), !structured)
+    await f.service.shutdown()
+  }
+})
+
+test('unsupported component platforms fail the queued song instead of leaving a polling loop', async () => {
+  const f = fixture(), c = withComponents(f)
+  c.state.supported = false
+  const project = await f.service.create({ current: true })
+  await f.settle()
+  const failed = await f.service.project(project!.id)
+  assert.equal(failed.status, 'failed')
+  assert.match(failed.error!, /Windows x64/)
+  assert.equal(f.launched.length, 0)
+  await f.service.shutdown()
+})
+
 test('a producer result is acknowledged only after durable commit; a failed commit is retried without losing the worker payload', async () => {
   const f = fixture()
   const save = f.ports.repository.commitArtifacts
@@ -204,6 +262,24 @@ function automaticFixture(initial: StudyRecord[] = []) {
     await f.settle(); await f.settle()
   } }
 }
+
+test('dismissing automatic component consent cancels waiting songs and disables subsequent analysis', async () => {
+  const f = automaticFixture(), c = withComponents(f)
+  await f.service.setAutomation({ stages: ['six'] })
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  const id = [...f.saved.keys()][0]
+  assert.equal((await f.service.project(id)).status, 'waiting-components')
+  await f.service.dismissComponents('automatic')
+  assert.deepEqual(await f.service.automation(), { stages: [] })
+  assert.equal((await f.service.project(id)).status, 'cancelled')
+  assert.deepEqual((await f.ports.components!.state()).requests, [])
+  c.ready('engine-main', 'engine-torch', 'demucs')
+  await f.runAutomatic(); await f.tick()
+  assert.equal(c.downloads(), 0)
+  assert.equal(f.launched.length, 0)
+  await f.service.shutdown()
+})
 
 test('automatic analysis defaults off, waits for playback and queues selected stages without changing audio', async () => {
   const f = automaticFixture()

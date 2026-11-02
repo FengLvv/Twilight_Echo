@@ -47,6 +47,21 @@
 .toplists-heading {
   margin-bottom: 20px;
 }
+.ncm-toplists--compact .toplists-heading-copy h2 {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+.ncm-toplists--compact .toplists-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ncm-toplists--compact .toplist-card {
+  background: var(--te-card-bg);
+}
+@container ncm-toplists (max-width: 560px) {
+  .ncm-toplists--compact .toplists-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .toplists-heading-copy {
   min-width: 0;
 }

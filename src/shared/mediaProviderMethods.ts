@@ -65,6 +65,8 @@ export type TwilightMediaProviderMethod =
   | 'isTrackLiked'
   | 'createPlaylist'
   | 'deletePlaylist'
+  | 'fetchAlbumSubscriptionState'
+  | 'subscribeAlbum'
   | 'fetchPlaylistSubscriptionState'
   | 'subscribePlaylist'
   | 'addTracksToPlaylist'
@@ -137,6 +139,8 @@ export const TWILIGHT_MEDIA_PROVIDER_METHODS = [
   'isTrackLiked',
   'createPlaylist',
   'deletePlaylist',
+  'fetchAlbumSubscriptionState',
+  'subscribeAlbum',
   'fetchPlaylistSubscriptionState',
   'subscribePlaylist',
   'addTracksToPlaylist',

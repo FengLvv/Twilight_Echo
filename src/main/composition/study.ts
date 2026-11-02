@@ -7,6 +7,7 @@ import { CorePlaybackSession } from '../../core/playback/session.ts'
 import { createPlaylistInputResolver } from '../../core/playlists/submission.ts'
 
 import { CoreMusicStudyService } from '../../core/audio/musicStudyService.ts'
+import { CoreStudyComponentsService } from '../../core/audio/studyComponentsService.ts'
 
 import { studyLyrics } from '../../core/audio/studyLyrics.ts'
 
@@ -58,6 +59,7 @@ export function createStudyDomain(options: StudyDomainOptions): CoreMusicStudySe
     return () => clearTimeout(timer)
   }
   return new CoreMusicStudyService({
+    components: new CoreStudyComponentsService(request => platform.call('study.componentIO', request), changed),
     repository: createStudyRepository(join(config.root, 'music-study')),
     newId: randomUUID,
     now: Date.now,
@@ -136,7 +138,7 @@ export function createStudyDomain(options: StudyDomainOptions): CoreMusicStudySe
         }
       }
     },
-    environment: () => platform!.call('study.environment', {}),
+    environment: (operation, lyrics) => platform!.call('study.environment', { operation, lyrics }),
     runtime: () => platform!.call('study.runtime', {}),
     runtimeActivity: (busy) => platform!.call('study.runtimeActivity', { busy }),
     audioInventory: () => platform!.call('study.audioInventory', {}),

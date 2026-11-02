@@ -865,9 +865,10 @@ export function validCorePayload(name: CoreOperation, payload: unknown): boolean
       return validCoreAudioPayload(name, p)
     case 'liked.play':
       return (
-        keys(p, ['selectedId', 'play']) &&
+        keys(p, ['selectedId', 'play', 'mode']) &&
         optional(p.selectedId, text) &&
-        optional(p.play, (value) => typeof value === 'boolean')
+        optional(p.play, (value) => typeof value === 'boolean') &&
+        optional(p.mode, (value) => value === 'heart')
       )
     case 'personalized.start':
       return (

@@ -2,11 +2,15 @@
 from pathlib import Path
 import sys
 import tempfile
+import json
+import os
 
 from runtime_context import check_cancel, emit
 
 
 def execute(method, params):
+    if 'componentPaths' in params:
+        os.environ['TWILIGHT_STUDY_COMPONENT_PATHS'] = json.dumps(params['componentPaths'])
     def report(value, stage):
         check_cancel()
         emit(dict(kind='progress', progress=value, stage=stage))

@@ -1,5 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { dirname, join, toNamespacedPath } from 'node:path'
 import { StudyProcessTree } from './studyProcessTree.ts'
 import { StudyRequestWatchdog, STUDY_WATCHDOG } from './studyRequestWatchdog.ts'
 
@@ -31,7 +33,8 @@ export class StudyResidentProcess {
   constructor(
     python: () => string,
     script: string,
-    diagnostic: (message: string) => void = () => {}
+    diagnostic: (message: string) => void = () => {},
+    private readonly componentPaths: () => import('../../shared/studyComponents.ts').StudyRuntimePaths = () => ({ models: {} })
   ) {
     this.python = python
     this.script = script
@@ -55,12 +58,18 @@ export class StudyResidentProcess {
     if (this.child) return this.child
     if (this.closing) throw new Error('分析运行时正在关闭')
     const generation = ++this.generation
-    const child = spawn(this.python(), ['-X', 'utf8', '-u', this.script], {
+    const bootstrap = 'import sys;sys.path.insert(0,sys.argv.pop(1));from study_bootstrap import run;run()'
+    const args = existsSync(join(dirname(this.script), 'study_bootstrap.py'))
+      ? ['-X', 'utf8', '-u', '-c', bootstrap, dirname(this.script), this.script]
+      : ['-X', 'utf8', '-u', this.script]
+    const executable = this.python()
+    const child = spawn(process.platform === 'win32' ? toNamespacedPath(executable) : executable, args, {
       windowsHide: true,
       detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
+        TWILIGHT_STUDY_COMPONENT_PATHS: JSON.stringify(this.componentPaths()),
         PYTHONUTF8: '1',
         PYTHONNOUSERSITE: '1',
         HF_HUB_OFFLINE: '1',
