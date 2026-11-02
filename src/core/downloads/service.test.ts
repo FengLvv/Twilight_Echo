@@ -7,8 +7,8 @@ import { createServer } from 'node:http'
 import {
   ProviderDownloadManager,
   type ProviderDownloadManagerOptions
-} from './providerDownloadManager.ts'
-import { CoreDownloadsService } from './service.ts'
+} from '../../main/adapters/downloads/providerDownloadManager.ts'
+import { CoreDownloadsService } from '../../main/composition/downloads/service.ts'
 import { createDownloadMetadataPreparation } from './metadataService.ts'
 
 function deferred<T>() {
@@ -36,7 +36,8 @@ const ready = {
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
 async function until(check: () => boolean) {
-  for (let i = 0; i < 300 && !check(); i++) await new Promise((resolve) => setTimeout(resolve, 10))
+  const deadline = Date.now() + 10_000
+  while (!check() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10))
   assert.ok(check(), 'task should reach its expected state')
 }
 function wave() {

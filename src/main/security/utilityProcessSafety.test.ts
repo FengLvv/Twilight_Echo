@@ -12,7 +12,7 @@ const {
   parseUtilityProcessResponse
 } = (await import(
   new URL('./utilityProcessSafety.ts', import.meta.url).href
-)) as typeof import('./utilityProcessSafety')
+)) as typeof import('./utilityProcessSafety.ts')
 
 test('accepts only ordinary utility-process message records', () => {
   assert.deepEqual(asUtilityProcessMessageRecord({ kind: 'response' }), { kind: 'response' })

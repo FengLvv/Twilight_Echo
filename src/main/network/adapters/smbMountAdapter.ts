@@ -4,9 +4,9 @@ import {
   createSmbMountAdapter as smb,
   createNfsMountAdapter as nfs,
   type MountAdapterDeps
-} from '../../../core/network/adapters/smbMountAdapter.ts'
+} from '../../adapters/network/adapters/smbMountAdapter.ts'
 import { runMountCommand } from '../systemRunners.ts'
-export * from '../../../core/network/adapters/smbMountAdapter.ts'
+export * from '../../adapters/network/adapters/smbMountAdapter.ts'
 function defaults(deps: Partial<MountAdapterDeps>): MountAdapterDeps {
   const runtime =
     process.env.XDG_RUNTIME_DIR ?? (process.getuid ? `/run/user/${process.getuid()}` : null)

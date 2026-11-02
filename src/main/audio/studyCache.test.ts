@@ -4,8 +4,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { createStudyCacheValidator, studySignature } from './studyCache.ts'
-import { VOCAL_MODEL_HASHES } from './studyModelRegistry.ts'
+import { createStudyCacheValidator, studySignature, studyVocalKeys } from './studyCache.ts'
+import credits from '../../../resources/music-study/lyric_credits.json' with { type: 'json' }
 import { STUDY_MELODY_ALGORITHM, STUDY_SCORE_LAYOUT, type StudyResult } from '../../shared/musicStudy.ts'
 
 async function fixture() {
@@ -17,7 +17,7 @@ async function fixture() {
     melody:{algorithm:STUDY_MELODY_ALGORITHM,source:'vocals',key:null,lyricsKey:'lyrics',notes:[],scores:[]},
     cache:{files:{},notesHash:'notes',signatures:{six,
       chords:studySignature(['sheetsage2-mert2-chord-full-paper-v1','sheetsage2/model.safetensors','mert2/model.safetensors'],six+'|piano',{}),
-      notes:studySignature([STUDY_MELODY_ALGORITHM,...Object.keys(VOCAL_MODEL_HASHES).sort()],six+'|lyrics',{}),
+      notes:studySignature(studyVocalKeys(),six+'|lyrics',{}),
       score:STUDY_SCORE_LAYOUT+'|notes'}},
     models:{instruments:'six',voices:'kara',singers:'duet',singersSampleRate:24000,singersChannels:1}}
   for(const name of ['original','vocals','drums','bass','other','piano','guitar'] as const){
@@ -50,4 +50,23 @@ test('a chord model update preserves the independent vocal result and six-track 
   const checked=await f.validate(f.root,{'sheetsage2/model.safetensors':'changed'},undefined,f.result)
   assert.deepEqual(checked.ready,['six','melody'])
   assert.equal(checked.notesReady,true)
+})
+
+test('changing the credit policy invalidates vocal inference without evicting six tracks or chords',async t=>{
+  const f=await fixture();t.after(f.close)
+  const updated={...credits,roles:[...credits.roles,'Additional test credit role']}
+  const checked=await createStudyCacheValidator(updated)(f.root,{},undefined,f.result)
+  assert.equal(checked.notesReady,false)
+  assert.deepEqual(checked.ready,['six','chords'])
+})
+
+test('structured TTML notes do not depend on the fallback text classifier or credit dictionary',async t=>{
+  const f=await fixture();t.after(f.close)
+  f.result.melody!.lyricFilter={mode:'structured',activity:{algorithm:'amll-structured-lyrics-v1',status:'skipped',start:null,end:null,margin:0},excluded:[]}
+  f.result.cache!.signatures.notes=studySignature(studyVocalKeys(credits,true),f.result.cache!.signatures.six+'|lyrics',{})
+  const updated={...credits,roles:[...credits.roles,'Unrelated fallback change']}
+  const checked=await createStudyCacheValidator(updated)(f.root,{},undefined,f.result)
+  assert(checked.notesReady)
+  assert(checked.ready.includes('melody'))
+  assert(!studyVocalKeys(credits,true).some(key=>key.startsWith('lyric-line-policy:')))
 })

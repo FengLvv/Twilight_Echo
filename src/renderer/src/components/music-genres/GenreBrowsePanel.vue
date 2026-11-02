@@ -43,7 +43,7 @@ watch(
   { immediate: true }
 )
 watch(
-  () => [core.state.value?.genresRevision, core.state.value?.catalogRevision] as const,
+  [() => core.state.value?.genresRevision, () => core.state.value?.catalogRevision],
   ([genresRevision, catalogRevision]) => view.observeRevisions({ genresRevision, catalogRevision })
 )
 watch(
@@ -53,13 +53,12 @@ watch(
   }
 )
 watch(
-  () =>
-    [
-      core.state.value?.entityMetadataRevision,
-      core.state.value?.classificationMetadataRevision,
-      core.state.value?.pluginsRevision,
-      core.state.value?.settingsRevision
-    ] as const,
+  [
+    () => core.state.value?.entityMetadataRevision,
+    () => core.state.value?.classificationMetadataRevision,
+    () => core.state.value?.pluginsRevision,
+    () => core.state.value?.settingsRevision
+  ],
   (revisions, previous) => {
     if (
       previous &&

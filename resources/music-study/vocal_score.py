@@ -10,12 +10,13 @@ import subprocess
 import xml.etree.ElementTree as ET
 import time
 import copy
+import os
 from fractions import Fraction
 from runtime_context import check_cancel
-from vocal_cache import score_key, reuse_score
+from vocal_cache import score_key, reuse_score, phrase_base
 
 SVG='http://www.w3.org/2000/svg'
-SCORE_LAYOUT_KEY='lyric-phrase-v2'
+SCORE_LAYOUT_KEY='lyric-phrase-v4'
 ET.register_namespace('',SVG)
 
 def inert_svg(source):
@@ -40,7 +41,7 @@ def phrase_part(rows):
     from music21 import stream,note,meter,key
     part=stream.Part()
     part.insert(0,meter.TimeSignature('4/4'));part.insert(0,key.Key('C'))
-    base=int(rows[0][1]['beat']//4)*4
+    base=phrase_base(rows[0][1]['beat'])
     cursor=0
     for i,row in rows:
         start=max(cursor,round((row['beat']-base)*8)/8)
@@ -61,7 +62,7 @@ def phrase_part(rows):
     # The engraver splits double/triple dots into supported native durations.
     for measure in measures:
         for obj in list(measure.notesAndRests):
-            if obj.duration.dots<=1: continue
+            if len(obj.duration.components)==1 and obj.duration.dots<=1: continue
             remaining=float(obj.duration.quarterLength);lengths=[]
             for v in [4,3,2,1.5,1,.75,.5,.375,.25,.1875,.125,.0625]:
                 while remaining>=v-1e-8: lengths.append(v);remaining-=v
@@ -108,19 +109,24 @@ def compile_batch(lily, paths, out):
     command=[str(lily),'-dbackend=svg','-dcrop','-dno-point-and-click','-o',str(out.resolve())+'/',
              *[str(path.resolve()) for path in paths]]
     child=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW if __import__('os').name=='nt' else 0)
+        # GNU gettext in the Windows engraver can access-violate while loading
+        # inherited translated catalogs (libintl-8.dll). Source text remains
+        # UTF-8; only this external tool's diagnostics use the stable C locale.
+        env={**os.environ,'LC_ALL':'C','LANG':'C','LANGUAGE':'C'},
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
     started=time.monotonic()
     try:
         while True:
             check_cancel()
             try:
-                _,stderr=child.communicate(timeout=.1)
+                stdout,stderr=child.communicate(timeout=.1)
                 break
             except subprocess.TimeoutExpired:
                 if time.monotonic()-started>180:
                     raise ValueError('简谱排版超时')
         if child.returncode:
-            raise ValueError('简谱排版失败：'+stderr.decode('utf-8',errors='replace')[-600:])
+            detail=(stderr or stdout).decode('utf-8',errors='replace')[-600:]
+            raise ValueError(f'简谱排版失败（退出码 {child.returncode}）：'+detail)
     finally:
         if child.poll() is None:
             child.kill();child.communicate()

@@ -8,12 +8,44 @@ import { useCoreConnection } from '../stores/coreConnection'
 import DownloadResultActions from './streaming-page/DownloadResultActions.vue'
 import { downloadStatusLabel } from './streaming-page/streamingDownloads'
 import MetadataTaskList from './music-metadata/MetadataTaskList.vue'
+import { useMusicStudyProgress } from '../stores/musicStudy.ts'
+import type { StudyProjectSummary } from '../../../shared/musicStudy.ts'
 const props = withDefaults(
   defineProps<{ active: boolean; filter?: 'all' | 'active' | 'attention' }>(),
   { filter: 'all' }
 )
 const emit = defineEmits<{ library: []; visibleCount: [count: number] }>()
 const notices = useAppNoticeStore()
+const study = useMusicStudyProgress()
+const studyWorking = (song: StudyProjectSummary) => ['queued', 'running', 'cancelling', 'recovering'].includes(song.status)
+const studyStatus = (song: StudyProjectSummary) => !studyWorking(song) && Object.values(song.stages ?? {}).some(stage => stage.status === 'failed') ? 'failed' : song.status
+const studyRetryable = (song: StudyProjectSummary) => ['failed', 'interrupted', 'cancelled'].includes(studyStatus(song))
+const studyError = (song: StudyProjectSummary) => song.error || Object.values(song.stages ?? {}).find(stage => stage.error)?.error
+const studyKey = (song: StudyProjectSummary) => `study-result:${song.id}`
+const studySongs = computed(() => {
+  const songs = new Map<string, StudyProjectSummary>()
+  for (const song of study.state.value?.projects ?? []) {
+    const key = song.songId || song.id, previous = songs.get(key)
+    if (!previous || studyWorking(song) && !studyWorking(previous)) songs.set(key, song)
+  }
+  return [...songs.values()]
+})
+const visibleStudies = computed(() => studySongs.value.filter(song => matches(studyStatus(song)) &&
+  (studyWorking(song) || !notices.clearedTaskResultKeys.value.has(studyKey(song)))))
+watch(studySongs, songs => {
+  for (const song of songs) if (studyWorking(song)) notices.clearedTaskResultKeys.value.delete(studyKey(song))
+})
+function studyTitle(song: StudyProjectSummary) {
+  return studyWorking(song) ? '识别中 · 点击取消' : studyRetryable(song)
+    ? `${studyStatus(song) === 'failed' ? '识别失败' : '识别中断'} · 点击重试` : '已识别'
+}
+async function studyAction(song: StudyProjectSummary) {
+  await run(`study:${song.id}`, async () => {
+    await study.core.command(studyWorking(song) ? 'study.cancel' : 'study.retry', { id: song.id })
+    await study.refresh()
+  })
+}
+function studyPage(delta: number) { study.page.value += delta; void study.refresh() }
 const core = useCoreConnection()
 function openLibrary() {
   emit('library')
@@ -35,6 +67,7 @@ const activeStates = [
   'enriching',
   'paused',
   'cancelling',
+  'recovering',
   'resolving',
   'retrying',
   'verifying',
@@ -51,6 +84,7 @@ const labels: Record<string, string> = {
   cancelled: '已取消',
   failed: '失败',
   cancelling: '正在取消',
+  recovering: '正在恢复',
   resolving: '准备更新',
   downloading: '正在下载',
   retrying: '正在重试',
@@ -131,7 +165,7 @@ const activeCount = computed(
   () =>
     jobs.value.filter((j) => activeStates.includes(j.state)).length +
     downloads.tasks.value.filter((t) => activeStates.includes(t.status)).length +
-    metadataCounts.value.active
+    metadataCounts.value.active + study.activeCount.value
 )
 const terminal = (state: string) => ['completed', 'failed', 'cancelled', 'error'].includes(state)
 const visibleJobs = computed(() =>
@@ -154,6 +188,8 @@ const visibleDownloads = computed(() =>
   )
 )
 function clearCompletedTasks(): void {
+  for (const song of studySongs.value)
+    if (!studyWorking(song)) notices.clearedTaskResultKeys.value.add(studyKey(song))
   for (const job of jobs.value) {
     if (job.id !== 'update' && terminal(job.state)) {
       notices.clearedTaskResultKeys.value.add('task-result:' + job.id)
@@ -174,7 +210,7 @@ watch(
   { immediate: true }
 )
 watch(
-  () => visibleJobs.value.length + visibleDownloads.value.length + metadataCounts.value.visible,
+  () => visibleJobs.value.length + visibleDownloads.value.length + metadataCounts.value.visible + visibleStudies.value.length,
   (count) => emit('visibleCount', count),
   { immediate: true }
 )
@@ -243,6 +279,23 @@ onUnmounted(() => {
 
 <template>
   <section v-if="active" class="notice-tasks" aria-label="后台任务">
+    <section v-if="visibleStudies.length" class="study-tasks" aria-label="歌曲分析">
+      <h3 class="task-group-title">歌曲分析</h3>
+      <div v-for="song in visibleStudies" :key="song.songId || song.id" class="study-task-row">
+        <span class="study-song-title" :title="song.title">{{ song.title }}</span>
+        <button v-if="studyWorking(song) || studyRetryable(song)" type="button"
+          class="study-task-status" :title="studyError(song) || studyTitle(song)"
+          :aria-label="`${song.title}：${studyTitle(song)}`" :disabled="pending.has(`study:${song.id}`)"
+          @click="studyAction(song)">
+          <i :class="studyWorking(song) ? 'pi pi-spin pi-spinner' : 'pi pi-exclamation-circle'" aria-hidden="true" />
+        </button>
+        <span v-else class="study-task-status" role="img" aria-label="已识别" title="已识别"><i class="pi pi-check-circle" aria-hidden="true" /></span>
+      </div>
+      <div v-if="(study.state.value?.total ?? 0) > 50" class="task-actions">
+        <button type="button" :disabled="!study.page.value" aria-label="上一页分析任务" @click="studyPage(-1)"><i class="pi pi-angle-left" /></button>
+        <button type="button" :disabled="(study.page.value + 1) * 50 >= (study.state.value?.total ?? 0)" aria-label="下一页分析任务" @click="studyPage(1)"><i class="pi pi-angle-right" /></button>
+      </div>
+    </section>
     <h3 v-if="visibleJobs.length || visibleDownloads.length" class="task-group-title">后台任务</h3>
     <p
       v-if="
@@ -326,6 +379,10 @@ onUnmounted(() => {
   />
 </template>
 <style scoped>
+.study-task-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.study-song-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.study-task-status { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; min-height: 30px; color: var(--te-settings-text); }
+button.study-task-status { background: transparent; padding: 4px; }
 .notice-tasks {
   padding: 0 20px;
   min-width: 0;

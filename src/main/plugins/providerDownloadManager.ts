@@ -1,4 +1,4 @@
-import { ProviderDownloadManager as PortableDownloadManager } from '../../core/downloads/providerDownloadManager.ts'
+import { ProviderDownloadManager as PortableDownloadManager } from '../adapters/downloads/providerDownloadManager.ts'
 import { writeDiagnostic } from '../diagnostics/logger.ts'
 import {
   filterAuthorizedLibraryRoots,

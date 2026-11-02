@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { derivePlaybackEvents } = (await import(
   new URL('./events.ts', import.meta.url).href
-)) as typeof import('./events')
+)) as typeof import('./events.ts')
 
 test('derives progress and track/state events from playback snapshots', () => {
   const events = derivePlaybackEvents(null, {

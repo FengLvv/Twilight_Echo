@@ -6,10 +6,10 @@ import test from 'node:test'
 
 const { backupPathFor } = (await import(
   new URL('./jsonFile.ts', import.meta.url).href
-)) as typeof import('./jsonFile')
+)) as typeof import('./jsonFile.ts')
 const { loadSettingsFile, writeSettingsFile } = (await import(
   new URL('./settingsFile.ts', import.meta.url).href
-)) as typeof import('./settingsFile')
+)) as typeof import('./settingsFile.ts')
 
 interface TestSettings {
   theme: 'light' | 'dark'

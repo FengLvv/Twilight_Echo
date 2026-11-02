@@ -96,14 +96,14 @@ watch(
   }
 )
 watch(
-  () => [
-    core.state.value?.catalogRevision,
-    core.state.value?.libraryRevision,
-    core.state.value?.entityMetadataRevision,
-    core.state.value?.classificationMetadataRevision,
-    core.state.value?.versionsRevision,
-    core.state.value?.settingsRevision,
-    core.state.value?.pluginsRevision
+  [
+    () => core.state.value?.catalogRevision,
+    () => core.state.value?.libraryRevision,
+    () => core.state.value?.entityMetadataRevision,
+    () => core.state.value?.classificationMetadataRevision,
+    () => core.state.value?.versionsRevision,
+    () => core.state.value?.settingsRevision,
+    () => core.state.value?.pluginsRevision
   ],
   (revisions, previous) => {
     if (

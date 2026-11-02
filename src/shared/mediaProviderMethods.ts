@@ -65,6 +65,8 @@ export type TwilightMediaProviderMethod =
   | 'isTrackLiked'
   | 'createPlaylist'
   | 'deletePlaylist'
+  | 'fetchPlaylistSubscriptionState'
+  | 'subscribePlaylist'
   | 'addTracksToPlaylist'
   | 'removeTracksFromPlaylist'
 
@@ -135,6 +137,8 @@ export const TWILIGHT_MEDIA_PROVIDER_METHODS = [
   'isTrackLiked',
   'createPlaylist',
   'deletePlaylist',
+  'fetchPlaylistSubscriptionState',
+  'subscribePlaylist',
   'addTracksToPlaylist',
   'removeTracksFromPlaylist'
 ] as const satisfies readonly TwilightMediaProviderMethod[]

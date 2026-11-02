@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/network/networkMetadata.ts'
+export * from '../adapters/network/networkMetadata.ts'

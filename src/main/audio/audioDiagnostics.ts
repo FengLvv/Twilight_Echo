@@ -1,8 +1,8 @@
-export * from '../../core/audio/audioDiagnostics.ts'
+export * from '../adapters/audio/audioDiagnostics.ts'
 import {
   AudioDiagnosticRecorder as CoreRecorder,
   type AudioDiagnosticRecorderOptions
-} from '../../core/audio/audioDiagnostics.ts'
+} from '../adapters/audio/audioDiagnostics.ts'
 import { writeDiagnostic } from '../diagnostics/logger.ts'
 
 /** The legacy adapter keeps its shared logger while Core injects its own lifecycle. */

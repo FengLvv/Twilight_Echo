@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/network/networkCover.ts'
+export * from '../adapters/network/networkCover.ts'

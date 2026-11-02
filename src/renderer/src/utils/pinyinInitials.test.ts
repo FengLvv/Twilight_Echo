@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { getPinyinInitial, getPinyinInitials, isCjkChar } = (await import(
   new URL('./pinyinInitials.ts', import.meta.url).href
-)) as typeof import('./pinyinInitials')
+)) as typeof import('./pinyinInitials.ts')
 
 test('extracts correct pinyin initials for common characters', () => {
   assert.equal(getPinyinInitials('周杰伦'), 'zjl')

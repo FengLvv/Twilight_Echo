@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/library/tagOperations.ts'
+export * from '../adapters/library/tagOperations.ts'

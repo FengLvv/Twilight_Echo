@@ -64,6 +64,18 @@ test('explicit caller keys pass through and failed retry state expires within a 
   assert.notEqual(afterExpiry.idempotencyKey, first.idempotencyKey)
 })
 
+test('playlist collection retries retain a write key and an opposite intent uses a new key', () => {
+  let nextKey = 0
+  const coordinator = new ProviderWriteIdempotencyCoordinator({ createKey: () => `playlist-${++nextKey}` })
+  const first = coordinator.begin('ncm', 'subscribePlaylist', [22, true])
+  first.settle(false)
+  const retry = coordinator.begin('ncm', 'subscribePlaylist', [22, true])
+  assert.equal(first.idempotencyKey, retry.idempotencyKey)
+  assert.ok(retry.idempotencyKey)
+  const opposite = coordinator.begin('ncm', 'subscribePlaylist', [22, false])
+  assert.notEqual(opposite.idempotencyKey, retry.idempotencyKey)
+})
+
 test('in-flight renderer write keys neither expire nor get evicted by the bounded registry', () => {
   let now = 0
   let nextKey = 0

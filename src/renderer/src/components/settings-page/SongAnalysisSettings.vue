@@ -2,10 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SettingsGroup from './SettingsGroup.vue'
 import { useCoreConnection } from '../../stores/coreConnection.ts'
-import type { StudyCacheStatus } from '../../../../shared/musicStudy.ts'
+import type { StudyCacheStatus, StudyAutomationPolicy, StudyAutomaticStage } from '../../../../shared/musicStudy.ts'
 
 const core = useCoreConnection()
 const cache = ref<StudyCacheStatus | null>(null)
+const automation = ref<StudyAutomationPolicy | null>(null)
+const automaticOptions: Array<{ stage: StudyAutomaticStage; label: string }> = [
+  { stage: 'six', label: '分轨' }, { stage: 'chords', label: '和弦' }, { stage: 'melody', label: '曲谱' }
+]
 const busy = ref(false), error = ref('')
 const sizes = [1, 2, 4, 8, 16, 32]
 const gib = 1024 ** 3
@@ -14,20 +18,28 @@ const format = (bytes: number) => bytes >= gib ? `${(bytes / gib).toFixed(1)} GB
 const summary = computed(() => cache.value ? `${format(cache.value.usedBytes)} / ${format(cache.value.limitBytes)}` : '')
 let timer: ReturnType<typeof setTimeout> | null = null, stopped = false, lastRefresh = 0
 
+async function readSettings() {
+  const [status, policy] = await Promise.all([core.query('study.cache', {}), core.query('study.automation', {})])
+  if (!stopped) { cache.value = status; automation.value = policy }
+  lastRefresh = Date.now()
+}
 async function refresh() {
   if (busy.value || stopped) return
   try {
-    const value = await core.query('study.cache', {})
-    if (!stopped) cache.value = value
-    lastRefresh = Date.now()
+    await readSettings()
   } catch (e) { if (!stopped) error.value = e instanceof Error ? e.message : String(e) }
 }
 async function change(action: () => Promise<unknown>) {
   if (busy.value) return
   busy.value = true; error.value = ''
-  try { cache.value = await action() as StudyCacheStatus; lastRefresh = Date.now() }
+  try { await action(); await readSettings() }
   catch (e) { error.value = e instanceof Error ? e.message : String(e) }
   finally { busy.value = false }
+}
+function toggleAutomatic(stage: StudyAutomaticStage) {
+  const selected = automation.value?.stages ?? []
+  const stages = selected.includes(stage) ? selected.filter(value => value !== stage) : [...selected, stage]
+  void change(() => core.command('study.setAutomation', { stages }))
 }
 watch(() => core.state.value?.studyRevision, () => {
   if (timer || stopped) return
@@ -40,6 +52,19 @@ onBeforeUnmount(() => { stopped = true; if (timer) clearTimeout(timer) })
 <template>
   <SettingsGroup id="playback-song-analysis" title="歌曲分析" :summary="summary" :attention="error">
     <div class="setting-list" :aria-busy="busy">
+      <div class="setting-item automatic-analysis" data-setting-id="automatic-song-analysis">
+        <div class="setting-copy"><strong id="analysis-automatic-label">播放时自动分析</strong></div>
+        <div class="automatic-options" role="group" aria-labelledby="analysis-automatic-label">
+          <button v-for="option in automaticOptions" :key="option.stage" type="button" class="preset-btn"
+            :class="{ active: automation?.stages.includes(option.stage) }" role="checkbox"
+            :aria-checked="automation?.stages.includes(option.stage) ?? false" :disabled="busy || !automation"
+            @click="toggleAutomatic(option.stage)">
+            <i :class="automation?.stages.includes(option.stage) ? 'pi pi-check-square' : 'pi pi-stop'" aria-hidden="true" />
+            {{ option.label }}
+          </button>
+        </div>
+      </div>
+      <hr />
       <div class="setting-item">
         <div class="setting-copy"><strong id="analysis-preload-label">预分析下一首</strong></div>
         <button type="button" class="toggle-switch" :class="{ active: cache?.preloadNext }"
@@ -65,3 +90,12 @@ onBeforeUnmount(() => { stopped = true; if (timer) clearTimeout(timer) })
     </div>
   </SettingsGroup>
 </template>
+
+<style scoped>
+.automatic-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.automatic-options .preset-btn { display: inline-flex; align-items: center; gap: 6px; }
+.automatic-options .preset-btn.active { color: var(--te-primary-500); background: rgba(var(--te-primary-rgb), 0.1); border-color: var(--te-primary-500); }
+@media (max-width: 560px) {
+  .automatic-analysis { align-items: flex-start; flex-direction: column; gap: 12px; }
+}
+</style>

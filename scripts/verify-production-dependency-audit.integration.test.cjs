@@ -21,7 +21,7 @@ const {
 const candidate = process.env.TWILIGHT_AUDIT_INTEGRATION_CANDIDATE
 const candidateRoot = candidate ? resolve(candidate) : resolve(__dirname, '..')
 const candidateRequire = createRequire(join(candidateRoot, 'package.json'))
-const { assertNodeForgePatch } = require('./verify-install-policy.cjs')
+const { assertNodeForgeSecurity } = require('./verify-install-policy.cjs')
 
 // Official PR #1152 vector at ceba34402e329f0365134f23fe19898756527d65.
 // The upstream test bypasses padding checks to isolate nested DigestAlgorithm
@@ -49,8 +49,8 @@ const FORGE_ATTACK = {
   ].join('')
 }
 
-test('installed node-forge rejects the upstream nested DigestAlgorithm attack accepted without the patch', () => {
-  assertNodeForgePatch(candidateRoot)
+test('installed node-forge rejects the upstream nested DigestAlgorithm attack accepted without canonical DER validation', () => {
+  assertNodeForgeSecurity(candidateRoot)
   const forge = candidateRequire('node-forge')
   const rsaPath = candidateRequire.resolve('node-forge/lib/rsa.js')
   const key = forge.pki.rsa.setPublicKey(
@@ -67,7 +67,7 @@ test('installed node-forge rejects the upstream nested DigestAlgorithm attack ac
     /ASN\.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value/
   )
 
-  // Remove only this backport in an isolated child module, never on disk or
+  // Remove only upstream canonical DER validation in an isolated child module, never on disk or
   // in the application's module cache, to prove the attack fixture is useful.
   const controlScript = `(${function (rsaPath, attack) {
     const assert = require('node:assert/strict')
@@ -76,11 +76,11 @@ test('installed node-forge rejects the upstream nested DigestAlgorithm attack ac
     const { dirname } = require('node:path')
     const forge = require('node-forge')
     const patched = readFileSync(rsaPath, 'utf8')
-    const unpatched = patched.replace(
-      /\|\|\s*obj\.value\[0\]\.value\.length\s*!==\s*\(\('parameters' in capture\) \? 2 : 1\)/,
-      ''
-    )
-    assert.notEqual(unpatched, patched, 'control must remove exactly the nested element check')
+    const validationStart = patched.indexOf('          if(d.substring(0, withParameters.length)')
+    const validationEnd = patched.indexOf('          // compare the given digest', validationStart)
+    assert(validationStart >= 0 && validationEnd > validationStart)
+    const unpatched = patched.slice(0, validationStart) + patched.slice(validationEnd)
+    assert.notEqual(unpatched, patched, 'control must remove exactly the canonical DER check')
     const control = new Module(rsaPath)
     control.filename = rsaPath
     control.paths = Module._nodeModulePaths(dirname(rsaPath))
@@ -110,7 +110,7 @@ test('installed node-forge rejects the upstream nested DigestAlgorithm attack ac
   assert.match(control.stdout, /unpatched-control-accepted/)
 })
 
-test('patched node-forge retains strict valid signatures and optional NULL algorithm parameters', () => {
+test('upstream node-forge retains strict valid signatures and optional NULL algorithm parameters', () => {
   const forge = candidateRequire('node-forge')
   const keys = generateKeyPairSync('rsa', { modulusLength: 1024, publicExponent: 65537 })
   const pem = keys.publicKey.export({ type: 'spki', format: 'pem' })

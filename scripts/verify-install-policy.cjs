@@ -1,16 +1,16 @@
 const assert = require('node:assert/strict')
-const { createHash } = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 
 const PNPM_VERSION = 'pnpm@11.7.0'
 const REQUIRED_OVERRIDES = Object.freeze({
   'form-data': '4.0.6',
-  qs: '6.16.0'
+  qs: '6.16.1',
+  'follow-redirects': '1.16.2',
+  'node-forge': '1.4.1'
 })
 const NCM_PATCH = '@neteasecloudmusicapienhanced/api@4.35.1'
 const NCM_PATCH_PATH = 'patches/@neteasecloudmusicapienhanced__api@4.35.1.patch'
-const FORGE_PATCH_PATH = 'patches/node-forge@1.4.0.patch'
 const DISALLOWED_LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'bun.lockb']
 
 function readFile(filePath) {
@@ -72,37 +72,18 @@ function assertWorkspacePolicy(root) {
     /@neteasecloudmusicapienhanced\/api@[\d.]+\(patch_hash=[^)]+\)/,
     'pnpm lockfile must retain the NCM patch hash'
   )
-  assertNodeForgePatch(root)
+  assertNodeForgeSecurity(root)
 }
 
-function assertNodeForgePatch(root) {
+function assertNodeForgeSecurity(root) {
   const workspace = readFile(path.join(root, 'pnpm-workspace.yaml'))
-  assert.match(
-    workspace,
-    /^\s+['"]?node-forge@1\.4\.0['"]?:\s*patches\/node-forge@1\.4\.0\.patch\s*$/m,
-    'node-forge security patch declaration is required'
-  )
-  const patchPath = path.join(root, FORGE_PATCH_PATH)
-  assert.ok(fs.existsSync(patchPath), 'node-forge security patch file is required')
-  const patch = fs.readFileSync(patchPath)
-  assert.match(patch.toString(), /GHSA-86w9-cpqp-85rv/, 'node-forge patch must name its advisory')
-  assert.match(
-    patch.toString(),
-    /ceba34402e329f0365134f23fe19898756527d65/,
-    'node-forge patch must retain its fixed upstream source'
-  )
-  const hash = createHash('sha256').update(patch).digest('hex')
+  assert.match(workspace, /^\s+['"]?node-forge['"]?:\s*1\.4\.1\s*$/m,
+    'node-forge must use the upstream security release')
   const lockfile = readFile(path.join(root, 'pnpm-lock.yaml'))
-  assert.match(
-    lockfile,
-    new RegExp(`^\\s+['"]?node-forge@1\\.4\\.0['"]?:\\s*${hash}\\s*$`, 'm'),
-    'pnpm lockfile must bind the node-forge patch bytes'
-  )
-  assert.match(
-    lockfile,
-    new RegExp(`node-forge: 1\\.4\\.0\\(patch_hash=${hash}\\)`),
-    'NCM must resolve the patched node-forge dependency'
-  )
+  assert.match(lockfile, /node-forge: 1\.4\.1(?:\s|$)/,
+    'NCM must resolve the fixed node-forge dependency')
+  assert.doesNotMatch(lockfile, /node-forge(?:@|: )1\.4\.0/,
+    'node-forge must not retain the superseded patched release')
 }
 
 function readModulesMetadata(nodeModulesDir) {
@@ -230,7 +211,6 @@ module.exports = {
   DISALLOWED_LOCKFILES,
   NCM_PATCH,
   NCM_PATCH_PATH,
-  FORGE_PATCH_PATH,
   PNPM_VERSION,
   REQUIRED_OVERRIDES,
   assertLocalVirtualStore,
@@ -238,7 +218,7 @@ module.exports = {
   assertPackageManager,
   assertSingleLockfile,
   assertWorkspacePolicy,
-  assertNodeForgePatch,
+  assertNodeForgeSecurity,
   readModulesMetadata,
   verifyInstallPolicy
 }

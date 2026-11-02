@@ -54,25 +54,81 @@ def languages_for(text, song_language):
         primary = 'ja'
     return [primary, 'en'] if primary != 'en' and re.search(r'[A-Za-z]', text) else [primary]
 
-def validate_lines(serialized, duration):
+def validate_lines(serialized, duration, excluded=None, *, check_duration=True):
     lyrics_key(serialized)
     rows=json.loads(serialized)
-    previous=-1
+    from vocal_lyrics import is_credit
+    previous=-1;selected=[]
     for row in rows:
         if (not isinstance(row,dict) or not isinstance(row.get('id'),int) or row['id']<=previous
                 or not isinstance(row.get('text'),str) or not row['text'].strip()
                 or len(row['text'])>2000
-                or not all(isinstance(row.get(k),(int,float)) and math.isfinite(row[k]) for k in ['start','end'])
-                or not 0<=row['start']<row['end']<=duration+.05):
+                or not all(isinstance(row.get(k),(int,float)) and math.isfinite(row[k]) for k in ['start','end'])):
             raise ValueError('歌词时间或内容无效，请重新加载歌词')
-        if row['end']-row['start']>55:
-            raise ValueError('单行歌词超过 55 秒，请使用逐行或逐字时间歌词')
         previous=row['id']
-    from vocal_lyrics import is_credit
-    selected=[row for row in rows if not is_credit(row['text'])]
+        origin=row.get('origin')
+        if origin is not None and (not isinstance(origin,dict) or not (
+                origin.get('format')=='netease-json' and origin.get('kind') in ('metadata','unknown') or
+                origin.get('format')=='amll-ttml' and origin.get('kind')=='lyric')):
+            raise ValueError('歌词来源信息无效，请重新加载歌词')
+        structured=origin is not None and origin['format']=='amll-ttml'
+        reason='source_metadata' if origin and origin['kind']=='metadata' else 'credit' if not structured and is_credit(row['text']) else None
+        if reason:
+            if excluded is not None: excluded.append(dict(id=row['id'],reason=reason))
+            continue
+        # MP3/AAC metadata can include encoder delay/padding removed by FFmpeg.
+        # Clamp only sub-100ms tail padding; larger lyric/audio mismatches fail.
+        if not 0<=row['start']<row['end']:
+            raise ValueError('歌词时间或内容无效，请重新加载歌词')
+        current=dict(row)
+        if current['end']-current['start']>55:
+            raise ValueError('单行歌词超过 55 秒，请使用逐行或逐字时间歌词')
+        selected.append(current)
     if not selected:
         raise ValueError('没有可用于对齐的演唱歌词')
+    if any((row.get('origin') or {}).get('format')=='amll-ttml' for row in selected) and not all(
+            (row.get('origin') or {}).get('format')=='amll-ttml' for row in selected):
+        raise ValueError('歌词来源混用，请重新加载歌词')
+    return validate_audio_times(selected,duration) if check_duration else selected
+
+
+def validate_audio_times(lines,duration):
+    selected=[]
+    for row in lines:
+        if not row['start']<min(row['end'],duration) or row['end']>duration+.1:
+            raise ValueError(f"歌词时间超出音频范围（第 {row['id']+1} 行，{row['start']:.2f}–{row['end']:.2f} 秒，音频 {duration:.2f} 秒），请检查歌词版本")
+        selected.append({**row,'end':min(row['end'],duration)})
     return selected
+
+
+def prepare_lyrics(serialized, duration, root, pack):
+    """Structured lead lyrics are authoritative; heuristic cleanup is a fallback."""
+    excluded=[]
+    # Validate structure first. Provider attribution rows can use rounded track
+    # durations; only surviving sung rows must match the decoded audio clock.
+    lines=validate_lines(serialized,duration,excluded,check_duration=False)
+    if all((row.get('origin') or {}).get('format')=='amll-ttml' for row in lines):
+        return validate_audio_times(lines,duration),dict(mode='structured',activity=dict(algorithm='amll-structured-lyrics-v1',
+            status='skipped',start=None,end=None,margin=0),excluded=[]),0
+    from vocal_lyric_classifier import filter_lyrics
+    _,classified,classifier=filter_lyrics(lines,pack)
+    from vocal_activity import detect_vocal_activity,filter_outer_lyrics
+    tick=time.perf_counter()
+    activity=detect_vocal_activity(root/'vocals.wav',root/'original.wav')
+    # The model proposes candidates. Actual vocal activity vetoes deletion;
+    # only wholly exterior candidates can narrow the 0.8-second safety margin.
+    by_id={row['id']:row for row in lines}
+    permitted=[item for item in classified if activity.get('status')=='estimated' and (
+        by_id[item['id']]['end']<=activity['start'] or by_id[item['id']]['start']>=activity['end'])]
+    if len(permitted)==len(lines):
+        permitted=[]
+        classifier['abstained']=True
+    removed={item['id'] for item in permitted}
+    classifier['rejected']=len(removed)
+    classifier['protected']=[identifier for identifier in classifier.get('candidates',[]) if identifier not in removed]
+    lines=[row for row in lines if row['id'] not in removed]
+    lines,outer_excluded=filter_outer_lyrics(lines,activity)
+    return validate_audio_times(lines,duration),dict(mode='heuristic',classifier=classifier,activity=activity,excluded=excluded+permitted+outer_excluded),round((time.perf_counter()-tick)*1000)
 
 def normalized_text(text):
     return ''.join(c for c in unicodedata.normalize('NFKC',text).casefold() if c.isalnum())
@@ -142,16 +198,17 @@ def run(request, progress):
     waveform,sr=sf.read(root/'vocals.wav',dtype='float32',always_2d=True)
     waveform=waveform.mean(axis=1)
     duration=len(waveform)/sr
-    lines=validate_lines(request['lyrics'],duration)
+    lines,lyric_filter,activity_ms=prepare_lyrics(request['lyrics'],duration,root,pack)
     torch.set_num_threads(4)
     progress(.02,'载入人声简谱模型')
     import onnxruntime as ort
     device='dml' if 'DmlExecutionProvider' in ort.get_available_providers() else 'cpu'
-    metrics = {'importsAndModelMs': round((time.perf_counter() - begin) * 1000), 'alignmentMs': 0, 'pitchMs': 0}
+    metrics = {'importsAndModelMs': round((time.perf_counter() - begin) * 1000), 'alignmentMs': 0, 'pitchMs': 0,
+               'activityMs':activity_ms,'lyricClassifierMs':lyric_filter.get('classifier',{}).get('elapsedMs',0)}
     from vocal_cache import group_key, reuse_group
     from model_residency import ensure_model
     previous = request.get('previous') or {}
-    if previous.get('reuse', {}).get('parent') != request['parent']:
+    if previous.get('algorithm') != ALGORITHM or previous.get('reuse', {}).get('parent') != request['parent']:
         previous = {}
     models = None
     def get_models():
@@ -239,7 +296,7 @@ def run(request, progress):
                 if current_word is None: raise ValueError('音符缺少原词')
                 word=current_word
                 word_id=word.source_word
-                group_notes.append({'start':begin,'end':finish,'midi':max(0,min(127,round(n.pitch))),
+                group_notes.append({'start':begin,'end':finish,'midi':max(0,min(127,round(n.pitch))), 'pitchMidi':float(n.pitch),
                     'lineId':owners[word_id],'wordId':word_id,
                     'lyric':word.source_text if word_id not in seen else '',
                     'beat':beat_at(begin),'durationBeats':max(.125,beat_at(finish)-beat_at(begin))})
@@ -263,8 +320,11 @@ def run(request, progress):
     for n in all_notes: pitches.append(m21note.Note(n['midi'],quarterLength=n['durationBeats']))
     key=pitches.analyze('key')
     key_data={'tonic':key.tonic.pitchClass,'mode':key.mode}
+    from vocal_pitch import quantize_pitches
+    pitch_quantization=quantize_pitches(all_notes,key_data)
     for group in cached_groups:
         group['noteIndices'] = [i for i,n in enumerate(all_notes) if n['lineId'] in group['lineIds']]
     return {'algorithm':ALGORITHM,'source':'vocals','notes':all_notes,'key':key_data,
+            'lyricFilter':lyric_filter, 'pitchQuantization':pitch_quantization,
             'tempo':tempo,'lyricsKey':lyrics_key(request['lyrics']), 'timings': metrics,
             'reuse': dict(parent=request['parent'], beats=beats.tolist(), downbeats=list(map(float,downbeats)), groups=cached_groups)}

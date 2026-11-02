@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/persistence/jsonFile.ts'
+export * from '../adapters/persistence/jsonFile.ts'

@@ -13,7 +13,7 @@ import { validMusicPreferencesPayload, validMusicPreferenceChoice, validMusicPre
 import type { MusicPreferenceState } from '../../shared/musicPreferences.ts'
 import type { TrackData } from '../../shared/track.ts'
 import type { Playlist } from '../../shared/playlists.ts'
-import { createPersonalBackupRepository } from '../../core/persistence/personalBackup.ts'
+import { createPersonalBackupRepository } from '../adapters/persistence/personalBackup.ts'
 import type { PersonalLibraryDatabase } from '../../shared/coreBackup.ts'
 import { emptyMusicVersions } from '../../shared/musicVersions.ts'
 

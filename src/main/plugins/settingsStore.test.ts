@@ -7,10 +7,10 @@ import test from 'node:test'
 const { deletePluginSetting, getPluginSetting, pluginSettingsPath, setPluginSetting } =
   (await import(
     new URL('./settingsStore.ts', import.meta.url).href
-  )) as typeof import('./settingsStore')
+  )) as typeof import('./settingsStore.ts')
 const { protectString, redactSensitiveText } = (await import(
   new URL('../security/secureStorage.ts', import.meta.url).href
-)) as typeof import('../security/secureStorage')
+)) as typeof import('../security/secureStorage.ts')
 
 function deeplyNestedValue(depth = 128): unknown {
   let value: unknown = 'leaf'

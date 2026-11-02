@@ -11,7 +11,7 @@ import {
   type ThemeLibrarySnapshot,
   type ThemeWindowDefaults
 } from '../../shared/theme.ts'
-import type { ThemeLibraryRepository } from '../persistence/themeLibraryRepository.ts'
+import type { ThemeLibraryRepository } from '../persistence/themeLibraryRepositoryContract.ts'
 import type { CoreSettingsService } from './service.ts'
 import { exportAppSettingsForBackup, importAppSettingsBackup } from './backupFormat.ts'
 import { createInheritedThemeSettingsPatch } from './windowInheritance.ts'

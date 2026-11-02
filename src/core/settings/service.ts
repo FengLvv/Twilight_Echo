@@ -6,7 +6,7 @@ import {
   type CoreSettingsState
 } from '../../shared/coreSettings.ts'
 import { effectiveAutoMixMode } from '../../shared/twilightAutoMix.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
 import type { CoreSettingsImportEffects } from './importEffects.ts'
 
 export interface CoreSettingsServiceOptions {

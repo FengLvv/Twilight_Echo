@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/network/networkLibrary.ts'
+export * from '../composition/network/networkLibrary.ts'

@@ -87,6 +87,9 @@ def build_g2p_pipeline(
         )
         converters.append(kana)
 
+    converters.append(get_converter("english-numbers")(
+        dict_path=str(dictionaries / "ds_cmudict-07b.txt"),
+    ))
     lstm = get_converter("lstm")(
         dict_path=str(dictionaries / "ds_cmudict-07b.txt"),
         model_path=str(root / "assets" / "LstmG2p-Eng"),

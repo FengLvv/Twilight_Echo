@@ -8,7 +8,7 @@ import type { CommentTrack as TrackData } from '../../shared/ncmComments.ts'
 import type { CommentPublish } from '../../shared/ncmComments.ts'
 import type { NativeCommentPublisher } from './publisher.ts'
 import { NcmClient } from './client.mjs'
-import { AssociationStore } from './store.mjs'
+import type { AssociationStore } from './storePort.ts'
 import {
   automaticMatch,
   explicitSongId,

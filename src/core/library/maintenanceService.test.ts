@@ -7,8 +7,8 @@ import test from 'node:test'
 import { File } from 'node-taglib-sharp'
 import { LibraryDatabase } from '../../main/library/libraryDatabase.ts'
 import { CoreLibraryMaintenance } from './maintenanceService.ts'
-import { runLibraryTagWorker } from './tagWorker.ts'
-import { getTagWriteJournalPath, readTagWriteJournal, tagBackupPath } from './tagWriteService.ts'
+import { runLibraryTagWorker } from '../../main/adapters/library/tagWorker.ts'
+import { getTagWriteJournalPath, readTagWriteJournal, tagBackupPath } from '../../main/adapters/library/tagWriteService.ts'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

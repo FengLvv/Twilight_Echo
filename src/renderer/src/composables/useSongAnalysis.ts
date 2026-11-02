@@ -1,11 +1,18 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useMusicStudyStore } from '../stores/musicStudy.ts'
-import { studyReady, type StudyMix, type StudyProject } from '../../../shared/musicStudy.ts'
+import { studyReady, type StudyMix, type StudyProject, type StudyTrack } from '../../../shared/musicStudy.ts'
 import { isRequestCancelled } from '../../../shared/cancellation.ts'
+import { useStudyDisplayToggle } from './useStudyDisplayToggle.ts'
 
 export function useSongAnalysis(songId: () => string) {
-  const store = useMusicStudyStore(),
-    core = store.core
+  return createSongAnalysis(songId, useMusicStudyStore())
+}
+
+export function createSongAnalysis(songId: () => string, store: ReturnType<typeof useMusicStudyStore>) {
+  const core = store.core
+  const occurrence = () => core.state.value?.queue?.occurrenceId ?? ''
+  const melodyDisplay = useStudyDisplayToggle(store, songId, occurrence, 'notationVisible')
+  const chordDisplay = useStudyDisplayToggle(store, songId, occurrence, 'chordsVisible')
   const project = computed(() => store.songs.value[songId()] ?? null)
   const open = ref(false),
     error = ref(''),
@@ -15,67 +22,22 @@ export function useSongAnalysis(songId: () => string) {
   const tracks = ref<StudyMix['tracks']>({})
   const sixReady = computed(() => studyReady(project.value?.result, 'six'))
   const chordsReady = computed(() => studyReady(project.value?.result, 'chords'))
-  const melodyEnabled = ref(false),
-    melodyStarting = ref(false),
-    melodyRequestError = ref('')
+  const melodyEnabled = melodyDisplay.enabled
   const melodyReady = computed(() => studyReady(project.value?.result, 'melody'))
   const melodyVisible = computed(() => melodyEnabled.value && melodyReady.value)
   const melodyBusy = computed(
     () =>
-      melodyStarting.value ||
-      (!melodyReady.value && ['queued', 'running'].includes(project.value?.status ?? ''))
+      melodyDisplay.starting.value ||
+      (!melodyReady.value && ['queued', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
   )
   const melodyError = computed(
-    () => melodyRequestError.value || project.value?.stages?.melody?.error || ''
+    () => melodyDisplay.error.value || project.value?.stages?.melody?.error || ''
   )
-  let melodyGeneration = 0,
-    melodyRequest: Promise<void> | null = null
-  function toggleMelody() {
-    melodyEnabled.value = !melodyEnabled.value
-    if (melodyRequest) return melodyRequest
-    const id = songId(),
-      token = melodyGeneration
-    if (!id) return
-    melodyStarting.value = true
-    melodyRequestError.value = ''
-    const work = (async () => {
-      try {
-        let applied: boolean
-        do {
-          applied = melodyEnabled.value
-          await store.setDisplay({ songId: id, notationVisible: applied })
-          if (token !== melodyGeneration || songId() !== id) return
-        } while (applied !== melodyEnabled.value)
-        await store.readSong(id)
-        void store.refresh()
-      } catch (e) {
-        if (token === melodyGeneration && !isRequestCancelled(e))
-          melodyRequestError.value = e instanceof Error ? e.message : String(e)
-      } finally {
-        if (token === melodyGeneration) melodyStarting.value = false
-      }
-    })()
-    melodyRequest = work
-    void work.finally(() => {
-      if (melodyRequest === work) {
-        melodyRequest = null
-        if (token === melodyGeneration)
-          melodyEnabled.value = store.displays.value[id]?.notationVisible ?? melodyEnabled.value
-      }
-    })
-    return work
-  }
-  watch(
-    () => store.displays.value[songId()]?.notationVisible,
-    (value) => {
-      if (value !== undefined && !melodyRequest) melodyEnabled.value = value
-    }
-  )
-  const chordsVisible = computed(() => chordsReady.value && project.value?.chordsVisible !== false)
+  const chordsVisible = computed(() => chordsReady.value && chordDisplay.enabled.value)
   const chordsBusy = computed(
     () =>
-      starting.value ||
-      (!chordsReady.value && ['queued', 'running'].includes(project.value?.status ?? ''))
+      starting.value || chordDisplay.starting.value ||
+      (!chordsReady.value && ['queued', 'running', 'cancelling', 'recovering'].includes(project.value?.status ?? ''))
   )
   let release: (() => void) | undefined,
     generation = 0,
@@ -85,9 +47,12 @@ export function useSongAnalysis(songId: () => string) {
   let desiredVoice: 'leadBacking' | 'twoSingers' | null = null
   let mixWork: Promise<void> = Promise.resolve(),
     mixScheduled = false
-  const occurrence = () => core.state.value?.queue?.occurrenceId ?? ''
   const report = (e: unknown) => {
     if (!isRequestCancelled(e)) error.value = e instanceof Error ? e.message : String(e)
+  }
+  function changeTrack(track: StudyTrack, setting: NonNullable<StudyMix['tracks'][StudyTrack]>) {
+    tracks.value = { ...tracks.value, [track]: setting }
+    return changeMix()
   }
   function changeMix() {
     if (!open.value || starting.value || !sixReady.value || !project.value || mixScheduled)
@@ -132,12 +97,13 @@ export function useSongAnalysis(songId: () => string) {
     error.value = ''
     binding = occurrence()
     const token = ++generation
+    const chordIntent = chordDisplay.intent()
     try {
       const value = (await core.command('study.analyze', { songId: id })) as StudyProject | null
       if (token !== generation || songId() !== id) return
       if (value) store.songs.value = { ...store.songs.value, [id]: value }
-      if (value) {
-        await core.command('study.chordsVisible', { id: value.id, visible: true })
+      if (value && chordDisplay.intent() === chordIntent) {
+        await chordDisplay.set(true)
         if (token !== generation || songId() !== id) return
       }
       await store.readSong(id)
@@ -219,11 +185,6 @@ export function useSongAnalysis(songId: () => string) {
   watch(
     [songId, occurrence],
     ([id]) => {
-      ++melodyGeneration
-      melodyEnabled.value = false
-      melodyStarting.value = false
-      melodyRequestError.value = ''
-      melodyRequest = null
       open.value = false
       ++generation
       activated = ''
@@ -235,14 +196,7 @@ export function useSongAnalysis(songId: () => string) {
       release?.()
       release = id ? store.retain(id) : undefined
       if (id) {
-        const token = melodyGeneration
-        void store
-          .readSong(id)
-          .then(() => {
-            if (token === melodyGeneration && !melodyRequest)
-              melodyEnabled.value = store.displays.value[id]?.notationVisible ?? false
-          })
-          .catch(report)
+        void store.readSong(id).catch(report)
       }
     },
     { immediate: true }
@@ -262,19 +216,23 @@ export function useSongAnalysis(songId: () => string) {
     sixReady,
     chordsReady,
     chordsVisible,
+    chordsEnabled: chordDisplay.enabled,
+    chordsError: chordDisplay.error,
     chordsBusy,
     melodyEnabled,
     melodyReady,
     melodyVisible,
     melodyBusy,
     melodyError,
-    toggleMelody,
+    toggleChords: chordDisplay.toggle,
+    toggleMelody: melodyDisplay.toggle,
     analyze,
     toggle,
     back,
     split,
     family,
     changeMix,
+    changeTrack,
     store
   }
 }

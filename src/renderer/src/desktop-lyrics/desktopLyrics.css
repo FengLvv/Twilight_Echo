@@ -147,6 +147,12 @@
 }
 
 .dl-line-content {
+  --lyric-annotation-outline-width: var(--dl-outline-width);
+  --lyric-annotation-outline-color: rgb(0 0 0 / 72%);
+  --lyric-annotation-inactive: var(--dl-inactive);
+  --lyric-annotation-active: var(--dl-active);
+  --lyric-annotation-opacity: 1;
+  --lyric-annotation-group-opacity: 1;
   max-width: 100%;
   width: max-content;
   transform-origin: left center;
@@ -192,8 +198,9 @@
   margin-top: 3px;
   font-size: 0.5em;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.58);
-  -webkit-text-stroke-width: 0;
+  color: inherit;
+  paint-order: stroke fill;
+  -webkit-text-stroke: var(--dl-outline-width) rgb(0 0 0 / 72%);
 }
 
 .dl-slot-shell.is-vertical .dl-translation,
@@ -533,7 +540,7 @@
 .dl-root.is-taskbar .dl-translation {
   margin-top: 2px;
   font-size: 0.65em;
-  color: rgba(255, 255, 255, 0.85);
+  color: inherit;
 }
 
 .dl-slot-shell.has-annotations .dl-line-content {

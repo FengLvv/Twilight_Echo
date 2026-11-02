@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { CoreBookmarksService } from './service.ts'
-import { VersionedDataStore } from '../persistence/versionedDataStore.ts'
+import { VersionedDataStore } from '../../main/adapters/persistence/versionedDataStore.ts'
 import {
   DEFAULT_PLAYBACK_BOOKMARKS,
   isPlaybackBookmarksDocument,

@@ -134,7 +134,7 @@ class AudioPipeline {
       double volume,
       const std::string& dspConfigJson,
       bool gaplessEnabled,
-      std::string* error, bool initiallyPaused = false);
+      std::string* error, bool initiallyPaused = false, bool followPlaybackClock = false);
   TAE_Result play(
       const std::string& source,
       double startTimeSeconds,
@@ -287,6 +287,7 @@ class AudioPipeline {
   };
 
   struct DecodeStream;
+  struct StudyStreamSwitch;
   struct DecodeStreamReaper;
   struct AutoMixGeneration;
   struct AutoMixSelection;
@@ -346,8 +347,9 @@ class AudioPipeline {
       const std::string& attemptedDopReason,
       bool dopModeRequested,
       std::optional<bool> graphProcessingActive = std::nullopt) const;
-  bool trySwitchStudyStream(const QueueItem& item, double startTimeSeconds,
-      const std::string& backendId, const std::string& deviceId, bool initiallyPaused);
+  bool trySwitchStudyStream(const QueueItem& item,
+      const std::string& backendId, const std::string& deviceId, bool followPlaybackClock);
+  void applyStudyStreamSwitch() noexcept;
   TAE_Result playInternal(
       const QueueItem& item,
       const std::optional<QueueItem>& upcomingItem,
@@ -361,7 +363,7 @@ class AudioPipeline {
       bool allowDop,
       const std::string& forcedDsdFallbackReason,
       const std::optional<NativeDsdRuntimeFacts>& forcedNativeDsdFallbackFacts,
-      std::string* error, bool initiallyPaused = false);
+      std::string* error, bool initiallyPaused = false, bool followPlaybackClock = false);
   void recomputeDspActiveLocked();
   void recomputeDspActiveLocked(double requestedVolume);
   bool updatePerfectLocked();
@@ -524,6 +526,7 @@ class AudioPipeline {
   // primitive hand-off values or retains the DecodeStream lifetime.
   std::atomic<PipelineState> renderState_{PipelineState::Stopped};
   std::atomic<DecodeStream*> renderActiveStream_{nullptr};
+  std::atomic<StudyStreamSwitch*> pendingStudyStreamSwitch_{nullptr};
   std::atomic<DecodeStream*> renderPreloadStream_{nullptr};
   std::atomic<bool> queueRebindExclusive_{false};
   std::atomic<uint32_t> queueTransitionReaders_{0};

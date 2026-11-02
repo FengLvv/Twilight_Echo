@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/plugins/packageSecurity.ts'
+export * from '../adapters/plugins/packageSecurity.ts'

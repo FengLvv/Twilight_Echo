@@ -60,6 +60,7 @@ const emit = defineEmits<{
 }>()
 
 const pageSize = 30
+const trackLiked = (track: Track) => props.isTrackFavorited?.(track) ?? props.isTrackLiked(track.ncmSongId)
 useDomTrackLocator('locatorRoot', () => props.currentTrack?.id)
 
 function isSelected(trackId: string): boolean {
@@ -245,10 +246,11 @@ function onTrackKeydown(event: KeyboardEvent, track: Track): void {
                   <button
                     class="btn-like"
                     :class="{
-                      liked: isTrackFavorited?.(track) ?? isTrackLiked(track.ncmSongId),
+                      liked: trackLiked(track),
                       loading: likingTracks.has(track.ncmSongId ?? 0)
                     }"
                     :disabled="likingTracks.has(track.ncmSongId ?? 0)"
+                    :aria-pressed="trackLiked(track)"
                     :title="
                       track.ncmSongId != null
                         ? isTrackLiked(track.ncmSongId)
@@ -267,7 +269,7 @@ function onTrackKeydown(event: KeyboardEvent, track: Track): void {
                     ></i>
                     <i
                       v-else
-                      :class="isTrackLiked(track.ncmSongId) ? 'pi pi-heart-fill' : 'pi pi-heart'"
+                      :class="trackLiked(track) ? 'pi pi-heart-fill' : 'pi pi-heart'"
                       style="font-size: calc(var(--te-font-size-body, 14px) * 14 / 14)"
                     ></i>
                   </button>

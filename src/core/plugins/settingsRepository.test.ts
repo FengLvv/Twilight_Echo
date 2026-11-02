@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
-import { PluginSettingsRepository, pluginSettingsPath } from './settingsRepository.ts'
+import { PluginSettingsRepository, pluginSettingsPath } from '../../main/adapters/plugins/settingsRepository.ts'
 import type { SecureValueEnvelope } from '../../shared/secureValue.ts'
 
 const envelope = (value: unknown): SecureValueEnvelope => ({

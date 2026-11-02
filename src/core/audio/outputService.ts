@@ -15,7 +15,7 @@ import {
   type AudioDeviceProfile,
   type AudioDeviceProfilesSnapshot
 } from '../../shared/audioDeviceProfiles.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
 
 export interface CoreOutputEngine {
   getAudioOutputState(): Promise<AudioOutputState>

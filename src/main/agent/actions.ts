@@ -66,7 +66,7 @@ export function createAgentActions(profile: string, application: CoreApplication
           input = { kind: 'local', id, fallback: { filePath: path, title: metadata.common.title || basename(path,extname(path)), artist: metadata.common.artist || '', album: metadata.common.album || '', duration: metadata.format.duration || 0 } }
           if (lyrics === undefined) {
             const sidecar = path.slice(0,-extname(path).length) + '.lrc'
-            try { if ((await stat(sidecar)).size <= 2 * 1024 * 1024) lyrics = await readFile(sidecar,'utf8') } catch {}
+            try { if ((await stat(sidecar)).size <= 2 * 1024 * 1024) lyrics = await readFile(sidecar,'utf8') } catch { /* A local audio file may have no readable lyric sidecar. */ }
           }
         } else if (payload.ncmId !== undefined || typeof payload.songId === 'string' && /^ncm:\d+$/.test(payload.songId)) {
           const value = String(payload.ncmId ?? String(payload.songId).slice(4))

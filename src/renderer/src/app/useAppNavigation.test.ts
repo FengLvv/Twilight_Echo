@@ -11,10 +11,10 @@ import {
 
 const { useAppNavigation } = (await import(
   new URL('./useAppNavigation.ts', import.meta.url).href
-)) as typeof import('./useAppNavigation')
+)) as typeof import('./useAppNavigation.ts')
 const { createNavigationSessionPersistence } = (await import(
   new URL('./useNavigationSessionPersistence.ts', import.meta.url).href
-)) as typeof import('./useNavigationSessionPersistence')
+)) as typeof import('./useNavigationSessionPersistence.ts')
 
 function memoryStorage(): NavigationSessionStorage {
   const values = new Map<string, string>()

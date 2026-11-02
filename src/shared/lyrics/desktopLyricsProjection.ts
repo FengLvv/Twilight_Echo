@@ -1,18 +1,24 @@
 import type { DesktopLyricsLine } from '../desktopLyrics.ts'
 import type { LyricLine } from './lyricTypes.ts'
+import { primaryLyricVoice } from './lyricLead.ts'
 
 function lineText(line: LyricLine): {
   text: string
   translation: string | null
   romanization: string | null
   words: LyricLine['words']
+  time: number | null
+  endTime?: number | null
 } {
   const lead = line.voices?.find((voice) => voice.role === 'lead') ?? line.voices?.[0]
+  const primary = primaryLyricVoice(line) ?? lead
   return {
     text: lead?.text ?? line.text,
     translation: lead?.translation?.text ?? line.translation,
     romanization: lead?.romanization?.text ?? line.romanization,
-    words: lead?.words ?? line.words
+    words: lead?.words ?? line.words,
+    time: primary?.time ?? line.time,
+    endTime: primary?.endTime
   }
 }
 
@@ -28,7 +34,7 @@ export function projectDesktopLyricsLines(lines: readonly LyricLine[]): DesktopL
     .map((line, index) => {
       const projected = lineText(line)
       const nextStart = nextTimedStarts[index]
-      const startMs = line.time == null ? null : Math.round(line.time * 1000)
+      const startMs = projected.time == null ? null : Math.round(projected.time * 1000)
       const words = projected.words?.map((word, wordIndex, source) => {
         const start = Math.round(word.time * 1000)
         const nextWord = source[wordIndex + 1]
@@ -44,7 +50,7 @@ export function projectDesktopLyricsLines(lines: readonly LyricLine[]): DesktopL
       const endMs =
         startMs == null
           ? null
-          : (explicitEnd ?? (nextStart == null ? startMs + 4000 : Math.round(nextStart * 1000)))
+          : (explicitEnd ?? (projected.endTime == null ? (nextStart == null ? startMs + 4000 : Math.round(nextStart * 1000)) : Math.round(projected.endTime * 1000)))
       return {
         id: `${index}:${startMs ?? 'plain'}`,
         startMs,

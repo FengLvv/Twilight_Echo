@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { goBack, pushBackHandler, canGoBack, backHint } = (await import(
   new URL('./useBackStack.ts', import.meta.url).href
-)) as typeof import('./useBackStack')
+)) as typeof import('./useBackStack.ts')
 
 test('stack resolves newest handler first and exposes canGoBack/backHint', () => {
   const order: string[] = []

@@ -2,7 +2,7 @@ const { existsSync, readdirSync, readFileSync } = require('node:fs')
 const { join, relative, resolve } = require('node:path')
 const { spawnSync } = require('node:child_process')
 
-const IGNORED_DIRECTORIES = new Set(['.git', '.workbuddy', 'node_modules', 'build', 'dist', 'out'])
+const IGNORED_DIRECTORIES = new Set(['.git', '.local', '.workbuddy', 'node_modules', 'build', 'dist', 'out'])
 const TEXT_EXTENSIONS = new Set([
   '.c',
   '.cc',

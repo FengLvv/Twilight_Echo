@@ -169,6 +169,17 @@ test('unmount waits for the subscribe ACK before removing the same subscription'
   assert.equal(f.calls[1].payload.subscriptionId, f.calls[0].payload.subscriptionId)
 })
 
+test('clock-only state replacement does not rebuild the island visualization tap', async t => {
+  const f = fixture(t)
+  f.mount(); await turn()
+  for (let sequence = 1; sequence <= 100; sequence++) {
+    f.state.value = { ...f.state.value, ...{ sequence, position: sequence / 5 } }
+    await turn()
+  }
+  assert.equal(f.calls.length, 1)
+  assert.equal(f.calls[0].name, 'visualization.subscribe')
+})
+
 test('a new epoch reconnects a new visualization tap without replaying old commands', async (t) => {
   const f = fixture(t)
   f.mount()

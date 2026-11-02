@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 
 const httpServerSource = readFileSync(
-  new URL('../../core/cast/httpServer.ts', import.meta.url),
+  new URL('../adapters/cast/httpServer.ts', import.meta.url),
   'utf8'
 )
 const remoteIpcSource = readFileSync(new URL('./remoteIpc.ts', import.meta.url), 'utf8')

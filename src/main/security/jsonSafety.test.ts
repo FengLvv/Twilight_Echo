@@ -8,7 +8,7 @@ const {
   tryParseJsonWithNestingLimit
 } = (await import(
   new URL('./jsonSafety.ts', import.meta.url).href
-)) as typeof import('./jsonSafety')
+)) as typeof import('./jsonSafety.ts')
 
 function deeplyNestedJson(depth: number): string {
   return `${'['.repeat(depth)}0${']'.repeat(depth)}`

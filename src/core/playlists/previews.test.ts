@@ -6,7 +6,7 @@ import { CorePlaylistPreviews, type CorePlaylistPreviewsOptions } from './previe
 import { createPlaylistReader, type PlaylistReaderPorts } from './reader.ts'
 import type { PlaylistImportDocument } from '../../shared/externalPlaylist.ts'
 import type { Playlist } from '../../shared/playlists.ts'
-import { readPlaylistImportFile } from './readFile.ts'
+import { readPlaylistImportFile } from '../../main/adapters/playlists/readFile.ts'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

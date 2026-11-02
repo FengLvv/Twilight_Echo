@@ -381,6 +381,11 @@ export interface SettingsSearchEntry {
 /** 设置项级细粒度搜索索引：每个设置项一条，保证任意设置项都能被搜到 */
 export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
+    id: 'automatic-song-analysis', section: 'playback', title: '播放时自动分析',
+    terms: '歌曲分析 自动 分轨 六轨 和弦 和声 曲谱 旋律 简谱 五线谱',
+    disclosureId: 'playback-song-analysis'
+  },
+  {
     id: 'audio-restart',
     section: 'playback',
     title: '重启音频引擎',

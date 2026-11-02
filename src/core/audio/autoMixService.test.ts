@@ -4,13 +4,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { CoreAutoMixService } from './autoMixService.ts'
+import { CoreAutoMixService } from '../../main/composition/audio/autoMixService.ts'
 import { ProviderPlaybackIdentityRegistry } from './providerPlaybackIdentity.ts'
 import type {
   TwilightAutoMixCoordinator,
   TwilightAutoMixContext
-} from './twilightAutoMixCoordinator.ts'
-import { STEM_MODEL_VERSION, STEM_CHECKPOINT_SHA256 } from './autoMixStemService.ts'
+} from './twilightAutoMixCoordinatorContract.ts'
+import { STEM_MODEL_VERSION, STEM_CHECKPOINT_SHA256 } from '../../main/adapters/audio/autoMixStemService.ts'
 import {
   TWILIGHT_AUTOMIX_MODEL_VERSION,
   type AutoMixAnalysisResult,

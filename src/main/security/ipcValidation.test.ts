@@ -35,7 +35,7 @@ const {
   stringifyJsonForIpcStorage
 } = (await import(
   new URL('./ipcValidation.ts', import.meta.url).href
-)) as typeof import('./ipcValidation')
+)) as typeof import('./ipcValidation.ts')
 
 test('accepts native Windows drive paths while still rejecting URL schemes', () => {
   // Electron dialogs and realpath() hand back backslash separators on Windows. Rejecting them
@@ -145,7 +145,7 @@ test('data IPC applies path and storage limits before touching local files', () 
     'utf8'
   )
   const versionedStoreSource = readFileSync(
-    new URL('../../core/persistence/versionedDataStore.ts', import.meta.url),
+    new URL('../adapters/persistence/versionedDataStore.ts', import.meta.url),
     'utf8'
   )
 

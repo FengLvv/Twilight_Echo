@@ -1,5 +1,5 @@
 import type { IpcMain } from 'electron'
-import { readPlaylistImportFile } from '../../core/playlists/readFile.ts'
+import { readPlaylistImportFile } from '../adapters/playlists/readFile.ts'
 import { choosePlaylistImportFile } from '../library/playlistImportDialog.ts'
 import { assertTrustedIpcSender } from '../security/electronSecurity.ts'
 import { IPC } from '../../shared/ipcChannels.ts'

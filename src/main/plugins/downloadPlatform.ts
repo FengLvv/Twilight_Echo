@@ -1,5 +1,5 @@
 import { createRemoteMediaRequestHandler } from '../security/remoteMediaGrants.ts'
-import type { FetchDownloadCover } from '../../core/downloads/downloadMetadata.ts'
+import type { FetchDownloadCover } from '../../core/downloads/downloadMetadataPort.ts'
 
 /** Resolve only an already-granted image handle through the existing media policy. */
 export const fetchDownloadCover: FetchDownloadCover = async (handle, signal) => {

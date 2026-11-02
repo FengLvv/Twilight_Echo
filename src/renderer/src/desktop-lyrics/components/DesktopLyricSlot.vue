@@ -9,6 +9,7 @@ import {
 } from '../../../../shared/desktopLyrics.ts'
 import { buildDesktopLyricsKaraokePlan, desktopLyricsKaraokeTime } from '../desktopLyricsKaraoke.ts'
 import LyricRhythmicScore from '../../components/LyricRhythmicScore.vue'
+import { provideNotationTypography } from '../../composables/useNotationTypography.ts'
 import LyricChords from '../../components/LyricChords.vue'
 import { romanChord } from '../../../../shared/lyrics/chordDegrees.ts'
 import type { DesktopLyricsAnalysis } from '../../../../shared/desktopLyrics.ts'
@@ -29,6 +30,8 @@ const props = defineProps<{
 const shell = ref<HTMLElement | null>(null)
 const content = ref<HTMLElement | null>(null)
 const scale = ref(1)
+const notationPixels = provideNotationTypography()
+const translationTextStyle = computed(() => notationPixels.value ? { fontSize: `${notationPixels.value}px` } : undefined)
 const clipped = ref(false)
 const score = ref<InstanceType<typeof LyricRhythmicScore>>()
 const audioPosition = ref(0)
@@ -278,6 +281,7 @@ defineExpose({ syncKaraoke, syncAnnotations, fit })
           :svg="line.score.svg"
           :text="line.text"
           :notes="line.score.notes"
+          :octave-shift="line.score.octaveShift"
           :position="audioPosition"
           :tonal-key="analysis?.key ?? null"
           :notation-mode="analysis?.display.notationMode"
@@ -298,7 +302,7 @@ defineExpose({ syncKaraoke, syncAnnotations, fit })
         </template>
         <span v-else>{{ line.text }}</span>
       </div>
-      <div v-if="translationVisible && line.translation" class="dl-translation">
+      <div v-if="translationVisible && line.translation" class="dl-translation" :style="translationTextStyle">
         {{ line.translation }}
       </div>
       <div v-if="romanizationVisible && line.romanization" class="dl-romanization">

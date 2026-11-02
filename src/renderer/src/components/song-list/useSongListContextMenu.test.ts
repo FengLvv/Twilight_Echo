@@ -6,7 +6,7 @@ import { disposeCoreConnection, useCoreConnection } from '../../stores/coreConne
 
 const { useSongListContextMenu } = (await import(
   new URL('./useSongListContextMenu.ts', import.meta.url).href
-)) as typeof import('./useSongListContextMenu')
+)) as typeof import('./useSongListContextMenu.ts')
 
 const providerTrack = {
   id: 'ncm:expired',

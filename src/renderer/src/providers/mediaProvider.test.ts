@@ -6,11 +6,11 @@ import { reactive } from 'vue'
 const { MediaProviderRegistry, getProviderLocalId, getTrackProviderId, toProviderIpcArgs } =
   (await import(
     new URL('./mediaProvider.ts', import.meta.url).href
-  )) as typeof import('./mediaProvider')
+  )) as typeof import('./mediaProvider.ts')
 
 const { getNcmSongId } = (await import(
   new URL('./ncmTrack.ts', import.meta.url).href
-)) as typeof import('./ncmTrack')
+)) as typeof import('./ncmTrack.ts')
 
 test('extracts provider prefixes from source or track id', () => {
   assert.equal(getTrackProviderId({ id: 'bili:BV1xx', source: undefined }), 'bili')

@@ -10,6 +10,7 @@ import type {
   LyricWord,
   LyricVoiceMetadata,
   LyricVoiceLayer,
+  LyricOrigin,
   BuildLyricLinesOptions
 } from './lyricTypes.ts'
 import { splitEmbeddedLyricLayers } from './embeddedLyricLayers.ts'
@@ -149,6 +150,7 @@ function groupTimedLyricLines(lines: readonly ParsedTimedLyricLine[]): Array<{
   text: string
   words?: LyricWord[]
   voices?: LyricVoiceLayer[]
+  origin?: LyricOrigin
 }> {
   const result: Array<{
     rowKey?: string
@@ -156,12 +158,13 @@ function groupTimedLyricLines(lines: readonly ParsedTimedLyricLine[]): Array<{
     text: string
     words?: LyricWord[]
     voices?: LyricVoiceLayer[]
+    origin?: LyricOrigin
   }> = []
   const groups = new Map<string, (typeof result)[number]>()
 
   lines.forEach((line, sourceIndex) => {
     if (!line.voice) {
-      result.push({ time: line.time, text: line.text, words: line.words })
+      result.push({ time: line.time, text: line.text, words: line.words, ...(line.origin ? { origin: line.origin } : {}) })
       return
     }
 
@@ -243,7 +246,8 @@ export function buildLyricLines(
       timed: true,
       words: line.words,
       ...(line.rowKey ? { rowKey: line.rowKey } : {}),
-      ...(line.voices ? { voices: line.voices } : {})
+      ...(line.voices ? { voices: line.voices } : {}),
+      ...(line.origin ? { origin: line.origin } : {})
     }))
   }
 

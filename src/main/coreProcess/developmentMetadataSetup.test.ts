@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { CoreSettingsRepository } from '../../core/persistence/settingsRepository.ts'
+import { CoreSettingsRepository } from '../composition/persistence/settingsRepository.ts'
 import { applyDevelopmentMetadataSetup } from './developmentMetadataSetup.ts'
 
 function fixture(t: test.TestContext) {

@@ -1,4 +1,3 @@
-import '../../adapters-node/index.ts'
 import { readFile } from 'node:fs/promises'
 import { parseFile } from 'music-metadata'
 import {

@@ -40,7 +40,7 @@ const {
   resolveQueueIndexForSource
 } = (await import(
   new URL('./audioEngineHelpers.ts', import.meta.url).href
-)) as typeof import('./audioEngineHelpers')
+)) as typeof import('./audioEngineHelpers.ts')
 
 function deeplyNestedJson(depth: number): string {
   return `${'['.repeat(depth)}0${']'.repeat(depth)}`

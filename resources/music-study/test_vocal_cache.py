@@ -1,10 +1,17 @@
 import copy
 import unittest
+from unittest.mock import patch
 from vocal_cache import group_key, reuse_group, score_key, reuse_score
 from vocal_pipeline import lyric_groups
 
 
 class VocalReuseTests(unittest.TestCase):
+    def test_child_receives_algorithm_provenance_with_reusable_notes_but_not_svg(self):
+        from vocal_melody import recognize, ALGORITHM
+        prior=dict(algorithm=ALGORITHM,notes=[dict(midi=60)],reuse=dict(parent='parent'),scores=['large-svg'])
+        with patch('vocal_melody.invoke',return_value={}) as invoke:
+            recognize(model_pack='models',progress=lambda *args:None,lyrics='lyrics',directory='audio',previous=prior,parent='parent')
+        self.assertEqual(invoke.call_args.kwargs['payload']['previous'],{k:v for k,v in prior.items() if k!='scores'})
     def test_text_retime_and_context_boundary_invalidate_only_matching_context(self):
         lines=[dict(id=i,start=i*15,end=i*15+10,text=f'line {i}') for i in range(6)]
         before=[group_key(group,'en') for group in lyric_groups(lines)]

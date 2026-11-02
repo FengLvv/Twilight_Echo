@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/audio/twilightAutoMixCoordinator.ts'
+export * from '../composition/audio/twilightAutoMixCoordinator.ts'

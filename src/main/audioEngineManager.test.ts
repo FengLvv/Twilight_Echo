@@ -110,7 +110,7 @@ const {
   mapSpectrumToVisualizerBars,
   normalizeAudioProcessingSettings
 } = (await import(
-  new URL('./audioEngineManager.ts', import.meta.url).href
+  new URL('./audioEngineManager', import.meta.url).href
 )) as typeof import('./audioEngineManager')
 
 const DEVICE_OPTIONS: AudioDeviceOption[] = [
@@ -1746,7 +1746,7 @@ test('gapless runtime fields and HiFi Active/Preload/Blocked wiring stay present
     )
   )
   const managerSource = await import('node:fs').then((fs) =>
-    fs.readFileSync(new URL('./audioEngineManager.ts', import.meta.url), 'utf8')
+    fs.readFileSync(new URL('./audioEngineManager', import.meta.url), 'utf8')
   )
   const playbackControllerSource = await import('node:fs').then((fs) =>
     fs.readFileSync(new URL('./audio/playbackController.ts', import.meta.url), 'utf8')
@@ -1823,7 +1823,7 @@ test('setStereoImage patches default scene balance/phase and preserves it across
     fs.readFileSync(new URL('../renderer/src/components/PlayerBar.vue', import.meta.url), 'utf8')
   )
   const managerSource = await import('node:fs').then((fs) =>
-    fs.readFileSync(new URL('./audioEngineManager.ts', import.meta.url), 'utf8')
+    fs.readFileSync(new URL('./audioEngineManager', import.meta.url), 'utf8')
   )
   assert.match(managerSource, /async setStereoImage\(/)
   assert.match(hifiSource, /Balance \/ Phase/)
@@ -1883,7 +1883,7 @@ test('setOutputStage patches default scene graph.outputStage and preserves it ac
     fs.readFileSync(new URL('../renderer/src/components/PlayerBar.vue', import.meta.url), 'utf8')
   )
   const managerSource = await import('node:fs').then((fs) =>
-    fs.readFileSync(new URL('./audioEngineManager.ts', import.meta.url), 'utf8')
+    fs.readFileSync(new URL('./audioEngineManager', import.meta.url), 'utf8')
   )
   assert.match(managerSource, /async setOutputStage\(/)
   assert.match(hifiSource, /DSP_OUTPUT_SAMPLE_RATE_OPTIONS/)
@@ -9246,6 +9246,66 @@ test('setPlaybackRate clamps, fans out to native, and marks non-unity rate imper
   manager.destroy()
 })
 
+test('source handoff publishes the native clock instead of rewinding to the old request position', async t => {
+  const binding = new FakeNativeBinding()
+  const manager = makeManager({ exclusiveMode: false }, binding)
+  t.after(() => manager.destroy())
+  const play = binding.Play
+  binding.Play = (source, position = 0) => {
+    play(source, position)
+    binding.playbackInfo.position = position + 1.4
+  }
+  await manager.play('C:/study/mix.temix', 42)
+  assert.equal(Reflect.get(manager, 'playbackInfo').position, 43.4)
+})
+
+test('study handoff can request a fresh service clock instead of the cached synchronous position', async t => {
+  const service = new FakeAudioServiceBinding()
+  const manager = makeManager({ exclusiveMode: false }, service)
+  t.after(() => manager.destroy())
+  await manager.play('C:/study/mix.temix', 42)
+  const cached = service.GetPlaybackInfo()
+  service.GetPlaybackInfo = () => cached
+  const call = service.callAsync.bind(service)
+  let reads = 0
+  service.callAsync = async (method, args) => {
+    if (method !== 'GetPlaybackInfo') return call(method, args)
+    reads++
+    return JSON.stringify({ ...JSON.parse(cached), source: 'C:/study/mix.temix', state: 'playing', position: 43.4 })
+  }
+  const current = await manager.getPlaybackInfo(true)
+  assert.equal(reads, 1)
+  assert.equal(current.position, 43.4)
+})
+
+test('study toggles explicitly follow the native clock, independently of request age', async t => {
+  const service = new FakeAudioServiceBinding()
+  const manager = makeManager({ exclusiveMode: false }, service)
+  t.after(() => manager.destroy())
+  const call = service.callAsync.bind(service)
+  const starts: unknown[][] = []
+  service.callAsync = async (method, args) => {
+    if (method === 'Play') starts.push(args)
+    return call(method, args)
+  }
+  await manager.play('C:/study/mix.temix', 12, undefined, false, true)
+  await manager.play('C:/study/original.flac', 12, undefined, true, true)
+  assert.deepEqual(starts, [['C:/study/mix.temix', 12, false, true], ['C:/study/original.flac', 12, true, true]])
+})
+
+test('slow study preparation cannot restore a stale request position beyond the ordinary seek tolerance', async t => {
+  const binding = new FakeNativeBinding()
+  const manager = makeManager({ exclusiveMode: false }, binding)
+  t.after(() => manager.destroy())
+  const play = binding.Play
+  binding.Play = (source, position = 0) => {
+    play(source, position)
+    binding.playbackInfo.position = position + 12
+  }
+  await manager.play('C:/study/mix.temix', 20, undefined, false, true)
+  assert.equal(Reflect.get(manager, 'playbackInfo').position, 32)
+})
+
 test('play preserves non-unity playbackRate and reasserts SetPlaybackRate on native', async () => {
   const nativeBinding = new FakeNativeBinding({
     state: 'stopped',
@@ -9414,7 +9474,7 @@ test('getPlaybackInfo refresh never lets a native unity report clobber the saved
 })
 
 test('loudnorm status event, library RG queue fields, and cancel IPC are wired end-to-end', () => {
-  const managerSource = readFileSync(new URL('./audioEngineManager.ts', import.meta.url), 'utf8')
+  const managerSource = readFileSync(new URL('./audioEngineManager', import.meta.url), 'utf8')
   const engineIpcSource = readFileSync(new URL('./audio/engineIpc.ts', import.meta.url), 'utf8')
   const loudnessIpcSource = readFileSync(new URL('./audio/loudnessIpc.ts', import.meta.url), 'utf8')
   const queuePrepSource = readFileSync(

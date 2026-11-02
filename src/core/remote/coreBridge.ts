@@ -19,7 +19,7 @@ import {
   type RemoteProviderSession
 } from '../../shared/remoteCoreBridge.ts'
 import type { CorePlaybackSession } from '../playback/session.ts'
-import type { RemoteMediaResolver } from './media.ts'
+import type { RemoteMediaResolver } from './mediaPort.ts'
 
 interface CoreRequest {
   <K extends keyof CoreQueries>(

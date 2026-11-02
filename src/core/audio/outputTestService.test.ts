@@ -3,10 +3,10 @@ import { access, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { CoreOutputTestService } from './outputTestService.ts'
+import { CoreOutputTestService } from '../../main/composition/audio/outputTestService.ts'
 import { CoreAudioOutputService, type CoreOutputEngine } from './outputService.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
-import type { OutputTestContext } from './outputTest.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
+import type { OutputTestContext } from './outputTestPort.ts'
 import { isCoreRequest } from '../../shared/coreProtocol.ts'
 
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve))

@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/network/profileStore.ts'
+export * from '../adapters/network/profileStore.ts'

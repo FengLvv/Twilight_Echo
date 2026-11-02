@@ -27,7 +27,7 @@ export const corePlugins = {
   openLog: (id: string) => useCoreConnection().command('plugins.showLog', { id }),
   onChanged: (listener: () => void) => {
     const core = useCoreConnection()
-    return watch(() => [core.state.value?.epoch, core.state.value?.pluginsRevision], listener)
+    return watch([() => core.state.value?.epoch, () => core.state.value?.pluginsRevision], listener)
   }
 }
 

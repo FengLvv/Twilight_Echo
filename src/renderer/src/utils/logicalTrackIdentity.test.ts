@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { getLogicalTrackKey, normalizeLogicalTrackText } = (await import(
   new URL('./logicalTrackIdentity.ts', import.meta.url).href
-)) as typeof import('./logicalTrackIdentity')
+)) as typeof import('./logicalTrackIdentity.ts')
 
 test('getLogicalTrackKey normalizes title and artist for cross-source identity', () => {
   assert.equal(

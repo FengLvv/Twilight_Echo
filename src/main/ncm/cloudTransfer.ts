@@ -4,7 +4,7 @@ import { runtime } from '../core/runtime.ts'
 import { assertTrustedIpcSender } from '../security/electronSecurity.ts'
 import { normalizeIpcString } from '../security/ipcValidation.ts'
 import { normalizeCloudSongId } from './cloudTransferHelpers.ts'
-import { CoreNcmCloudTransferService } from '../../core/ncm/cloudTransferService.ts'
+import { CoreNcmCloudTransferService } from '../adapters/ncm/cloudTransferService.ts'
 import { chooseNcmCloudDownloadFile, chooseNcmCloudUploadFiles } from './cloudTransferPlatform.ts'
 import { NCM_CLOUD_TRANSFER_PROGRESS_CHANNEL } from '../../shared/ncmCloud.ts'
 

@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/downloads/taglib.ts'
+export * from '../adapters/downloads/taglib.ts'

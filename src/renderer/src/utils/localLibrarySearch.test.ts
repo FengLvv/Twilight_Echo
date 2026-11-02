@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { filterLocalGridItems } = (await import(
   new URL('./localLibrarySearch.ts', import.meta.url).href
-)) as typeof import('./localLibrarySearch')
+)) as typeof import('./localLibrarySearch.ts')
 
 test('filters local grid items by card metadata and nested tracks', () => {
   const items = [

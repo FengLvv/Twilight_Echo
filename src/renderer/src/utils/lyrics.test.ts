@@ -13,7 +13,7 @@ const {
   rewriteLyricVoiceDraftRows,
   serializeLyricVoiceTag,
   stripValidLyricVoiceTags
-} = (await import(new URL('./lyrics.ts', import.meta.url).href)) as typeof import('./lyrics')
+} = (await import(new URL('./lyrics.ts', import.meta.url).href)) as typeof import('./lyrics.ts')
 
 test('parseTimedLrc parses timestamped LRC lines', () => {
   assert.deepEqual(parseTimedLrc('[00:01.20]First line\n[00:03.50][00:04.00]Repeat'), [
@@ -97,7 +97,7 @@ test('findActiveLyricIndex handles large lyric files quickly', () => {
 test('parseTimedLrc keeps Enhanced LRC word timings', async () => {
   const { findActiveWordIndex } = (await import(
     new URL('./lyrics.ts', import.meta.url).href
-  )) as typeof import('./lyrics')
+  )) as typeof import('./lyrics.ts')
   const lines = parseTimedLrc('[00:10.00]<00:10.00>Hel<00:10.40>lo <00:10.80>world')
   assert.equal(lines.length, 1)
   assert.equal(lines[0]?.text, 'Hello world')

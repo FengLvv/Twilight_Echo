@@ -4,7 +4,7 @@ import test from 'node:test'
 const { clearCoverCache, clearRemoteCoverGrantCache, readCachedCover, resolveCover } =
   (await import(
     new URL('./coverLoader.ts', import.meta.url).href
-  )) as typeof import('./coverLoader')
+  )) as typeof import('./coverLoader.ts')
 
 test('cached artwork is available synchronously with the same source priority and invalidation', async () => {
   const record = globalThis as Record<string, unknown>
@@ -359,7 +359,7 @@ test('useCover clears previous art when handle is not immediately displayable', 
   clearCoverCache()
   const { useCover } = (await import(
     new URL('./coverLoader.ts', import.meta.url).href
-  )) as typeof import('./coverLoader')
+  )) as typeof import('./coverLoader.ts')
   const { ref, nextTick } = await import('vue')
 
   const grants: string[] = []

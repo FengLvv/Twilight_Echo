@@ -401,8 +401,8 @@ napi_value readJson(napi_env env, TAE_Result (*fn)(TAE_EngineHandle, char*, size
 napi_value Play(napi_env env, napi_callback_info info) {
   ensureEngine();
   clearLastError();
-  size_t argc = 3;
-  napi_value argv[3];
+  size_t argc = 4;
+  napi_value argv[4];
   napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
   if (argc < 1) {
     napi_throw_type_error(env, nullptr, "播放需要音频地址");
@@ -410,7 +410,8 @@ napi_value Play(napi_env env, napi_callback_info info) {
   }
   const std::string source = getStringArg(env, argv[0]);
   const double start = argc > 1 ? getNumberArg(env, argv[1], 0.0) : 0.0;
-  return throwOnError(env, TAE_PlayWithState(g_engine, source.c_str(), start,argc>2&&getBoolArg(env,argv[2],false)));
+  return throwOnError(env, TAE_PlayWithState(g_engine, source.c_str(), start,
+      argc>2&&getBoolArg(env,argv[2],false),argc>3&&getBoolArg(env,argv[3],false)));
 }
 
 napi_value Pause(napi_env env, napi_callback_info) {

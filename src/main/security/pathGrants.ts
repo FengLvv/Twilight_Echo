@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/persistence/pathGrants.ts'
+export * from '../adapters/persistence/pathGrants.ts'

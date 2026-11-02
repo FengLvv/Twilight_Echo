@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/library/tagWriteService.ts'
+export * from '../adapters/library/tagWriteService.ts'

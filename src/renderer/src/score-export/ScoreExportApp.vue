@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import LyricRhythmicScore from '../components/LyricRhythmicScore.vue'
 import { keyName } from '../../../shared/lyrics/chordDegrees.ts'
 import type { AgentScoreExportData } from '../../../shared/agentScoreExport.ts'
+import { numberedOctaveShift } from '../../../shared/lyrics/numberedNotation.ts'
 
 const data = ref<AgentScoreExportData>()
+const octaveShift = computed(() => numberedOctaveShift(data.value?.rows.flatMap(row => row.notes) ?? [], data.value?.key ?? null))
 const frame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 onMounted(async () => {
   try {
@@ -51,7 +53,7 @@ onMounted(async () => {
     <h1>{{ data.title }}</h1>
     <p>{{ data.notation === 'staff' ? '五线谱' : '简谱' }} · {{ data.key ? keyName(data.key) : '调性未确定' }}</p>
     <section v-for="row in data.rows" :key="row.lineId" :data-line-id="row.lineId" class="score-export-row">
-      <LyricRhythmicScore :svg="row.svg" :text="row.text" :notes="row.notes" :tonal-key="data.key" :notation-mode="data.notation" :position="-1" eager />
+      <LyricRhythmicScore :svg="row.svg" :text="row.text" :notes="row.notes" :octave-shift="octaveShift" :tonal-key="data.key" :notation-mode="data.notation" :position="-1" eager />
     </section>
   </main>
 </template>

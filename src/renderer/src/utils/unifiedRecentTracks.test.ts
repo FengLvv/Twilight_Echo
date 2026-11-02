@@ -25,7 +25,7 @@ const {
   resolveUnifiedRecentTracks
 } = (await import(
   new URL('./unifiedRecentTracks.ts', import.meta.url).href
-)) as typeof import('./unifiedRecentTracks')
+)) as typeof import('./unifiedRecentTracks.ts')
 const {
   notifyLocalTracksUnavailable,
   onLocalTracksUnavailable,

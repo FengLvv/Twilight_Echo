@@ -240,6 +240,7 @@ export interface CoreSnapshot {
   entityMetadataRevision?: number | null
   /** Identities, candidates and saved metadata; excludes task-only progress. */
   entityMetadataContentRevision?: number | null
+  metadataEnrichmentRevision?: number | null
   pluginsRevision: number | null
   isStreamBuffering: boolean
   loading: boolean
@@ -781,11 +782,14 @@ const OPERATIONS: Record<
   'study.submit': { kind: 'command', permission: 'library:write' },
   'study.state': { kind: 'query', permission: 'playback:read' },
   'study.cache': { kind: 'query', permission: 'playback:read' },
+  'study.automation': { kind: 'query', permission: 'playback:read' },
+  'study.setAutomation': { kind: 'command', permission: 'library:write' },
   'study.runtime': { kind: 'query', permission: 'playback:read' },
   'study.setCachePolicy': { kind: 'command', permission: 'library:write' },
   'study.clearAudioCache': { kind: 'command', permission: 'library:write' },
   'study.exportSources': { kind: 'command', permission: 'library:read' },
   'study.song': { kind: 'query', permission: 'playback:read' },
+  'study.songSummary': { kind: 'query', permission: 'playback:read' },
   'study.lyricsDisplay': { kind: 'query', permission: 'playback:read' },
   'study.setLyricsDisplay': { kind: 'command', permission: 'library:write' },
   'study.analyze': { kind: 'command', permission: 'library:write' },

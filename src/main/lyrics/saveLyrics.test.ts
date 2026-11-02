@@ -6,7 +6,7 @@ import test from 'node:test'
 
 const { saveLyricsFromDialog, writeLyricsAtomically } = (await import(
   new URL('./saveLyrics.ts', import.meta.url).href
-)) as typeof import('./saveLyrics')
+)) as typeof import('./saveLyrics.ts')
 
 test('LRC save is canceled without creating a file', async () => {
   assert.equal(

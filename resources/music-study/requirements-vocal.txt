@@ -11,6 +11,8 @@ fugashi==1.5.2
 unidic-lite==1.0.8
 pypinyin==0.55.0
 g2pflow==0.3.1
+inflect==7.6.0
+tokenizers==0.20.3
 beat-this==1.1.0
 music21==10.5.2
 jianpu-ly==1.891

@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { parseM3uPlaylist, parsePlsPlaylist, parseRadioPlaylist } = (await import(
   new URL('./playlistImport.ts', import.meta.url).href
-)) as typeof import('./playlistImport')
+)) as typeof import('./playlistImport.ts')
 
 test('parses M3U playlist with EXTINF titles', () => {
   const text = `#EXTM3U

@@ -1,1 +1,1 @@
-export * from '../../../src/core/comments/store.mjs'
+export * from '../../../src/main/adapters/comments/store.mjs'

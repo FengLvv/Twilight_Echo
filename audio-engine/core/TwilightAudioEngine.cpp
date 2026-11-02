@@ -795,7 +795,7 @@ void TwilightAudioEngine::setInputFactory(std::shared_ptr<const SeekableInputFac
   pipeline_->setInputFactory(std::move(factory));
 }
 
-TAE_Result TwilightAudioEngine::play(const std::string& source, double startTimeSeconds, bool initiallyPaused) {
+TAE_Result TwilightAudioEngine::play(const std::string& source, double startTimeSeconds, bool initiallyPaused, bool followPlaybackClock) {
   std::lock_guard transportLock(transportMutex_);
   const ClockWake wake(*this);
   if (source.empty()) return TAE_RESULT_INVALID_ARGUMENT;
@@ -851,7 +851,7 @@ TAE_Result TwilightAudioEngine::play(const std::string& source, double startTime
 
   std::string error;
   const TAE_Result result =
-      pipeline_ ? pipeline_->play(item, upcoming, startTimeSeconds, backend, device, volume, dspConfigJson, gaplessEnabled, &error, initiallyPaused)
+      pipeline_ ? pipeline_->play(item, upcoming, startTimeSeconds, backend, device, volume, dspConfigJson, gaplessEnabled, &error, initiallyPaused, followPlaybackClock)
                 : TAE_RESULT_NOT_INITIALIZED;
   if (result != TAE_RESULT_OK) {
     {
@@ -3170,9 +3170,9 @@ TAE_Result TAE_Play(TAE_EngineHandle engine, const char* source, double start_ti
   return fromHandle(engine)->play(source, start_time_seconds);
 }
 
-TAE_Result TAE_PlayWithState(TAE_EngineHandle engine, const char* source, double start_time_seconds, int initially_paused) {
+TAE_Result TAE_PlayWithState(TAE_EngineHandle engine, const char* source, double start_time_seconds, int initially_paused, int follow_playback_clock) {
   if(!engine||!source)return TAE_RESULT_INVALID_ARGUMENT;
-  return fromHandle(engine)->play(source,start_time_seconds,initially_paused!=0);
+  return fromHandle(engine)->play(source,start_time_seconds,initially_paused!=0,follow_playback_clock!=0);
 }
 
 TAE_Result TAE_Load(TAE_EngineHandle engine, const char* source, double start_time_seconds) {

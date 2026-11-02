@@ -417,7 +417,7 @@ export interface ProviderDownloadTaskSnapshot {
 }
 
 export type TwilightProviderStreamingSection =
-  import('../shared/providerHome').ProviderStreamingSection
+  import('../shared/providerHome.ts').ProviderStreamingSection
 
 export interface TwilightProviderUiMetadata {
   icon: string
@@ -438,8 +438,8 @@ export interface TwilightProviderUiMetadata {
     icon: string
     method: string
   }>
-  streamingHome?: import('../shared/providerHome').ProviderHomePresentation
-  streamingDiscovery?: import('../shared/providerHome').ProviderDiscoveryPresentation
+  streamingHome?: import('../shared/providerHome.ts').ProviderHomePresentation
+  streamingDiscovery?: import('../shared/providerHome.ts').ProviderDiscoveryPresentation
   streamingSections?: TwilightProviderStreamingSection[]
   streamingLibraryTab?: boolean
   streamingSearch?: boolean
@@ -618,9 +618,9 @@ export interface TwilightThemeContribution {
   compatibilityNotes?: string[]
 }
 
-export type ThemeWorkshopApi = import('../shared/themeWorkshop').ThemeWorkshopApi
+export type ThemeWorkshopApi = import('../shared/themeWorkshop.ts').ThemeWorkshopApi
 export type WorkshopDiagnosticReport =
-  import('../shared/themeWorkshopDiagnostics').WorkshopDiagnosticReport
+  import('../shared/themeWorkshopDiagnostics.ts').WorkshopDiagnosticReport
 
 export interface TwilightPluginExtensionContribution {
   pluginId: string

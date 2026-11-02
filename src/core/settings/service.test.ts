@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, rmSync, readFileSync, renameSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import { CoreSettingsRepository } from '../../main/composition/persistence/settingsRepository.ts'
 import { CoreSettingsService, type CoreSettingsServiceOptions } from './service.ts'
 import type { CoreSettingsPatch } from '../../shared/coreSettings.ts'
 

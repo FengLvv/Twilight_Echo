@@ -11,7 +11,7 @@ import test from 'node:test'
 // Dynamic import of the pure-logic search module (no Vue/window dependencies).
 const { filterLocalGridItems } = (await import(
   new URL('../utils/localLibrarySearch.ts', import.meta.url).href
-)) as typeof import('../utils/localLibrarySearch')
+)) as typeof import('../utils/localLibrarySearch.ts')
 
 // Mock data generators are exported for reuse by performance fixtures.
 export interface MockTrack {

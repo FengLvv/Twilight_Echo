@@ -8,6 +8,7 @@ const IDEMPOTENT_PROVIDER_WRITE_METHODS = new Set<TwilightMediaProviderMethod>([
   'followUser',
   'createPlaylist',
   'deletePlaylist',
+  'subscribePlaylist',
   'addTracksToPlaylist',
   'removeTracksFromPlaylist',
   'completeCloudUpload',

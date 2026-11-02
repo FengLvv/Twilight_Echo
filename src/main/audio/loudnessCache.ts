@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/audio/loudnessCache.ts'
+export * from '../adapters/audio/loudnessCache.ts'

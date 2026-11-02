@@ -247,15 +247,29 @@ export function createCoreMusicStore(core: Client) {
   const enrichment = shallowRef<
     import('../../../../shared/coreMetadata.ts').LibraryMetadataEnrichmentStatus | null
   >(null)
-  const off = core.subscribe((message) => {
-    if (message.kind === 'state')
-      void core
-        .query('metadata.status', {})
-        .then((s) => {
-          enrichment.value = s
-        })
-        .catch(() => {})
-  })
+  let enrichmentRead: Promise<void> | null = null
+  let enrichmentAbort: AbortController | null = null
+  let disposed = false
+  const enrichmentKey = () => !disposed && core.state.value?.phase === 'ready'
+    ? `${core.state.value.epoch}:${core.state.value.metadataEnrichmentRevision}` : ''
+  function refreshEnrichment() {
+    return enrichmentRead ??= (async () => {
+      let requested: string
+      do {
+        requested = enrichmentKey()
+        if (!requested) return
+        enrichmentAbort = new AbortController()
+        try {
+          const status = await core.query('metadata.status', {}, enrichmentAbort.signal)
+          if (requested === enrichmentKey()) enrichment.value = status
+        } catch { /* Domain changes retry; obsolete or cancelled reads stay invisible. */ }
+      } while (enrichmentKey() && requested !== enrichmentKey())
+    })().finally(() => { enrichmentRead = null })
+  }
+  const off = watch(enrichmentKey, key => {
+    if (key) void refreshEnrichment()
+    else { enrichmentAbort?.abort(); enrichment.value = null }
+  }, { immediate: true })
   async function selectTracks(tracks: readonly Track[]): Promise<LibrarySelectionSnapshot> {
     const ids = tracks.map((t) => t.id),
       page = await core.query('library.tracks', { ids, limit: 200 })
@@ -489,6 +503,8 @@ export function createCoreMusicStore(core: Client) {
     writeTrackTags: (selectionId: string, patch: CoreTagPatch) =>
       core.command('library.tags.write', { selectionId, patch }),
     dispose() {
+      disposed = true
+      enrichmentAbort?.abort()
       generation++
       stop()
       off()

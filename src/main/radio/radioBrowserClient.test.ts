@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { searchRadioBrowserStations } = (await import(
   new URL('./radioBrowserClient.ts', import.meta.url).href
-)) as typeof import('./radioBrowserClient')
+)) as typeof import('./radioBrowserClient.ts')
 
 test('searchRadioBrowserStations maps directory rows and skips broken urls', async () => {
   const rows = [

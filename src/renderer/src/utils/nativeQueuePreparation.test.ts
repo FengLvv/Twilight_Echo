@@ -5,7 +5,7 @@ import { preparedNativePlayMode, type PrepareNativeQueueOptions } from './native
 
 const { prepareNativeQueue } = (await import(
   new URL('./nativeQueuePreparation.ts', import.meta.url).href
-)) as typeof import('./nativeQueuePreparation')
+)) as typeof import('./nativeQueuePreparation.ts')
 
 function createTrack(overrides: Partial<Track> = {}): Track {
   return {

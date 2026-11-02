@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/audio/fileAnalysisManager.ts'
+export * from '../adapters/audio/fileAnalysisManager.ts'

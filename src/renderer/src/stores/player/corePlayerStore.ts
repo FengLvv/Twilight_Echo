@@ -124,7 +124,7 @@ export function createCorePlayerStore(
     const themeCoverIdentity = computed(
       () => `${currentTrack.value?.id ?? ''}:${themeCoverUrl.value}`
     )
-    watch(() => [currentTrack.value?.cover, currentTrack.value?.coverSource] as const, async ([handle, source], _old, cleanup) => {
+    watch([() => currentTrack.value?.cover, () => currentTrack.value?.coverSource], async ([handle, source], _old, cleanup) => {
       let active = true
       cleanup(() => {
         active = false

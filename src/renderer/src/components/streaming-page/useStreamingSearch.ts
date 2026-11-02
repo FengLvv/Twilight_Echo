@@ -37,6 +37,7 @@ export interface SearchSourceOption {
 }
 
 type UseStreamingSearchOptions = {
+  initialSource?: SearchSource
   searchAlbums?: (
     keywords: string,
     limit?: number,
@@ -133,6 +134,7 @@ interface SearchRequestSnapshot {
 }
 
 export function useStreamingSearch({
+  initialSource = 'all',
   searchAlbums,
   searchLocalAlbums,
   searchProviderAlbums,
@@ -172,7 +174,7 @@ export function useStreamingSearch({
 } {
   const searchQuery = ref('')
   const searchType = ref<SearchType>('songs')
-  const searchSource = ref<SearchSource>('all')
+  const searchSource = ref<SearchSource>(initialSource)
   const searchResults = shallowRef<Track[]>([])
   const searchAlbumsResults = shallowRef<AlbumSearchItem[]>([])
   const searchPlaylistsResults = shallowRef<MediaProviderPlaylistSummary[]>([])

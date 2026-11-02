@@ -1,2 +1,1 @@
-import '../../../adapters-node/index.ts'
-export * from '../../../core/network/adapters/webdavAdapter.ts'
+export * from '../../adapters/network/adapters/webdavAdapter.ts'

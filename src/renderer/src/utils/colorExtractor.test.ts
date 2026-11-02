@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm'
 
 const { clearDominantColorCache, extractDominantColor, extractAverageColor } = (await import(
   new URL('./colorExtractor.ts', import.meta.url).href
-)) as typeof import('./colorExtractor')
+)) as typeof import('./colorExtractor.ts')
 
 const globalRecord = {
   get Image(): unknown {

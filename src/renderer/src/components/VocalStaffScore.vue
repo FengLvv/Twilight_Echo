@@ -110,12 +110,20 @@ defineExpose({ syncPosition: highlight })
   font-family: var(--lyric-score-font-family, var(--te-font-sans));
   font-weight: 500;
   -webkit-text-stroke: 0;
+  paint-order: stroke fill;
+  stroke: var(--lyric-annotation-outline-color, transparent);
+  stroke-width: var(--lyric-annotation-outline-width, 0px);
+  vector-effect: non-scaling-stroke;
+}
+.vocal-staff-score :deep(tspan) {
+  vector-effect: inherit;
 }
 .vocal-staff-score :deep([data-note]) {
-  opacity: 0.7;
+  color: var(--lyric-annotation-inactive, inherit);
+  opacity: var(--lyric-annotation-opacity, 0.7);
 }
 .vocal-staff-score :deep([aria-current='true']) {
   opacity: 1;
-  color: var(--te-playback-lyric-active-text, currentColor);
+  color: var(--lyric-annotation-active, var(--te-playback-lyric-active-text, currentColor));
 }
 </style>

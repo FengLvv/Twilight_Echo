@@ -1,6 +1,6 @@
 import { readFileSync, renameSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
-import type { CoreSettingsRepository } from '../../core/persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../../core/persistence/settingsRepositoryContract.ts'
 import { musicMetadataSetupChoice } from '../../shared/musicIdentificationSchedule.ts'
 
 export type DevelopmentMetadataSetupResult =

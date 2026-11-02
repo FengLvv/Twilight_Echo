@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { planPluginStartup } = (await import(
   new URL('./dependencies.ts', import.meta.url).href
-)) as typeof import('./dependencies')
+)) as typeof import('./dependencies.ts')
 
 type TestPlugin = {
   id: string

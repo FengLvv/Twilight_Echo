@@ -128,7 +128,7 @@ class TwilightAudioEngine {
   void setStateEventsEnabled(bool enabled);
   void setInputFactory(std::shared_ptr<const SeekableInputFactory> factory);
 
-  TAE_Result play(const std::string& source, double startTimeSeconds, bool initiallyPaused = false);
+  TAE_Result play(const std::string& source, double startTimeSeconds, bool initiallyPaused = false, bool followPlaybackClock = false);
   TAE_Result pause();
   TAE_Result setPaused(bool paused);
   TAE_Result stop();

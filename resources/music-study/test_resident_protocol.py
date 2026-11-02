@@ -28,7 +28,9 @@ serve(handler)
         output = queue.Queue()
         def read():
             for line in child.stdout:
-                output.put(json.loads(line))
+                value = json.loads(line)
+                if value.get('kind') not in ('started', 'heartbeat'):
+                    output.put(value)
         reader = threading.Thread(target=read, daemon=True); reader.start()
         def send(value):
             child.stdin.write(json.dumps(value) + '\n'); child.stdin.flush()

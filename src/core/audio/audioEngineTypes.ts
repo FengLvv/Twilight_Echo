@@ -23,7 +23,7 @@ export interface AudioEngineScheduler {
 }
 
 export interface NativeAudioBinding {
-  Play: (source: string, startTime?: number, initiallyPaused?: boolean) => void
+  Play: (source: string, startTime?: number, initiallyPaused?: boolean, followPlaybackClock?: boolean) => void
   Pause: () => void
   Stop: () => void
   Seek: (time: number) => void

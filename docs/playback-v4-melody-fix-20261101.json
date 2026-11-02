@@ -1,0 +1,158 @@
+{
+  "package": {
+    "checkedUtc": "2026-11-01T12:14:34.582Z",
+    "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\study-v4-melody-fix\\win-unpacked\\TwilightEcho.exe",
+    "bytes": 239410176,
+    "executableSha256": "dde987adc97099d4950621a2d61bcfb4853d61a69bfb32fa5fd0919f5f5c9729",
+    "asarSha256": "6cd4be043db8f906cca96cf1bdd122602d4d2a01286b19bb37fdb066cd6cc8dc",
+    "compiledFilesCompared": 264,
+    "resources": [
+      {
+        "name": "lyric_credits.json",
+        "sha256": "ae4294c7b808e375c44e10cb68553b4c3894d079fc7695af333728c3b47f1ce6"
+      },
+      {
+        "name": "lyric_line_models.json",
+        "sha256": "a6de85052780e543f9e0e8fe8c1784add9810e0b5561402fc8dfe55244ef9d02"
+      },
+      {
+        "name": "vocal_lyric_classifier.py",
+        "sha256": "d7509bc952c6997441331229b2cd347d5539a9c9df7f9fe531754a66483aab10"
+      },
+      {
+        "name": "vocal_lyrics.py",
+        "sha256": "c0b6fea37e9d32e9691695f6e45e1464c22f65ffb5dbac1db532550de998acde"
+      },
+      {
+        "name": "vocal_pipeline.py",
+        "sha256": "2556203c211af5ae7d73579e90a12cd3078e74c6a6c0a9aeef14649290d44249"
+      }
+    ]
+  },
+  "changes": {
+    "menu": "Centered on trigger; uses matched popover surface and ink tokens",
+    "search": "Streaming page defaults to NetEase provider search (/cloudsearch?type=1) and retains every result in server order. Explicit all-source search continues to use relevance and version grouping.",
+    "handoff": "Fresh native position before switching sources; preserve acknowledged native position after prepared source handoff instead of resetting to request position.",
+    "classifier": {
+      "algorithm": "minilm-v4-real1092-precision",
+      "directory": "lyric-line-v4-real1092-precision",
+      "manifestSha256": "755cbbeaaabe639add88c5887da33fb3ff0cffae5bbcab52627cf90c5133d23f",
+      "files": {
+        "lyric-line.onnx": "ef9f5cbe152e57fcc293370e43651ffca03bc92de2546d1b4bbc221b004c8c20",
+        "tokenizer.json": "a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+        "manifest.json": "755cbbeaaabe639add88c5887da33fb3ff0cffae5bbcab52627cf90c5133d23f"
+      },
+      "baseModel": "MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli",
+      "baseRevision": "0a71e92a985b6e1ad1828cf67ce9c459639c1dca",
+      "license": "MIT"
+    },
+    "melody": "Validate lyric structure first, clean unstructured provider credits and exterior rows, then validate remaining lines against decoded audio duration. AMLL still skips heuristic cleanup."
+  },
+  "failedSong": {
+    "title": "芬兰距离",
+    "songId": "ncm:2144687877",
+    "projectId": "d8c111fc-01cd-4ceb-a66e-b304a4d928b1",
+    "rowId": 61,
+    "start": 349.203,
+    "end": 350,
+    "decodedDuration": 349.5417233560091,
+    "failure": "Trailing production-company attribution failed duration validation before cleanup could run"
+  },
+  "replay": {
+    "fullSong": true,
+    "notes": 266,
+    "scoreLines": 45,
+    "lyricFilter": {
+      "mode": "heuristic",
+      "classifier": {
+        "algorithm": "minilm-v4-real1092-precision",
+        "policy": "lyric-line-policy:755cbbeaaabe639add88c5887da33fb3ff0cffae5bbcab52627cf90c5133d23f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+        "threshold": 0.9928489731384277,
+        "uniqueLines": 30,
+        "candidates": [
+          49,
+          50,
+          52,
+          53,
+          58,
+          59,
+          61
+        ],
+        "rejected": 7,
+        "protected": [],
+        "abstained": false,
+        "reused": false,
+        "elapsedMs": 803
+      },
+      "activity": {
+        "algorithm": "vocal-stem-outer-energy-v1",
+        "status": "estimated",
+        "start": 22.12,
+        "end": 331.78,
+        "margin": 0.8,
+        "levelDb": -10.82,
+        "contrastDb": 75.49,
+        "thresholdDb": -52.82,
+        "medianStemRatioDb": -3.12
+      },
+      "excluded": [
+        {
+          "id": 49,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 50,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 52,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 53,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 58,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 59,
+          "reason": "non_lyric_classifier"
+        },
+        {
+          "id": 61,
+          "reason": "non_lyric_classifier"
+        }
+      ]
+    },
+    "timings": {
+      "importsAndModelMs": 23940,
+      "alignmentMs": 6001,
+      "pitchMs": 14522,
+      "activityMs": 615,
+      "lyricClassifierMs": 803,
+      "beatMs": 6920,
+      "reusedGroups": 0,
+      "processedGroups": 8
+    }
+  },
+  "validation": {
+    "nodeTests": 462,
+    "pythonTests": 39,
+    "types": [
+      "core",
+      "node",
+      "web"
+    ],
+    "uiWidths": [
+      1440,
+      900
+    ],
+    "unselectedContrast": "at least 4.5:1 on light and dark popovers",
+    "impeccableFindings": 0,
+    "packagedStartup": "isolated hidden profile reached ready; requested normal quit",
+    "nativeAudio": "Source clock regressions passed; no shared-profile listening test and no proof of zero hardware output discontinuity"
+  },
+  "scope": "No push or GitHub release; no mutation of the running regular player or its failed job record."
+}

@@ -10,7 +10,7 @@ const {
   isRadioStationsDocument
 } = (await import(
   new URL('./radioStations.ts', import.meta.url).href
-)) as typeof import('./radioStations')
+)) as typeof import('./radioStations.ts')
 
 test('radio station URL helpers accept http/https and reject credentials', () => {
   assert.equal(isHttpOrHttpsUrl('https://stream.example/live'), true)

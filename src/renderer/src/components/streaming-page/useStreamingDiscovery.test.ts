@@ -5,7 +5,7 @@ import type { NcmPlaylistSummary } from '../../stores/useNcmStore.ts'
 
 const { useStreamingDiscovery, DISCOVERY_PAGE_SIZE } = (await import(
   new URL('./useStreamingDiscovery.ts', import.meta.url).href
-)) as typeof import('./useStreamingDiscovery')
+)) as typeof import('./useStreamingDiscovery.ts')
 
 const catalogueFixture = {
   hotTags: ['华语', '流行'],

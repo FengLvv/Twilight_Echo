@@ -1,4 +1,3 @@
-import '../../adapters-node/index.ts'
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -18,7 +17,7 @@ import {
   validatePersonalDomain,
   mergePersonalDomain
 } from '../../shared/personalBackup.ts'
-import { createPersonalBackupRepository } from '../../core/persistence/personalBackup.ts'
+import { createPersonalBackupRepository } from '../adapters/persistence/personalBackup.ts'
 import { parseMusicVersions, type MusicVersionsDocument } from '../../shared/musicVersions.ts'
 import type {
   CoreStatisticsCheckpoint,

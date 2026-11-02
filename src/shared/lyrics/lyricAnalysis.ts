@@ -5,12 +5,22 @@ import {
 } from '../desktopLyrics.ts'
 import type { StudyLyricsProjection, StudyResult } from '../musicStudy.ts'
 import { inferChordKey, parseKey } from './chordDegrees.ts'
+import { primaryLyricVoice } from './lyricLead.ts'
+import type { LyricLine } from './lyricTypes.ts'
+import type { ChordKey } from './chordDegrees.ts'
+import { numberedOctaveShift } from './numberedNotation.ts'
+
+export function primaryLyricScore(score: RhythmicLyricScore | undefined, line: LyricLine): RhythmicLyricScore | undefined {
+  const lead=primaryLyricVoice(line)
+  return score && lead && score.text.trim()===lead.text.trim() ? score : undefined
+}
 
 /** Each view gets the same native layout with row-local, stable note identities. */
 export function rhythmicLyricScore(
   melody: StudyResult['melody'],
   lineId: number,
-  text: string
+  text: string,
+  key: ChordKey | null = melody?.key ?? null
 ): RhythmicLyricScore | undefined {
   const score = melody?.scores?.find((s) => s.lineId === lineId && s.text.trim() === text.trim())
   if (!score || !melody) return undefined
@@ -28,7 +38,7 @@ export function rhythmicLyricScore(
     }
     return `data-note="${local}"`
   })
-  return valid ? { svg, text, notes: selected.map((n) => n.note) } : undefined
+  return valid ? { svg, text, notes: selected.map((n) => n.note), octaveShift: numberedOctaveShift(melody.notes, key) } : undefined
 }
 
 /** Send a small look-ahead window to the satellite; keep the complete score in Core/Main. */
@@ -81,7 +91,7 @@ export function projectDesktopAnalysis(
         ...line,
         chords,
         score: analysis.display.notationVisible
-          ? rhythmicLyricScore(analysis.melody, sourceIndex, line.text)
+          ? rhythmicLyricScore(analysis.melody, sourceIndex, line.text, header.key)
           : undefined
       }
     })

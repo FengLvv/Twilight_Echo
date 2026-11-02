@@ -9,7 +9,7 @@ const {
   runLibraryMetadataEnrichmentBenchmark
 } = (await import(
   new URL('./libraryMetadataEnrichment.ts', import.meta.url).href
-)) as typeof import('./libraryMetadataEnrichment')
+)) as typeof import('./libraryMetadataEnrichment.ts')
 
 const localTrack = {
   id: 'local:moon',

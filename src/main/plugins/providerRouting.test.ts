@@ -13,10 +13,10 @@ const {
   providerSupportsMethod
 } = (await import(
   new URL('./providerRouting.ts', import.meta.url).href
-)) as typeof import('./providerRouting')
+)) as typeof import('./providerRouting.ts')
 const { isRecoverableBundledPluginFailure } = (await import(
   new URL('./stateRecovery.ts', import.meta.url).href
-)) as typeof import('./stateRecovery')
+)) as typeof import('./stateRecovery.ts')
 
 type TestRunningProvider = {
   pluginId: string
@@ -42,6 +42,16 @@ const skeleton: TestRunningProvider = {
     }
   ]
 }
+
+test('playlist subscription methods require the advertised library capability', () => {
+  const methods = ['fetchPlaylistSubscriptionState', 'subscribePlaylist'] as const
+  for (const method of methods) {
+    assert.equal(isTwilightMediaProviderMethod(method), true)
+    assert.equal(providerSupportsMethod({ id: 'ncm', name: 'NCM', capabilities: ['library'], supportedMethods: [...methods] }, method), true)
+    assert.equal(providerSupportsMethod({ id: 'ncm', name: 'NCM', capabilities: ['playlist'], supportedMethods: [...methods] }, method), false)
+    assert.equal(providerSupportsMethod({ id: 'ncm', name: 'NCM', capabilities: ['library'], supportedMethods: [] }, method), false)
+  }
+})
 
 const fullProvider: TestRunningProvider = {
   pluginId: 'com.twilightecho.provider.bilibili',
@@ -347,7 +357,7 @@ test('omits utility process env option when no proxy env is configured', () => {
 })
 
 test('bundled provider missing-method errors mention restarting the app', () => {
-  const source = readFileSync(new URL('../../core/plugins/manager.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../adapters/plugins/manager.ts', import.meta.url), 'utf8')
 
   assert.match(source, /内置音源插件尚未加载最新代码，请重启应用/)
 })

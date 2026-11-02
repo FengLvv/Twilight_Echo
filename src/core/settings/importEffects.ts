@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../shared/appSettings.ts'
 import type { CoreOutputEngine } from '../audio/outputService.ts'
-import type { CoreDspService } from '../audio/dspService.ts'
+import type { CoreDspService } from '../audio/dspServicePort.ts'
 import { effectiveAutoMixMode } from '../../shared/twilightAutoMix.ts'
 
 export interface CoreSettingsImportEffects {

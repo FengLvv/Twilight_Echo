@@ -16,7 +16,7 @@ import {
 import { resolveProviderIdempotencyKey } from './rpcCoordinator.ts'
 import type { TwilightMediaProviderRegistration, TwilightPluginDescriptor } from './types.ts'
 
-const source = readFileSync(new URL('../../core/plugins/manager.ts', import.meta.url), 'utf8').replaceAll(
+const source = readFileSync(new URL('../adapters/plugins/manager.ts', import.meta.url), 'utf8').replaceAll(
   '\r\n',
   '\n'
 )

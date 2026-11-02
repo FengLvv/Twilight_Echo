@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createAutoMixModelPackPlatform } from './autoMixModelPackPlatform.ts'
-import { decodeWithPlatform } from '../../core/audio/modelPackService.ts'
+import { decodeWithPlatform } from '../adapters/audio/modelPackService.ts'
 
 const lzmaData = Buffer.from('Audio inference fixture\n'.repeat(1000))
 const lzmaPayload = Buffer.from(

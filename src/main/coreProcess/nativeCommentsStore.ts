@@ -1,7 +1,7 @@
 import { copyFile, mkdir } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { join } from 'node:path'
-import { AssociationStore } from '../../core/comments/store.mjs'
+import { AssociationStore } from '../adapters/comments/store.mjs'
 
 /** Copy legacy corrections once; never replace native data or modify the old file. */
 export class NativeAssociationStore extends AssociationStore {

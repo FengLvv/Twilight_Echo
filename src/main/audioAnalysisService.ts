@@ -12,9 +12,9 @@ import {
   loadNativeBindingWithDiagnostics
 } from './audio/nativeBinding.ts'
 import type { NativeAudioBinding } from './audio/audioEngineTypes.ts'
-import { prepareDownloadedMetadata } from '../core/downloads/downloadMetadata.ts'
+import { prepareDownloadedMetadata } from './adapters/downloads/downloadMetadata.ts'
 import type { DownloadMetadataRequest } from '../shared/coreDownloadMetadata.ts'
-import { runLibraryTagWorker } from '../core/library/tagWorker.ts'
+import { runLibraryTagWorker } from './adapters/library/tagWorker.ts'
 import type { LibraryTagWorkerRequest } from '../shared/coreLibraryMaintenance.ts'
 import { contentHash } from './library/duplicateDetection.ts'
 

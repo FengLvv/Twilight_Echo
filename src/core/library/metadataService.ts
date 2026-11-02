@@ -54,6 +54,7 @@ export class CoreMetadataService {
   private seen = new Map<string, string>()
   private readonly candidates = new Map<string, Candidates>()
   private status: LibraryMetadataEnrichmentStatus | null = null
+  private enrichmentRevision = 0
   private totals = { total: 0, completed: 0, failed: 0, skipped: 0, error: '' }
   constructor(options: Options) {
     this.options = options
@@ -73,6 +74,7 @@ export class CoreMetadataService {
         }
         if (status.state === 'completed' && this.status.completed === 0 && this.status.failed > 0)
           this.status.state = 'failed'
+        this.enrichmentRevision++
         options.changed()
       },
       onTrackEnriched: async (update) => {
@@ -100,6 +102,7 @@ export class CoreMetadataService {
   snapshot() {
     return { ...(this.status ?? this.queue.getStatus()) }
   }
+  getEnrichmentRevision() { return this.enrichmentRevision }
   /** Called at scan completion/provider inventory changes, never on renderer attachment. */
   refresh(force = false): void {
     if (!this.activated || this.stopped || this.suspended || !this.options.available()) return

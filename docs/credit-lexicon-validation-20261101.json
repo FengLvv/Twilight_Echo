@@ -1,0 +1,968 @@
+{
+  "songs": 50,
+  "duration": 13730.667102040816,
+  "inputRows": 2925,
+  "structured": 278,
+  "oldCovered": 250,
+  "newCovered": 274,
+  "oldAll": 292,
+  "newAll": 321,
+  "timeAll": 223,
+  "combinedAll": 333,
+  "combinedCovered": 277,
+  "combinedUncovered": [
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 107,
+      "text": "Mixed at The Mixsuite (South London and Los Angeles)",
+      "time": 231.356,
+      "activity": {
+        "algorithm": "vocal-stem-outer-energy-v1",
+        "status": "estimated",
+        "start": 9.84,
+        "end": 230.82,
+        "margin": 0.8,
+        "levelDb": -9.15,
+        "contrastDb": 38.79,
+        "thresholdDb": -41.94,
+        "medianStemRatioDb": -3.37
+      }
+    }
+  ],
+  "newlyMatched": [
+    {
+      "title": "Fix You",
+      "ncmId": "22447802",
+      "id": 37,
+      "text": "音频助理: Adam Noble/Adam Scheuermann/Andrea Wright/Brad Spence/Bryan Russell/Dan Porter/Jake Jackson/Jon Bailey/Jon Withnall/Mathieu LeJeune/Mike Pierce/Rob Smith/Taz Mattar/Tim Roe",
+      "structured": true
+    },
+    {
+      "title": "Fix You",
+      "ncmId": "22447802",
+      "id": 38,
+      "text": "低音吉他: Guy Berryman",
+      "structured": true
+    },
+    {
+      "title": "Fix You",
+      "ncmId": "22447802",
+      "id": 42,
+      "text": "录音工程师: Mark Phythian",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 4,
+      "text": "配唱编写: 窦颖/林灵",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 53,
+      "text": "小号：李博",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 61,
+      "text": "人声录音师：钱雷/杨惠琳@Studio 21A",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 62,
+      "text": "人声录音棚A：RMB Studio爆棚@奔跑怪物",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 63,
+      "text": "人声录音棚B：Studio 21A Beijing",
+      "structured": true
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "id": 64,
+      "text": "Vocal edite：汝文博@SBMS Beijing",
+      "structured": true
+    },
+    {
+      "title": "这世界那么多人",
+      "ncmId": "1842025914",
+      "id": 42,
+      "text": "曼陀林: 彭飞",
+      "structured": true
+    },
+    {
+      "title": "起风了",
+      "ncmId": "1330348068",
+      "id": 67,
+      "text": "录音工程: 玉乃井光紀 (Mitsunori Tamanoi) - studioFine",
+      "structured": true
+    },
+    {
+      "title": "起风了",
+      "ncmId": "1330348068",
+      "id": 69,
+      "text": "特别支持：中村光雄(Mitsuo Nakamura)",
+      "structured": true
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "id": 56,
+      "text": "OP: 北京享耳音乐文化有限公司 Sure Recordings Co., Ltd",
+      "structured": true
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "id": 57,
+      "text": "SP: Universal Music China Admin by Universal Music Publishing CHINA",
+      "structured": true
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "id": 58,
+      "text": "P - Line: 2016 北京享耳音乐文化有限公司Sure Recordings Culture Co., Ltd",
+      "structured": true
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "id": 59,
+      "text": "C - Line: 2016 北京享耳音乐文化有限公司Sure Recordings Culture Co., Ltd",
+      "structured": true
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "id": 60,
+      "text": "未经著作权人许可 不得翻录翻唱或使用",
+      "structured": true
+    },
+    {
+      "title": "刻在我心底的名字",
+      "ncmId": "1472921626",
+      "id": 53,
+      "text": "小号：古嘉䜣",
+      "structured": false
+    },
+    {
+      "title": "刻在我心底的名字",
+      "ncmId": "1472921626",
+      "id": 54,
+      "text": "吉他录音师：单为明",
+      "structured": false
+    },
+    {
+      "title": "漠河舞厅",
+      "ncmId": "1430319727",
+      "id": 12,
+      "text": "录音棚：C.L.K",
+      "structured": false
+    },
+    {
+      "title": "Levitating",
+      "ncmId": "1433934518",
+      "id": 91,
+      "text": "音频助理: Phil Hotz",
+      "structured": true
+    },
+    {
+      "title": "Levitating",
+      "ncmId": "1433934518",
+      "id": 95,
+      "text": "Talkbox: Bosko Elecrospit Kante",
+      "structured": true
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 103,
+      "text": "Producers : Steve Mac / Ed Sheeran (Co.)",
+      "structured": true
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 104,
+      "text": "Lead & Background Vocals : Ed Sheeran",
+      "structured": true
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 110,
+      "text": "Engineering : Dann Pursey / Chris Laws / Joe Rubel",
+      "structured": true
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 113,
+      "text": "Percussion : Ed Sheeran",
+      "structured": true
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "id": 114,
+      "text": "Mixing Assistant : Geoff Swan / Michael Freeman",
+      "structured": true
+    },
+    {
+      "title": "Uptown Funk",
+      "ncmId": "29722263",
+      "id": 98,
+      "text": "Producers : Mark Ronson / Jeff Bhasker / Bruno Mars",
+      "structured": false
+    },
+    {
+      "title": "Uptown Funk",
+      "ncmId": "29722263",
+      "id": 105,
+      "text": "Talkbox : Jeff Bhasker",
+      "structured": false
+    }
+  ],
+  "falseDrops": [],
+  "uncovered": [
+    {
+      "header": "Mixed at The Mixsuite (South London and Los Angeles)",
+      "count": 1,
+      "examples": [
+        {
+          "song": "Shape of You",
+          "ncmId": "451703096",
+          "id": 107,
+          "text": "Mixed at The Mixsuite (South London and Los Angeles)",
+          "time": 231.356
+        }
+      ]
+    },
+    {
+      "header": "Published by Ed Sheeran Limited and Sony/ATV Music Publishing (UK) Limited, Spirit B Unique Music / Polar Patrol administered by Kobalt Music Publishing Ltd. (PRS) and Rokstone Music Limited administered under exclusive license to Universal Music Publishing Limited",
+      "count": 1,
+      "examples": [
+        {
+          "song": "Shape of You",
+          "ncmId": "451703096",
+          "id": 108,
+          "text": "Published by Ed Sheeran Limited and Sony/ATV Music Publishing (UK) Limited, Spirit B Unique Music / Polar Patrol administered by Kobalt Music Publishing Ltd. (PRS) and Rokstone Music Limited administered under exclusive license to Universal Music Publishing Limited",
+          "time": 231.632
+        }
+      ]
+    },
+    {
+      "header": "Recorded at Rokstone Studios (London) and Gingerbread Man Studios (Suffolk and London), 2016",
+      "count": 1,
+      "examples": [
+        {
+          "song": "Shape of You",
+          "ncmId": "451703096",
+          "id": 109,
+          "text": "Recorded at Rokstone Studios (London) and Gingerbread Man Studios (Suffolk and London), 2016",
+          "time": 231.908
+        }
+      ]
+    },
+    {
+      "header": "Mastered at Metropolis Mastering (London)",
+      "count": 1,
+      "examples": [
+        {
+          "song": "Shape of You",
+          "ncmId": "451703096",
+          "id": 115,
+          "text": "Mastered at Metropolis Mastering (London)",
+          "time": 233.564
+        }
+      ]
+    }
+  ],
+  "unsupported": [
+    {
+      "title": "Shape of You",
+      "text": "Mixed at The Mixsuite (South London and Los Angeles)"
+    },
+    {
+      "title": "Shape of You",
+      "text": "Published by Ed Sheeran Limited and Sony/ATV Music Publishing (UK) Limited, Spirit B Unique Music / Polar Patrol administered by Kobalt Music Publishing Ltd. (PRS) and Rokstone Music Limited administered under exclusive license to Universal Music Publishing Limited"
+    },
+    {
+      "title": "Shape of You",
+      "text": "Recorded at Rokstone Studios (London) and Gingerbread Man Studios (Suffolk and London), 2016"
+    },
+    {
+      "title": "Shape of You",
+      "text": "Mastered at Metropolis Mastering (London)"
+    }
+  ],
+  "perSong": [
+    {
+      "title": "十年",
+      "ncmId": "66842",
+      "artist": "陈奕迅",
+      "oldMatches": 7,
+      "newMatches": 7,
+      "timeMatches": 6,
+      "combinedMatches": 7,
+      "structured": 7,
+      "oldStructured": 7,
+      "newStructured": 7,
+      "combinedStructured": 7
+    },
+    {
+      "title": "遇见",
+      "ncmId": "454828887",
+      "artist": "孙燕姿",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "倔强",
+      "ncmId": "386175",
+      "artist": "五月天",
+      "oldMatches": 15,
+      "newMatches": 15,
+      "timeMatches": 12,
+      "combinedMatches": 15,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "平凡之路",
+      "ncmId": "28815250",
+      "artist": "朴树",
+      "oldMatches": 10,
+      "newMatches": 10,
+      "timeMatches": 9,
+      "combinedMatches": 10,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "Play我呸 (Alesso Remix Version)",
+      "ncmId": "432698987",
+      "artist": "蔡依林 / Alesso",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "光年之外",
+      "ncmId": "449818741",
+      "artist": "G.E.M.邓紫棋",
+      "oldMatches": 6,
+      "newMatches": 6,
+      "timeMatches": 0,
+      "combinedMatches": 6,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "爱人错过",
+      "ncmId": "1368754688",
+      "artist": "告五人",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 2,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "大鱼 (唱片版)",
+      "ncmId": "516823132",
+      "artist": "周深",
+      "oldMatches": 10,
+      "newMatches": 10,
+      "timeMatches": 9,
+      "combinedMatches": 10,
+      "structured": 10,
+      "oldStructured": 10,
+      "newStructured": 10,
+      "combinedStructured": 10
+    },
+    {
+      "title": "云烟成雨",
+      "ncmId": "513360721",
+      "artist": "房东的猫",
+      "oldMatches": 8,
+      "newMatches": 8,
+      "timeMatches": 7,
+      "combinedMatches": 8,
+      "structured": 5,
+      "oldStructured": 5,
+      "newStructured": 5,
+      "combinedStructured": 5
+    },
+    {
+      "title": "最炫民族风",
+      "ncmId": "354738",
+      "artist": "凤凰传奇",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Someone Like You",
+      "ncmId": "16435049",
+      "artist": "Adele",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "bad guy",
+      "ncmId": "1355147933",
+      "artist": "Billie Eilish",
+      "oldMatches": 7,
+      "newMatches": 7,
+      "timeMatches": 1,
+      "combinedMatches": 7,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Just the Way You Are",
+      "ncmId": "25657276",
+      "artist": "Bruno Mars",
+      "oldMatches": 10,
+      "newMatches": 10,
+      "timeMatches": 7,
+      "combinedMatches": 10,
+      "structured": 10,
+      "oldStructured": 10,
+      "newStructured": 10,
+      "combinedStructured": 10
+    },
+    {
+      "title": "Numb",
+      "ncmId": "16686599",
+      "artist": "Linkin Park",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Stan",
+      "ncmId": "17572422",
+      "artist": "Eminem / Dido",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Get Lucky",
+      "ncmId": "26349642",
+      "artist": "Daft Punk / Pharrell Williams / Nile Rodgers",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 3,
+      "combinedMatches": 3,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Bohemian Rhapsody",
+      "ncmId": "1868553",
+      "artist": "Queen",
+      "oldMatches": 5,
+      "newMatches": 5,
+      "timeMatches": 0,
+      "combinedMatches": 5,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "Don't Know Why",
+      "ncmId": "22489132",
+      "artist": "Norah Jones",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "夜に駆ける",
+      "ncmId": "1409311773",
+      "artist": "YOASOBI",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 1,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "残響散歌",
+      "ncmId": "1902315758",
+      "artist": "Aimer",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "贝加尔湖畔",
+      "ncmId": "109998",
+      "artist": "李健",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 4,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "海阔天空",
+      "ncmId": "1357375695",
+      "artist": "Beyond",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Hotel California",
+      "ncmId": "1302701468",
+      "artist": "Eagles",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Stairway To Heaven",
+      "ncmId": "1833372266",
+      "artist": "Led Zeppelin",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Fix You",
+      "ncmId": "22447802",
+      "artist": "Coldplay",
+      "oldMatches": 18,
+      "newMatches": 21,
+      "timeMatches": 20,
+      "combinedMatches": 21,
+      "structured": 21,
+      "oldStructured": 18,
+      "newStructured": 21,
+      "combinedStructured": 21
+    },
+    {
+      "title": "when the party's over",
+      "ncmId": "1355149438",
+      "artist": "Billie Eilish",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 0,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Lemon",
+      "ncmId": "536622304",
+      "artist": "米津玄師",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 0,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "紅蓮華",
+      "ncmId": "1360592706",
+      "artist": "LiSA",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 0,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "First Love",
+      "ncmId": "22786083",
+      "artist": "宇多田ヒカル",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 2,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "Rolling in the Deep",
+      "ncmId": "16435051",
+      "artist": "Adele",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "如愿",
+      "ncmId": "1888381008",
+      "artist": "王菲",
+      "oldMatches": 16,
+      "newMatches": 22,
+      "timeMatches": 24,
+      "combinedMatches": 24,
+      "structured": 22,
+      "oldStructured": 16,
+      "newStructured": 22,
+      "combinedStructured": 22
+    },
+    {
+      "title": "这世界那么多人",
+      "ncmId": "1842025914",
+      "artist": "莫文蔚",
+      "oldMatches": 12,
+      "newMatches": 13,
+      "timeMatches": 12,
+      "combinedMatches": 13,
+      "structured": 13,
+      "oldStructured": 12,
+      "newStructured": 13,
+      "combinedStructured": 13
+    },
+    {
+      "title": "起风了",
+      "ncmId": "1330348068",
+      "artist": "冯沁苑(买辣椒也用券)",
+      "oldMatches": 10,
+      "newMatches": 12,
+      "timeMatches": 11,
+      "combinedMatches": 12,
+      "structured": 12,
+      "oldStructured": 10,
+      "newStructured": 12,
+      "combinedStructured": 12
+    },
+    {
+      "title": "孤勇者",
+      "ncmId": "1901371647",
+      "artist": "陈奕迅",
+      "oldMatches": 10,
+      "newMatches": 10,
+      "timeMatches": 13,
+      "combinedMatches": 13,
+      "structured": 10,
+      "oldStructured": 10,
+      "newStructured": 10,
+      "combinedStructured": 10
+    },
+    {
+      "title": "山海",
+      "ncmId": "411314659",
+      "artist": "草东没有派对",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 3,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "凄美地",
+      "ncmId": "436346833",
+      "artist": "郭顶",
+      "oldMatches": 4,
+      "newMatches": 9,
+      "timeMatches": 8,
+      "combinedMatches": 9,
+      "structured": 9,
+      "oldStructured": 4,
+      "newStructured": 9,
+      "combinedStructured": 9
+    },
+    {
+      "title": "如果可以",
+      "ncmId": "1890530891",
+      "artist": "韦礼安",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 3,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "刻在我心底的名字",
+      "ncmId": "1472921626",
+      "artist": "卢广仲",
+      "oldMatches": 8,
+      "newMatches": 10,
+      "timeMatches": 12,
+      "combinedMatches": 14,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "漠河舞厅",
+      "ncmId": "1430319727",
+      "artist": "柳爽",
+      "oldMatches": 4,
+      "newMatches": 5,
+      "timeMatches": 1,
+      "combinedMatches": 5,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Blinding Lights",
+      "ncmId": "1406633327",
+      "artist": "The Weeknd",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 2,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Levitating",
+      "ncmId": "1433934518",
+      "artist": "Dua Lipa",
+      "oldMatches": 14,
+      "newMatches": 16,
+      "timeMatches": 13,
+      "combinedMatches": 16,
+      "structured": 16,
+      "oldStructured": 14,
+      "newStructured": 16,
+      "combinedStructured": 16
+    },
+    {
+      "title": "Shape of You",
+      "ncmId": "451703096",
+      "artist": "Ed Sheeran",
+      "oldMatches": 16,
+      "newMatches": 21,
+      "timeMatches": 10,
+      "combinedMatches": 24,
+      "structured": 25,
+      "oldStructured": 16,
+      "newStructured": 21,
+      "combinedStructured": 24
+    },
+    {
+      "title": "Uptown Funk",
+      "ncmId": "29722263",
+      "artist": "Mark Ronson / Bruno Mars",
+      "oldMatches": 8,
+      "newMatches": 10,
+      "timeMatches": 0,
+      "combinedMatches": 10,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "Billie Jean",
+      "ncmId": "21178262",
+      "artist": "Michael Jackson",
+      "oldMatches": 7,
+      "newMatches": 7,
+      "timeMatches": 3,
+      "combinedMatches": 7,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "Smells Like Teen Spirit",
+      "ncmId": "4208530",
+      "artist": "Nirvana",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 1,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Hallelujah",
+      "ncmId": "18604663",
+      "artist": "Jeff Buckley",
+      "oldMatches": 2,
+      "newMatches": 2,
+      "timeMatches": 0,
+      "combinedMatches": 2,
+      "structured": 2,
+      "oldStructured": 2,
+      "newStructured": 2,
+      "combinedStructured": 2
+    },
+    {
+      "title": "Pretender",
+      "ncmId": "1365924378",
+      "artist": "Official髭男dism",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 3,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "群青",
+      "ncmId": "1472480890",
+      "artist": "YOASOBI",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 0,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    },
+    {
+      "title": "打上花火",
+      "ncmId": "496869422",
+      "artist": "Daoko / 米津玄師",
+      "oldMatches": 4,
+      "newMatches": 4,
+      "timeMatches": 3,
+      "combinedMatches": 4,
+      "structured": 4,
+      "oldStructured": 4,
+      "newStructured": 4,
+      "combinedStructured": 4
+    },
+    {
+      "title": "白日",
+      "ncmId": "1347630432",
+      "artist": "King Gnu",
+      "oldMatches": 3,
+      "newMatches": 3,
+      "timeMatches": 0,
+      "combinedMatches": 3,
+      "structured": 3,
+      "oldStructured": 3,
+      "newStructured": 3,
+      "combinedStructured": 3
+    }
+  ],
+  "crossRuntimeParity": {
+    "rows": 2925,
+    "modelKeys": true,
+    "classifications": true
+  }
+}

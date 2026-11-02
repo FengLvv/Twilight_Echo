@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { importLyricsFromDialog, validateImportedLyrics } = (await import(
   new URL('./importLyrics.ts', import.meta.url).href
-)) as typeof import('./importLyrics')
+)) as typeof import('./importLyrics.ts')
 
 test('lyrics import returns null on dialog cancel without reading a path', async () => {
   let reads = 0

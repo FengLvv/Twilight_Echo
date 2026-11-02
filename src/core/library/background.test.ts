@@ -4,7 +4,7 @@ import { watch } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import type { LibraryMetadata } from '../../shared/libraryDatabase.ts'
-import { CoreLibraryBackground } from './background.ts'
+import { CoreLibraryBackground } from '../../main/composition/library/background.ts'
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
 

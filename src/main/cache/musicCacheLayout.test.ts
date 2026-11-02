@@ -7,7 +7,7 @@ import test from 'node:test'
 const { MANAGED_MUSIC_CACHE_DIRECTORY_NAMES, clearManagedMusicCache, getManagedMusicCacheSize } =
   (await import(
     new URL('./musicCacheLayout.ts', import.meta.url).href
-  )) as typeof import('./musicCacheLayout')
+  )) as typeof import('./musicCacheLayout.ts')
 import { clearCoreMusicCache } from './musicCacheLayout.ts'
 
 test('Core clear retains native current/preload pins and leaves platform directories to their owners', async (t) => {

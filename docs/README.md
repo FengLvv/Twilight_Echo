@@ -5,6 +5,7 @@
 ## 开发与架构
 
 - [开发者文档](./DEVELOPER_README.md)
+- [应用架构与演进约束](./application-architecture.md)
 - [宏观质量门禁](./quality-gates.md)
 - [音频引擎架构](./twilight-audio-engine-architecture.md)
 - [音频引擎 API](./audio-engine-api.md)

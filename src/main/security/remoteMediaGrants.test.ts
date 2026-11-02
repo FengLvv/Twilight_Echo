@@ -8,7 +8,7 @@ const {
   grantRemoteImageUrl
 } = (await import(
   new URL('./remoteMediaGrants.ts', import.meta.url).href
-)) as typeof import('./remoteMediaGrants')
+)) as typeof import('./remoteMediaGrants.ts')
 
 test('metadata image permission expiry is absolute, isolated from ordinary tokens and never stored in image caches', async () => {
   let now = 1000, reads = 0, writes = 0

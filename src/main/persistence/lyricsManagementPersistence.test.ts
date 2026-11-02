@@ -6,13 +6,13 @@ import test from 'node:test'
 
 const { VersionedDataStore } = (await import(
   new URL('./versionedDataStore.ts', import.meta.url).href
-)) as typeof import('./versionedDataStore')
+)) as typeof import('./versionedDataStore.ts')
 const { DEFAULT_LYRICS_MANAGEMENT, isLyricsManagementDocument } = (await import(
   new URL('../../shared/lyricsManagement.ts', import.meta.url).href
-)) as typeof import('../../shared/lyricsManagement')
+)) as typeof import('../../shared/lyricsManagement.ts')
 const { PersistentDataRevisionConflictError } = (await import(
   new URL('../../shared/versionedPersistence.ts', import.meta.url).href
-)) as typeof import('../../shared/versionedPersistence')
+)) as typeof import('../../shared/versionedPersistence.ts')
 
 test('lyrics management persists offsets and manual tracks through the versioned store', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'twilight-lyrics-management-'))

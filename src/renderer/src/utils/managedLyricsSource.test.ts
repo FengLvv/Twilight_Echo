@@ -4,7 +4,7 @@ import type { ResolverLyricsState } from './managedLyricsSource.ts'
 
 const { resolverLyricsInput } = (await import(
   new URL('./managedLyricsSource.ts', import.meta.url).href
-)) as typeof import('./managedLyricsSource')
+)) as typeof import('./managedLyricsSource.ts')
 
 test('forced source reloads from a clean automatic baseline and Auto restores that baseline', () => {
   const automatic: ResolverLyricsState = {

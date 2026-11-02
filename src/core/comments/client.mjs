@@ -110,9 +110,15 @@ async function limitedBytes(response, limit, signal) {
       if (done) break
       size += value.length
       if (size > limit) throw new Error('响应过大')
-      chunks.push(Buffer.from(value))
+      chunks.push(value)
     }
-    return Buffer.concat(chunks)
+    const bytes = new Uint8Array(size)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.length
+    }
+    return bytes
   } catch (error) {
     await reader.cancel().catch(() => {})
     throw error
@@ -144,7 +150,7 @@ export class NcmClient {
         let data
         const body = await limitedBytes(response, 2 * 1024 * 1024, abort)
         try {
-          data = JSON.parse(body.toString('utf8'))
+          data = JSON.parse(bytesToUtf8(body))
         } catch {
           throw new Error('网易云返回了非 JSON 数据，请稍后重试')
         }
@@ -252,7 +258,7 @@ export class NcmClient {
         if (!response.ok || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(type))
           return null
         const bytes = await limitedBytes(response, 96 * 1024, abort)
-        return `data:${type};base64,${bytes.toString('base64')}`
+        return `data:${type};base64,${bytesToBase64(bytes)}`
       },
       { signal, ttl: 30 * 60 * 1000 }
     )
@@ -262,3 +268,4 @@ export class NcmClient {
     this.pool.close()
   }
 }
+import { bytesToUtf8, bytesToBase64 } from '../../shared/portableBytes.ts'

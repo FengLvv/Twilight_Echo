@@ -24,12 +24,33 @@ class MixedLanguageTests(unittest.TestCase):
         self.assertFalse(is_credit('吉他轻轻唱'))
         with self.assertRaisesRegex(ValueError,'演唱歌词'):validate_lines(json.dumps(rows[1:]),10)
 
+    def test_credit_composition_and_codec_tail_padding_are_normalized_before_alignment(self):
+        for text in ['民谣吉他：怪兽','Loop：石头','弦乐编曲：乐手','弦乐改编：乐手','弦乐演奏：乐手',
+                     '人声录音室: Studio','插画: Lost7','Programing / Guitars / Keyboards &Sythn : 音乐人']:
+            self.assertTrue(is_credit(text),text)
+        rows=[dict(id=1,start=250,end=261.66857142857145,text='最后一句'),
+              dict(id=2,start=261,end=262,text='弦乐演奏：乐手')]
+        selected=validate_lines(json.dumps(rows),261.6184580498866)
+        self.assertEqual(selected,[{**rows[0],'end':261.6184580498866}])
+        with self.assertRaisesRegex(ValueError,'歌词时间'):validate_lines(json.dumps(rows[:1]),261.4)
+
     def test_language_set_preserves_kanji_context_but_keeps_english_lines_english(self):
         self.assertEqual(languages_for("梦一样的自由 Say it's a new world",'zh'),['zh','en'])
         self.assertEqual(languages_for('明日 hello world','ja'),['ja','en'])
         self.assertEqual(languages_for('明日','ja'),['ja'])
         self.assertEqual(languages_for('Say hello','ja'),['en'])
         self.assertEqual(languages_for('青花瓷','zh'),['zh'])
+
+    def test_studio_labels_and_exact_notices_do_not_erase_ordinary_sentences(self):
+        for text in ['配唱编写：某某','人声录音师：某某','人声录音棚A：某棚','鼓录音室2：某棚',
+                     '低音吉他：某某','曼陀林：某某','小号：某某','Vocal edite：某某',
+                     'OP: Publisher','Lead & Background Vocals: Singer','Talkbox: Player',
+                     '未经著作权人许可 不得翻录翻唱或使用']:
+            self.assertTrue(is_credit(text),text)
+        for text in ['我在录音室里等你','录音室A的灯还亮着：你在哪','制作人说：再唱一次',
+                     'I said: stay','Love: don’t leave','你说未经著作权人许可 不得翻录翻唱或使用',
+                     'Recorded at dawn, I remembered you']:
+            self.assertFalse(is_credit(text),text)
 
     def test_japanese_mora_and_english_words_keep_their_own_identity_and_phones(self):
         phones=['ja/a','ja/i','en/W','en/ER','en/L','en/D','zh/n','zh/i']
@@ -85,6 +106,46 @@ class PronunciationPackTests(unittest.TestCase):
             model=NS(timestep=.01,vocabulary=self.vocabulary)
             with self.assertRaisesRegex(ValueError,'歌词发音编码失败.*say'):
                 run_tifa_fa(model,root,language='zh',g2p_pipeline=self.g2p)
+
+    def test_numeric_english_lyrics_have_candidate_pronunciations_and_original_identity(self):
+        from inference.TiFA.g2p.encoding import encode_paths
+        from vocal_pipeline import source_owners
+        text='24/7 90 1999 007 1st'
+        words=self.g2p.convert(text,languages=['en'])
+        self.assertEqual([word.text for word in words],['24','7','90','1999','007','1st'])
+        readings={tuple(group.script for group in path) for reading in words[0].readings for path in reading.paths}
+        self.assertIn(('twenty','four'),readings)
+        self.assertIn(('two','four'),readings)
+        data,_,texts=encode_paths(words,self.vocabulary,languages=['en'])
+        self.assertTrue(data['paths'].any())
+        aligned=[NS(source_word=i,source_text=source) for i,source in enumerate(texts)]
+        owners,_=source_owners(aligned,[dict(id=8,text=text)])
+        self.assertEqual(set(owners.values()),{8})
+
+    def test_standalone_hyphens_are_not_pronounced_but_compounds_and_original_punctuation_survive(self):
+        from inference.TiFA.g2p.encoding import encode_paths
+        from vocal_pipeline import source_owners,restore_spelling
+        text="Sincerely yours' Stan -- P.S. I can't stop - not-a chance"
+        words=self.g2p.convert(text,languages=['en'])
+        self.assertFalse(any(word.text in ['-','--'] for word in words))
+        self.assertIn("can't",[word.text for word in words])
+        self.assertIn('not-a',[word.text for word in words])
+        encode_paths(words,self.vocabulary,languages=['en'])
+        owners,starts=source_owners([NS(source_word=i,source_text=w.text) for i,w in enumerate(words)],[dict(id=9,text=text)])
+        notes=[dict(wordId=i,lineId=owners[i],lyric='') for i in range(len(words))]
+        restore_spelling(notes,[dict(id=9,text=text)],starts)
+        self.assertEqual(''.join(n['lyric'] for n in notes),text)
+
+    def test_japanese_quote_punctuation_is_not_sent_as_an_unknown_phoneme(self):
+        from inference.TiFA.g2p.encoding import encode_paths
+        from vocal_pipeline import source_owners
+        text='「さよなら」だけだった。『愛してる』'
+        words=self.g2p.convert(text,languages=['ja'])
+        data,_,texts=encode_paths(words,self.vocabulary,languages=['ja'])
+        self.assertTrue(data['paths'].any())
+        self.assertFalse(any(char in ''.join(texts) for char in '「」『』。'))
+        owners,_=source_owners([NS(source_word=i,source_text=source) for i,source in enumerate(texts)],[dict(id=4,text=text)])
+        self.assertEqual(set(owners.values()),{4})
 
 
 if __name__=='__main__':unittest.main()

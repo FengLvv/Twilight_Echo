@@ -178,11 +178,15 @@ export function validCorePlatformPayload(request: CorePlatformRequest): boolean 
     if (['study.environment','study.choosePack','study.runtime','study.audioInventory'].includes(request.name)) return Object.keys(p).length===0
     if (request.name==='study.runtimeActivity') return Object.keys(p).length===1 && typeof p.busy==='boolean'
     if (typeof p.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(p.id)) return false
+    if (request.name === 'study.workerResult' || request.name === 'study.ackWorkerResult')
+      return Object.keys(p).every(key => ['id','runId','generation','resultRevision',...(request.name === 'study.ackWorkerResult' ? ['terminal'] : [])].includes(key)) &&
+        typeof p.runId === 'string' && /^[a-zA-Z0-9-]{1,80}$/.test(p.runId) && Number.isSafeInteger(p.generation) && Number(p.generation) >= 0 &&
+        Number.isSafeInteger(p.resultRevision) && Number(p.resultRevision) >= 0 && (request.name !== 'study.ackWorkerResult' || typeof p.terminal === 'boolean')
     if(request.name==='study.validateCache')return Object.keys(p).every(k=>['id','source','result','verifyAudio'].includes(k))&&(p.source===undefined||typeof p.source==='string'&&p.source.length<32768&&!p.source.includes('\0')) && (p.result===undefined || !!p.result && typeof p.result==='object') && (p.verifyAudio===undefined || typeof p.verifyAudio==='boolean')
     if(request.name==='study.removeAudio')return Object.keys(p).every(k=>['id','kind'].includes(k))&&['six','leadBacking','twoSingers'].includes(String(p.kind))
     if(request.name==='study.exportSources')return Object.keys(p).every(k=>['id','outputDirectory','melody','lyrics'].includes(k))&&typeof p.outputDirectory==='string'&&p.outputDirectory.length>0&&p.outputDirectory.length<32768&&!p.outputDirectory.includes('\0')&&!!p.melody&&typeof p.melody==='object'&&typeof p.lyrics==='string'&&p.lyrics.length<=1024*1024
     if(request.name==='study.captureLocal')return Object.keys(p).length===2&&typeof p.path==='string'&&p.path.length<32768&&!p.path.includes('\0')
-    if (request.name==='study.startWorker') return typeof p.source==='string' && p.source.length<32768 && !p.source.includes('\0') &&
+    if (request.name==='study.startWorker') return typeof p.runId === 'string' && /^[a-zA-Z0-9-]{1,80}$/.test(p.runId) && typeof p.source==='string' && p.source.length<32768 && !p.source.includes('\0') &&
       typeof p.leadBacking==='boolean' && typeof p.twoSingers==='boolean' &&
       (p.lyrics===undefined || typeof p.lyrics==='string' && p.lyrics.length<=1024*1024 && !p.lyrics.includes('\0')) &&
       (p.operation===undefined || STUDY_OPERATIONS.some(operation => operation === p.operation)) &&

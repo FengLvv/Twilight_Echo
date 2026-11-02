@@ -1,5 +1,5 @@
 import { PortableBuffer } from '../../shared/portableBytes.ts'
-import type { prepareDownloadedMetadata } from './downloadMetadata.ts'
+import type { prepareDownloadedMetadata } from './downloadMetadataPort.ts'
 import type {
   DownloadMetadataRequest,
   DownloadMetadataResult

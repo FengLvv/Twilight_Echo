@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/downloads/completedDownloadResult.ts'
+export * from '../adapters/downloads/completedDownloadResult.ts'

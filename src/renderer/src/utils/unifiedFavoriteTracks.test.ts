@@ -4,7 +4,7 @@ import type { Track } from '../types/music'
 
 const { resolveUnifiedFavoriteTracks, summarizeUnifiedFavorites } = (await import(
   new URL('./unifiedFavoriteTracks.ts', import.meta.url).href
-)) as typeof import('./unifiedFavoriteTracks')
+)) as typeof import('./unifiedFavoriteTracks.ts')
 
 const localFavorite: Track = {
   id: 'local:moon',

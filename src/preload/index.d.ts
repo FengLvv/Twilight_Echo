@@ -197,13 +197,13 @@ interface AudioEngineAPI {
   loadQueue: (
     items: AudioEngineQueueItem[],
     startIndex?: number
-  ) => Promise<import('../shared/nativeQueue').NativeQueueCommit | void>
+  ) => Promise<import('../shared/nativeQueue.ts').NativeQueueCommit | void>
   selectQueueItem?: (
-    selection: import('../shared/nativeQueue').NativeQueueSelection
+    selection: import('../shared/nativeQueue.ts').NativeQueueSelection
   ) => Promise<boolean>
   rebindQueue?: (
-    request: import('../shared/nativeQueue').NativeQueueRebind
-  ) => Promise<import('../shared/nativeQueue').NativeQueueCommit | null>
+    request: import('../shared/nativeQueue.ts').NativeQueueRebind
+  ) => Promise<import('../shared/nativeQueue.ts').NativeQueueCommit | null>
   play: (filePath: string, startTime?: number) => Promise<AudioEnginePlayResult>
   isHtmlAudioFallbackAllowed: () => Promise<boolean>
   togglePause: () => Promise<void>
@@ -484,22 +484,22 @@ interface WindowAPI {
     getStartupSnapshot: () => Promise<AppStartupSnapshot>
     consumePendingNavigation: () => Promise<TrayNavigationTarget | null>
     relaunch: () => Promise<void>
-    checkForUpdates: () => Promise<import('../shared/appUpdate').AppUpdateCheckResult>
-    getUpdateState: () => Promise<import('../shared/appUpdate').AppUpdateSnapshot>
+    checkForUpdates: () => Promise<import('../shared/appUpdate.ts').AppUpdateCheckResult>
+    getUpdateState: () => Promise<import('../shared/appUpdate.ts').AppUpdateSnapshot>
     setUpdatePreferences: (
-      patch: import('../shared/appUpdate').AppUpdatePreferencePatch
-    ) => Promise<import('../shared/appUpdate').AppUpdateSnapshot>
+      patch: import('../shared/appUpdate.ts').AppUpdatePreferencePatch
+    ) => Promise<import('../shared/appUpdate.ts').AppUpdateSnapshot>
     dismissUpdate: (
       action: 'skip' | 'later'
-    ) => Promise<import('../shared/appUpdate').AppUpdateSnapshot>
+    ) => Promise<import('../shared/appUpdate.ts').AppUpdateSnapshot>
     onUpdateState: (
-      cb: (snapshot: import('../shared/appUpdate').AppUpdateSnapshot) => void
+      cb: (snapshot: import('../shared/appUpdate.ts').AppUpdateSnapshot) => void
     ) => () => void
-    downloadUpdate: () => Promise<import('../shared/appUpdate').AppUpdateDownloadResult>
+    downloadUpdate: () => Promise<import('../shared/appUpdate.ts').AppUpdateDownloadResult>
     cancelUpdateDownload: () => Promise<boolean>
-    installUpdate: () => Promise<import('../shared/appUpdate').AppUpdateInstallResult>
+    installUpdate: () => Promise<import('../shared/appUpdate.ts').AppUpdateInstallResult>
     onUpdateProgress: (
-      cb: (progress: import('../shared/appUpdate').AppUpdateProgress) => void
+      cb: (progress: import('../shared/appUpdate.ts').AppUpdateProgress) => void
     ) => () => void
     /**
      * Reject to report a failed close-time persistence transaction. The main
@@ -793,7 +793,7 @@ interface WindowAPI {
   fonts: {
     listInstalled: () => Promise<string[]>
   }
-  themeWorkshop: import('./types').ThemeWorkshopApi
+  themeWorkshop: import('./types.ts').ThemeWorkshopApi
   themes: {
     getSystemTone: () => Promise<ThemeTone>
     getBootstrap: () => Promise<ThemeBootstrap>

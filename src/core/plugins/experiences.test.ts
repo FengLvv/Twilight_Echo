@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import type { TwilightPluginDescriptor } from '../../shared/pluginTypes.ts'
 import type { LibraryDatabaseApi } from '../../shared/libraryDatabase.ts'
-import { CorePluginExperiences } from './experiences.ts'
+import { CorePluginExperiences } from '../../main/adapters/plugins/experiences.ts'
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'twilight-core-experiences-'))

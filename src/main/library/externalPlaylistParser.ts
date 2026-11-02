@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/playlists/fileParser.ts'
+export * from '../adapters/playlists/fileParser.ts'

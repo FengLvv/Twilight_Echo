@@ -42,8 +42,7 @@ export function useIslandVisualizer(enabled: Ref<boolean>, core: CorePlayerClien
     setBars(frame?.active && frame.tapStatus === 'active' ? frame.visualizerBars : [])
   })
   watch(
-    () =>
-      [enabled.value, visible.value, core.state.value?.epoch, core.status.value?.phase] as const,
+    [() => enabled.value, () => visible.value, () => core.state.value?.epoch, () => core.status.value?.phase],
     ([enabled, visible, epoch, phase], _previous, cleanup) => {
       setBars()
       if (!enabled || !visible || !epoch || phase !== 'ready') return

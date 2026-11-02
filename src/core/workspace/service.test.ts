@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { CoreWorkspaceService, type CoreWorkspaceOptions } from './service.ts'
-import { VersionedDataStore } from '../persistence/versionedDataStore.ts'
+import { VersionedDataStore } from '../../main/adapters/persistence/versionedDataStore.ts'
 import { captureQueueSession } from './tracks.ts'
 import {
   isQueueWorkspaceDocument,

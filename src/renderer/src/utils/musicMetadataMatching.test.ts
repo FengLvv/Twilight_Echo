@@ -4,7 +4,7 @@ import test from 'node:test'
 const { buildMetadataMatchCandidates, findBestMetadataMatch, enrichLocalTrackMetadata } =
   (await import(
     new URL('./musicMetadataMatching.ts', import.meta.url).href
-  )) as typeof import('./musicMetadataMatching')
+  )) as typeof import('./musicMetadataMatching.ts')
 
 const localTrack = {
   id: 'local:abc',

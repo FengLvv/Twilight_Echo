@@ -90,18 +90,17 @@ export function createCorePlayerVisualization(
     if (event.error) failed(new Error(event.error))
   })
   watch(
-    () =>
-      [
-        core.state.value?.epoch,
-        core.status.value?.phase,
-        visible.value,
-        hasConsumers.value,
-        options.value.spectrumPoints,
-        options.value.waveformPoints,
-        options.value.visualizerBarCount,
-        options.value.spectrogramFrames,
-        options.value.oscilloscopePoints
-      ] as const,
+    [
+      () => core.state.value?.epoch,
+      () => core.status.value?.phase,
+      () => visible.value,
+      () => hasConsumers.value,
+      () => options.value.spectrumPoints,
+      () => options.value.waveformPoints,
+      () => options.value.visualizerBarCount,
+      () => options.value.spectrogramFrames,
+      () => options.value.oscilloscopePoints
+    ],
     ([epoch, phase, isVisible, hasActiveConsumers], _previous, cleanup) => {
       if (!epoch || phase !== 'ready' || !isVisible || !hasActiveConsumers) {
         activeEpoch = undefined

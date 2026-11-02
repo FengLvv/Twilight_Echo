@@ -4,6 +4,7 @@ import type { LyricLine, LyricVoiceLayer } from '../utils/lyrics.ts'
 import { resolveLyricVoiceLayout, type LyricTextDirection } from '../utils/lyricVoiceLayout.ts'
 import { isSupportingVoiceActive } from '../utils/lyricSupportingVoice.ts'
 import PlayingLyricWords from './PlayingLyricWords.vue'
+import { provideNotationTypography } from '../composables/useNotationTypography.ts'
 
 interface LyricClockSnapshot {
   epoch: number
@@ -27,6 +28,10 @@ const props = defineProps<{
   harmonyStyle: Record<string, string>
   align: 'left' | 'center' | 'right'
 }>()
+const notationPixels = provideNotationTypography()
+const translationTextStyle = computed(() => notationPixels.value
+  ? { ...props.translationStyle, fontSize: `${notationPixels.value}px`, '--lyric-style-font-size': `${notationPixels.value}px` }
+  : props.translationStyle)
 
 const lineDirection = computed<LyricTextDirection>(() => {
   const text = props.line.voices?.map((voice) => voice.text).join(' ') || props.line.text
@@ -80,7 +85,7 @@ function voiceStyle(voice: LyricVoiceLayer): Record<string, string> | undefined 
 }
 
 function voiceTranslationStyle(voice: LyricVoiceLayer): Record<string, string> {
-  return voice.role === 'lead' ? props.translationStyle : props.harmonyStyle
+  return voice.role === 'lead' ? translationTextStyle.value : props.harmonyStyle
 }
 
 function voiceRomanizationStyle(voice: LyricVoiceLayer): Record<string, string> {
@@ -300,7 +305,7 @@ function voiceMotionRole(voice: LyricVoiceLayer): 'lead' | 'background' | 'harmo
     <span
       v-if="line.translation && !hasVoiceTranslation"
       class="lyric-translation"
-      :style="translationStyle"
+      :style="translationTextStyle"
       dir="auto"
     >
       {{ line.translation }}

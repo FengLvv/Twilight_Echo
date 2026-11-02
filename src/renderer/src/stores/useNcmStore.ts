@@ -5,6 +5,7 @@ import { useCoreConnection } from './coreConnection.ts'
 import { createCoreCloudTransfers } from './coreCloudTransfers.ts'
 import type { Track } from '../types/music'
 import { syncPluginProviders, useMediaProviders } from '@renderer/providers'
+import type { MediaProviderPlaylistSubscriptionState, MediaProviderPlaylistSummary } from '../../../shared/providerSearch.ts'
 
 export interface NcmProfile {
   userId: number
@@ -160,6 +161,7 @@ let cloudStateRevision = 0
 let accountRevision = 0
 let loginRequestRevision = 0
 let libraryRequestRevision = 0
+let libraryMutationRevision = 0
 
 export function captureNcmSession(): () => boolean {
   const revision = accountRevision
@@ -290,11 +292,21 @@ async function callNcmProvider<T>(
   }
 }
 
-function syncLikedIds(tracks: Track[]): void {
-  const ids = new Set<number>()
+let likedStateRevision = 0
+function syncLikedIds(tracks: Track[], replace = false): void {
+  likedStateRevision++
+  const ids = new Set<number>(replace ? [] : likedSongIds.value)
   for (const track of tracks) {
     if (track.ncmSongId != null) ids.add(track.ncmSongId)
   }
+  likedSongIds.value = ids
+}
+function applyLikedState(songId: number, liked: boolean): void {
+  if (!Number.isFinite(songId) || songId <= 0) return
+  likedStateRevision++
+  const ids = new Set(likedSongIds.value)
+  if (liked) ids.add(songId)
+  else ids.delete(songId)
   likedSongIds.value = ids
 }
 
@@ -391,7 +403,8 @@ export function useNcmStore() {
   }> {
     const isCurrentSession = captureNcmSession()
     const request = ++libraryRequestRevision
-    const isCurrent = (): boolean => isCurrentSession() && request === libraryRequestRevision
+    const mutation = libraryMutationRevision
+    const isCurrent = (): boolean => isCurrentSession() && request === libraryRequestRevision && mutation === libraryMutationRevision
     libraryLoading.value = true
     libraryError.value = ''
     try {
@@ -420,7 +433,7 @@ export function useNcmStore() {
   async function fetchLikedTracks(force = false): Promise<Track[]> {
     const isCurrent = captureNcmSession()
     const tracks = await callNcmProvider<Track[]>('fetchLikedTracks', [force])
-    if (isCurrent()) syncLikedIds(tracks)
+    if (isCurrent()) syncLikedIds(tracks, true)
     return tracks
   }
 
@@ -692,13 +705,17 @@ export function useNcmStore() {
     const isCurrent = captureNcmSession()
     await callNcmProvider<void>('likeTrack', [songId, like])
     if (!isCurrent()) return
-    if (like) {
-      likedSongIds.value = new Set([...likedSongIds.value, songId])
-    } else {
-      const next = new Set(likedSongIds.value)
-      next.delete(songId)
-      likedSongIds.value = next
-    }
+    applyLikedState(songId, like)
+  }
+  async function refreshLikedStates(tracks: readonly Track[]): Promise<void> {
+    if (!isLoggedIn.value) return
+    const isCurrent = captureNcmSession(), revision = likedStateRevision
+    const ids = [...new Set(tracks.flatMap(track => track.ncmSongId != null ? [track.ncmSongId] : []))]
+    const results = await Promise.all(ids.map(async id => [id, await callNcmProvider<boolean>('isTrackLiked', [id])] as const))
+    if (!isCurrent() || revision !== likedStateRevision) return
+    const next = new Set(likedSongIds.value)
+    for (const [id, liked] of results) { if (liked) next.add(id); else next.delete(id) }
+    likedSongIds.value = next
   }
 
   function isTrackLiked(ncmSongId: number | undefined): boolean {
@@ -748,6 +765,7 @@ export function useNcmStore() {
       owned: playlist.owned !== false
     }
     if (isCurrent()) {
+      libraryMutationRevision++
       userPlaylists.value = [
         summary,
         ...userPlaylists.value.filter((item) => item.id !== summary.id)
@@ -761,8 +779,22 @@ export function useNcmStore() {
     const isCurrent = captureNcmSession()
     await callNcmProvider<void>('deletePlaylist', [playlistId])
     if (!isCurrent()) return
+    libraryMutationRevision++
     const id = String(playlistId)
     userPlaylists.value = userPlaylists.value.filter((item) => String(item.id) !== id)
+  }
+
+  async function fetchPlaylistSubscriptionState(playlistId: number | string): Promise<MediaProviderPlaylistSubscriptionState> {
+    return callNcmProvider<MediaProviderPlaylistSubscriptionState>('fetchPlaylistSubscriptionState', [playlistId])
+  }
+
+  async function subscribePlaylist(playlist: MediaProviderPlaylistSummary, subscribe: boolean): Promise<void> {
+    const isCurrent = captureNcmSession()
+    await callNcmProvider<void>('subscribePlaylist', [playlist.id, subscribe])
+    if (!isCurrent()) return
+    libraryMutationRevision++
+    const remaining = userPlaylists.value.filter(item => String(item.id) !== String(playlist.id))
+    userPlaylists.value = subscribe ? [{ ...playlist, id: Number(playlist.id), owned: false }, ...remaining] : remaining
   }
 
   async function addTracksToPlaylist(
@@ -772,6 +804,7 @@ export function useNcmStore() {
     const isCurrent = captureNcmSession()
     await callNcmProvider<void>('addTracksToPlaylist', [playlistId, trackIds])
     if (!isCurrent()) return
+    libraryMutationRevision++
     const id = String(playlistId)
     userPlaylists.value = userPlaylists.value.map((item) =>
       String(item.id) === id
@@ -787,6 +820,7 @@ export function useNcmStore() {
     const isCurrent = captureNcmSession()
     await callNcmProvider<void>('removeTracksFromPlaylist', [playlistId, trackIds])
     if (!isCurrent()) return
+    libraryMutationRevision++
     const id = String(playlistId)
     const removed = trackIds.length
     userPlaylists.value = userPlaylists.value.map((item) =>
@@ -798,6 +832,8 @@ export function useNcmStore() {
 
   return {
     providerAvailable,
+    refreshLikedStates,
+    applyLikedState,
     providerError,
     isLoggedIn,
     profile,
@@ -866,6 +902,8 @@ export function useNcmStore() {
     syncLikedIds,
     createPlaylist,
     deletePlaylist,
+    fetchPlaylistSubscriptionState,
+    subscribePlaylist,
     addTracksToPlaylist,
     removeTracksFromPlaylist
   }

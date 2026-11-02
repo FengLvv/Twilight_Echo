@@ -28,7 +28,7 @@ type AssertNever<T> = [T] extends [never] ? true : never
 const registrationCoversUnion: AssertNever<MethodsMissingFromRegistration> = true
 const unionCoversRegistration: AssertNever<MethodsMissingFromUnion> = true
 
-const managerSource = readFileSync(new URL('../../core/plugins/manager.ts', import.meta.url), 'utf8')
+const managerSource = readFileSync(new URL('../adapters/plugins/manager.ts', import.meta.url), 'utf8')
 
 test('Core acknowledges plugin imports after persistence and emits one combined result notice', async () => {
   const ast = ts.createSourceFile('manager.ts', managerSource, ts.ScriptTarget.Latest, true)
@@ -231,17 +231,17 @@ test('metadata opt-in retains legacy provider string responses and authorized ca
   assert.equal(cached.bitrate, undefined)
 })
 const statePersistenceSource = readFileSync(
-  new URL('../../core/plugins/statePersistence.ts', import.meta.url),
+  new URL('../adapters/plugins/statePersistence.ts', import.meta.url),
   'utf8'
 )
 const operationQueueSource = readFileSync(new URL('../../core/plugins/operationQueue.ts', import.meta.url), 'utf8')
 const rpcCoordinatorSource = readFileSync(new URL('../../core/plugins/rpcCoordinator.ts', import.meta.url), 'utf8')
 const providerRoutingSource = readFileSync(new URL('../../core/plugins/providerRouting.ts', import.meta.url), 'utf8')
 const updateTransactionSource = readFileSync(
-  new URL('../../core/plugins/updateTransaction.ts', import.meta.url),
+  new URL('../adapters/plugins/updateTransaction.ts', import.meta.url),
   'utf8'
 )
-const packageSecuritySource = readFileSync(new URL('../../core/plugins/packageSecurity.ts', import.meta.url), 'utf8')
+const packageSecuritySource = readFileSync(new URL('../adapters/plugins/packageSecurity.ts', import.meta.url), 'utf8')
 const pluginTypesSource = readFileSync(new URL('../../shared/pluginTypes.ts', import.meta.url), 'utf8')
 const themeContributionSource = readFileSync(
   new URL('../../core/plugins/themeContribution.ts', import.meta.url),

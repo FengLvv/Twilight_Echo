@@ -1,1 +1,1 @@
-export * from '../../../core/plugins/rhine-vendor/qq-credits.mjs'
+export * from '../../../main/adapters/plugins/rhine-vendor/qq-credits.mjs'

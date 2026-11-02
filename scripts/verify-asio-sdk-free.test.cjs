@@ -32,6 +32,7 @@ test('ASIO SDK removal gate catches SDK paths and includes without matching inte
 
 test('ASIO SDK removal gate ignores WorkBuddy project data and generated directories', () => {
   assert.equal(IGNORED_DIRECTORIES.has('.workbuddy'), true)
+  assert.equal(IGNORED_DIRECTORIES.has('.local'), true)
   assert.equal(IGNORED_DIRECTORIES.has('node_modules'), true)
   assert.equal(IGNORED_DIRECTORIES.has('build'), true)
 })

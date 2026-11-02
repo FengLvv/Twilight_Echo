@@ -7,7 +7,7 @@ import { EventEmitter } from 'node:events'
 import {
   CoreNcmCloudTransferService,
   type CoreNcmCloudTransferOptions
-} from './cloudTransferService.ts'
+} from '../../main/adapters/ncm/cloudTransferService.ts'
 import type { NcmCloudTransferProgress } from '../../shared/ncmCloud.ts'
 
 function deferred<T = void>() {

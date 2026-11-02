@@ -1,10 +1,86 @@
 import json
 import unittest
 from types import SimpleNamespace as Word
-from vocal_pipeline import validate_lines, source_owners, restore_spelling, lyric_groups
+from vocal_pipeline import validate_lines, source_owners, restore_spelling, lyric_groups, prepare_lyrics
 from vocal_score import inert_svg, phrase_part, engraving_part
 
 class VocalPipelineTests(unittest.TestCase):
+    def test_provider_outro_is_cleaned_before_audio_duration_validation(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        rows=[dict(id=0,start=5,end=7,text='真实演唱'),
+              dict(id=61,start=349.203,end=350,text='出品音乐公司：天涯音乐工作室 Tian Ya Music Productions')]
+        with patch('vocal_activity.detect_vocal_activity',return_value=dict(status='estimated',start=5,end=7,margin=.8)), \
+             patch('vocal_lyric_classifier.filter_lyrics',side_effect=lambda lines,pack:(lines,[],dict(elapsedMs=0))):
+            kept,policy,_=prepare_lyrics(json.dumps(rows),349.5417,Path('audio'),Path('models'))
+        self.assertEqual(kept,rows[:1])
+        self.assertIn(dict(id=61,reason='after_vocals'),policy['excluded'])
+
+    def test_uncertain_activity_still_rejects_sung_rows_outside_audio(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        rows=[dict(id=3,start=349,end=350,text='不要误删这句演唱')]
+        with patch('vocal_activity.detect_vocal_activity',return_value=dict(status='uncertain')), \
+             patch('vocal_lyric_classifier.filter_lyrics',side_effect=lambda lines,pack:(lines,[],dict(elapsedMs=0))):
+            with self.assertRaisesRegex(ValueError,'第 4 行.*349.54'):
+                prepare_lyrics(json.dumps(rows),349.5417,Path('audio'),Path('models'))
+
+    def test_structured_lead_lyrics_skip_credit_words_and_do_not_read_audio_boundaries(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        rows=[dict(id=3,start=0,end=2,text='作词：我心中的你',origin=dict(format='amll-ttml',kind='lyric'))]
+        with patch('vocal_activity.detect_vocal_activity',side_effect=AssertionError('Must not run for TTML')):
+            selected,policy,elapsed=prepare_lyrics(json.dumps(rows),5,Path('nonexistent-audio'),Path('models'))
+        self.assertEqual(selected,rows)
+        self.assertEqual(policy['mode'],'structured')
+        self.assertEqual(policy['activity']['status'],'skipped')
+        self.assertEqual(policy['excluded'],[])
+        self.assertEqual(elapsed,0)
+
+    def test_plain_provider_lyrics_keep_the_existing_credit_and_vocal_boundary_fallback(self):
+        from pathlib import Path
+        from unittest.mock import patch
+        rows=[dict(id=0,start=0,end=1,text='作词：某某'),dict(id=1,start=1,end=2,text='Unknown attribution'),
+              dict(id=2,start=5,end=7,text='真正演唱的歌词')]
+        activity=dict(status='estimated',start=5,end=7,margin=.8)
+        with patch('vocal_activity.detect_vocal_activity',return_value=activity) as detect, \
+             patch('vocal_lyric_classifier.filter_lyrics',side_effect=lambda lines,pack:(lines,[],dict(elapsedMs=0))):
+            selected,policy,_=prepare_lyrics(json.dumps(rows),8,Path('audio'),Path('models'))
+        detect.assert_called_once()
+        self.assertEqual(selected,rows[2:])
+        self.assertEqual(policy['mode'],'heuristic')
+        self.assertEqual(policy['excluded'],[dict(id=0,reason='credit'),dict(id=1,reason='before_vocals')])
+
+    def test_mixed_source_annotations_cannot_disable_the_provider_cleanup(self):
+        rows=[dict(id=0,start=0,end=1,text='Main',origin=dict(format='amll-ttml',kind='lyric')),
+              dict(id=1,start=1,end=2,text='Other')]
+        with self.assertRaisesRegex(ValueError,'来源混用'):validate_lines(json.dumps(rows),3)
+
+    def test_rounding_an_attack_onto_the_next_downbeat_cannot_leave_an_empty_pickup_measure(self):
+        from music21 import stream
+        for beat in [223.97297282506887,3.98,-.02]:
+            part,events=phrase_part([(7,dict(beat=beat,durationBeats=.375)),(8,dict(beat=beat+.375,durationBeats=.25))])
+            rendered=engraving_part(part)
+            self.assertTrue(all(m.highestTime>0 for m in rendered.getElementsByClass(stream.Measure)))
+            self.assertEqual(events,[(0,.375,7),(.375,.625,8)])
+
+    def test_complex_rests_are_split_before_musicxml_roundtrip_without_losing_time_or_note_identity(self):
+        from music21 import stream
+        import jianpu_ly
+        import tempfile
+        from pathlib import Path
+        beats=[(1,.125),(1.75,.125),(4.125,.625),(4.75,.125),(4.875,.125),(5,.125),(8.75,.75)]
+        part,events=phrase_part([(i,dict(beat=b,durationBeats=d)) for i,(b,d) in enumerate(beats)])
+        self.assertEqual(set(index for start,end,index in events),set(range(len(beats))))
+        self.assertAlmostEqual(sum(end-start for start,end,index in events),sum(d for b,d in beats))
+        for obj in part.recurse().notesAndRests:
+            self.assertEqual(len(obj.duration.components),1)
+            self.assertLessEqual(obj.duration.dots,1)
+        with tempfile.TemporaryDirectory() as directory:
+            score=stream.Score();score.append(engraving_part(part));xml=Path(directory)/'rest.musicxml'
+            score.write('musicxml',fp=str(xml))
+            self.assertTrue(jianpu_ly.process_input(jianpu_ly.xml2jianpu(xml.read_text(encoding='utf-8'))))
+
     def test_render_adapter_supports_every_eighth_beat_pickup_without_changing_source_events(self):
         from music21 import stream,meter
         import jianpu_ly

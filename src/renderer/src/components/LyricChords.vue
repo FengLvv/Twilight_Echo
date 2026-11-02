@@ -59,16 +59,19 @@ const slots = computed(() =>
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: 0.02em;
   color: inherit;
-  opacity: 0.72;
+  opacity: var(--lyric-annotation-group-opacity, 0.72);
   white-space: nowrap;
   overflow: hidden;
   text-align: center;
 }
 .lyric-chords > span {
+  color: var(--lyric-annotation-inactive, inherit);
+  paint-order: stroke fill;
+  -webkit-text-stroke: var(--lyric-annotation-outline-width, 0px) var(--lyric-annotation-outline-color, transparent);
   transition:
     opacity 0.12s,
     color 0.12s;
-  opacity: 0.6;
+  opacity: var(--lyric-annotation-opacity, 0.6);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,7 +80,7 @@ const slots = computed(() =>
 }
 .lyric-chords > .chord-active {
   opacity: 1;
-  color: var(--te-playback-lyric-active-text, #fff);
+  color: var(--lyric-annotation-active, var(--te-playback-lyric-active-text, #fff));
   border-bottom-color: currentColor;
   background: color-mix(in srgb, currentColor 8%, transparent);
 }

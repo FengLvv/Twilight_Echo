@@ -748,7 +748,7 @@ export function createExperienceBridge(
         () => send('player', state())
       )
     )
-    stops.push(watch(() => [player.libraryQueueSnapshot.value?.id, player.libraryQueueSnapshot.value?.revision], () => send('queue', null)))
+    stops.push(watch([() => player.libraryQueueSnapshot.value?.id, () => player.libraryQueueSnapshot.value?.revision], () => send('queue', null)))
     stops.push(
       watch(
         () => player.currentTrack.value?.lyrics,
@@ -758,7 +758,7 @@ export function createExperienceBridge(
   }
   if (experience.permissions.includes('library:read'))
     stops.push(watch(
-      () => [core.state.value?.epoch, core.state.value?.libraryRevision, core.state.value?.playlistsRevision, core.state.value?.scan],
+      [() => core.state.value?.epoch, () => core.state.value?.libraryRevision, () => core.state.value?.playlistsRevision, () => JSON.stringify(core.state.value?.scan)],
       () => send('library', null)
     ))
   const timer = setInterval(() => {

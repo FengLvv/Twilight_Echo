@@ -6,7 +6,7 @@ import test from 'node:test'
 
 const { CanonicalPathGrantSet } = (await import(
   new URL('./pathGrants.ts', import.meta.url).href
-)) as typeof import('./pathGrants')
+)) as typeof import('./pathGrants.ts')
 
 test('canonical grants authorize descendants but reject unrelated files', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'twilight-path-grants-'))

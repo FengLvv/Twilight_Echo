@@ -17,9 +17,9 @@ import type {
   CoreSnapshot
 } from '../shared/coreProtocol.ts'
 import { coreOperation } from '../shared/coreProtocol.ts'
-import { CoreDownloadsService } from './downloads/service.ts'
+import { CoreDownloadsService } from '../main/composition/downloads/service.ts'
 import { CoreMusicCacheService } from './cache/service.ts'
-import { OpraCatalog } from './audio/opraCatalog.ts'
+import { OpraCatalog } from '../main/adapters/audio/opraCatalog.ts'
 import { CoreCatalogService } from './catalog/service.ts'
 import { CoreGenresService } from './library/genresService.ts'
 import { CoreMusicRatingsService } from './library/ratingsService.ts'
@@ -43,7 +43,7 @@ import { LibraryDatabase } from '../main/library/libraryDatabase.ts'
 import { emptyMusicVersions } from '../shared/musicVersions.ts'
 import type { TrackData } from '../shared/track.ts'
 import { CoreMetadataService } from './library/metadataService.ts'
-import { CorePersonalBackupService } from './persistence/personalBackupService.ts'
+import { CorePersonalBackupService } from '../main/composition/persistence/personalBackupService.ts'
 import type { EntityMetadataDatabaseApi, EntityMetadataDetail, EntityMetadataJob } from '../shared/entityMetadata.ts'
 
 function fixture(

@@ -8,7 +8,7 @@ const {
   shouldUseNativePlaybackTarget
 } = (await import(
   new URL('./playbackRouting.ts', import.meta.url).href
-)) as typeof import('./playbackRouting')
+)) as typeof import('./playbackRouting.ts')
 
 test('local files use native playback without requiring exclusive output', () => {
   for (const extension of ['ape', 'wma', 'wv', 'dsf']) {

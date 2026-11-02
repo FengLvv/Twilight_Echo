@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+__pycache__/
+*.py[cod]
 resources/music-study/**/__pycache__/
 agent-harness/**/__pycache__/
 agent-harness/*.egg-info/

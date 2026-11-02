@@ -79,8 +79,9 @@ interface LoadContext {
 }
 
 export interface CorePlaybackEngine extends LibraryNativeQueueEngine {
+  getPlaybackInfo(fresh?: boolean): Promise<PlaybackInfo>
   start(): Promise<void>
-  play(source: string, position?: number, requested?: () => boolean, initiallyPaused?: boolean): Promise<AudioEnginePlayResult>
+  play(source: string, position?: number, requested?: () => boolean, initiallyPaused?: boolean, followPlaybackClock?: boolean): Promise<AudioEnginePlayResult>
   setStudyMixGains?(gains: Partial<Record<import('../../shared/musicStudy.ts').StudyTrack,number>>): Promise<void>
   pause(): Promise<void>
   stop(): Promise<void>
@@ -165,13 +166,13 @@ export class CorePlaybackSession {
     await this.transport(async()=>{
       this.guard(intent)
       if(!matches())throw Object.assign(new Error('当前歌曲已变化'),{code:'CANCELLED'})
-      const actual=await this.options.engine.getPlaybackInfo()
+      const actual=await this.options.engine.getPlaybackInfo(true)
       const resume=this.restored?this.info?.state==='playing':actual.state==='playing'
       const position=this.restored?this.info?.position??0:actual.position
       this.studyAudition={source,intent,position,resume,loop:null,songId:this.currentTrack?.id??'',occurrenceId:this.controller.reference()?.entryId,originalSource:this.restored?'':actual.source,originalQueue:structuredClone([...this.options.engine.getQueueSnapshot()]),originalIndex:actual.queueIndex,originalRevision:this.controller.reference()?.revision}
       await this.options.engine.setLoopRangeConfirmed?.(-1,-1)
       await this.options.engine.loadQueue([],0)
-      const result=await this.options.engine.play(source,position,()=>this.intent===intent&&matches(),!resume)
+      const result=await this.options.engine.play(source,position,()=>this.intent===intent&&matches(),!resume,true)
       if (!result.nativeStarted) { this.studyAudition=null; throw new Error(result.fallbackReason || '无法开始分轨试听') }
       this.restored=false;this.observed=null;this.uncertain=false
       this.info={...await this.options.engine.getPlaybackInfo(),queueIndex:this.controller.reference()?.index??0}
@@ -185,8 +186,8 @@ export class CorePlaybackSession {
     await this.transport(async()=>{
       const session=this.studyAudition
       if (!session || session.intent!==this.intent) throw new Error('分轨试听已结束')
-      const info=await this.options.engine.getPlaybackInfo()
-      const result=await this.options.engine.play(source,info.position,()=>this.studyAudition===session&&session.intent===this.intent,info.state!=='playing')
+      const info=await this.options.engine.getPlaybackInfo(true)
+      const result=await this.options.engine.play(source,info.position,()=>this.studyAudition===session&&session.intent===this.intent,info.state!=='playing',true)
       if (!result.nativeStarted) throw new Error(result.fallbackReason || '无法更新分轨混音')
       if(this.studyAudition!==session||session.intent!==this.intent)return
       session.source=source
@@ -207,7 +208,7 @@ export class CorePlaybackSession {
       let fallback: {position:number; playing:boolean} | null = null
       await this.transport(async()=>{
         if(this.studyAudition!==session||session.intent!==this.intent)return
-        const actual=await this.options.engine.getPlaybackInfo()
+        const actual=await this.options.engine.getPlaybackInfo(true)
         this.guard(session.intent)
         await this.options.engine.setLoopRangeConfirmed?.(-1,-1)
         if(!session.originalSource || !session.originalQueue.length || this.controller.reference()?.revision!==session.originalRevision){
@@ -218,7 +219,7 @@ export class CorePlaybackSession {
           this.publish();return
         }
         await this.options.engine.loadQueue(session.originalQueue,session.originalIndex)
-        const restored=await this.options.engine.play(session.originalSource,actual.position,()=>this.studyAudition===session&&session.intent===this.intent,actual.state!=='playing')
+        const restored=await this.options.engine.play(session.originalSource,actual.position,()=>this.studyAudition===session&&session.intent===this.intent,actual.state!=='playing',true)
         if(!restored.nativeStarted||restored.superseded)throw nativeStartFailure(restored)
         this.guard(session.intent)
         this.studyAudition=null;this.restored=false;this.observed=null
@@ -2111,7 +2112,7 @@ export class CorePlaybackSession {
   }
   private async stopTransport(current = () => true): Promise<void> {
     const started=this.options.now()
-    const timing=(phase:string)=>{try{this.options.preparationTiming?.({intent:this.intent,phase,elapsedMs:this.options.now()-started})}catch{}}
+    const timing=(phase:string)=>{try{this.options.preparationTiming?.({intent:this.intent,phase,elapsedMs:this.options.now()-started})}catch{ /* Timing observers must not interrupt playback. */ }}
     timing('stop.wait')
     await this.transport(async () => {
       timing('stop.enter')

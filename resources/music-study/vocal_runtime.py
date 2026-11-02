@@ -53,6 +53,8 @@ def dispatch(method, params):
     if method == 'residency':
         return snapshot()
     if method == 'standby':
+        from vocal_lyric_classifier import release_classifier
+        release_classifier()
         return standby()
     try:
         return execute(method, params)

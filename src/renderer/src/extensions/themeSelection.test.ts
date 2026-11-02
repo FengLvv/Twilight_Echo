@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { getPluginThemeKey, resolveSelectedPluginTheme } = (await import(
   new URL('./themeSelection.ts', import.meta.url).href
-)) as typeof import('./themeSelection')
+)) as typeof import('./themeSelection.ts')
 
 const themes = [
   {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {useAppWindowLifecycle} from './app/useAppWindowLifecycle.ts'
+
 import NativeDialogTransition from '@renderer/components/NativeDialogTransition.vue'
 import { mountWorkshopDecorations } from '@renderer/components/theme-workshop/workshopDecorations'
 import {
@@ -713,11 +715,7 @@ watch(
   { immediate: true }
 )
 
-let removePlaybackSessionSaveListener: (() => void) | null = null
-let removeAppNavigationListener: (() => void) | null = null
-let removeHistoryCommandListener: (() => void) | null = null
-let quitFlushHandler: (() => void) | null = null
-let pageHideFlushHandler: (() => void) | null = null
+const appWindowLifecycle=useAppWindowLifecycle({navigate:applyExternalNavigation,history:routeHistoryCommand,flush:()=>navigationPersistence.flush(),back:onGlobalBackKeydown})
 const startupDataErrorScopes = new Set<string>()
 
 function reportStartupDataError(scope: string, error: unknown): void {
@@ -736,9 +734,6 @@ function reportStartupDataError(scope: string, error: unknown): void {
   })
 }
 
-function flushPendingPersistenceForExit(): void {
-  navigationPersistence.flush()
-}
 
 onMounted(async () => {
   const startupSnapshot = await getStartupSnapshot()
@@ -746,12 +741,7 @@ onMounted(async () => {
   const loadedSettings = startupSnapshot
     ? hydrateStartupSnapshot(startupSnapshot)
     : await loadSettings()
-  removeAppNavigationListener = window.api.app.onNavigate((target) => {
-    applyExternalNavigation(target)
-    void window.api.app.consumePendingNavigation()
-  })
-  removeHistoryCommandListener = window.api.app.onHistoryCommand(routeHistoryCommand.run)
-  window.addEventListener('mouseup', routeHistoryCommand.handleMouseUp, true)
+  appWindowLifecycle.navigation()
   const pendingNavigation =
     startupSnapshot?.pendingNavigation ?? (await window.api.app.consumePendingNavigation())
   if (pendingNavigation) applyExternalNavigation(pendingNavigation)
@@ -775,9 +765,7 @@ onMounted(async () => {
   const startupNavigation = navigation.session.value
 
   // Closing a view only saves its navigation; main flushes the Core owner.
-  removePlaybackSessionSaveListener = window.api.app.onSavePlaybackSession(async () => {
-    navigationPersistence.flush()
-  })
+  appWindowLifecycle.persistence()
   // Run independent startup operations in parallel so none blocks the others.
   const libraryLoad = loadApplicationLibrary()
   const playlistsLoad = loadPlaylists()
@@ -824,11 +812,7 @@ onMounted(async () => {
 
   // Lifecycle events are best-effort; the close IPC callback above provides
   // the awaitable completion barrier for application shutdown.
-  quitFlushHandler = flushPendingPersistenceForExit
-  pageHideFlushHandler = flushPendingPersistenceForExit
-  window.addEventListener('beforeunload', quitFlushHandler)
-  window.addEventListener('pagehide', pageHideFlushHandler)
-  window.addEventListener('keydown', onGlobalBackKeydown)
+  appWindowLifecycle.pageEvents()
 })
 
 watch(
@@ -879,18 +863,6 @@ onBeforeUnmount(() => {
   navigationPersistence.stop()
   idleLoginCheck?.cancel()
   idleLoginCheck = null
-  removePlaybackSessionSaveListener?.()
-  removePlaybackSessionSaveListener = null
-  removeAppNavigationListener?.()
-  removeAppNavigationListener = null
-  removeHistoryCommandListener?.()
-  removeHistoryCommandListener = null
-  window.removeEventListener('mouseup', routeHistoryCommand.handleMouseUp, true)
-  if (quitFlushHandler) window.removeEventListener('beforeunload', quitFlushHandler)
-  if (pageHideFlushHandler) window.removeEventListener('pagehide', pageHideFlushHandler)
-  window.removeEventListener('keydown', onGlobalBackKeydown)
-  quitFlushHandler = null
-  pageHideFlushHandler = null
   stopSideMenuMonitor()
   disposeSideMenuClearance()
   document.body.classList.remove('te-settings-surface')

@@ -1,0 +1,676 @@
+{
+  "date": "2026-11-01",
+  "hardware": "NVIDIA RTX 5080 16 GiB; system RAM 127.5 GiB; Windows 11",
+  "executable": "dist/study-corpus-reviewed/win-unpacked/TwilightEcho.exe",
+  "corpus": {
+    "songs": 20,
+    "seconds": 5226.30739229025,
+    "selection": "Authorized full recordings from NetEase; coverage labels manually selected, not provider genre metadata"
+  },
+  "baseline": {
+    "passed": 14,
+    "failed": [
+      {
+        "index": 3,
+        "title": "倔强",
+        "error": "Error: 歌词时间或内容无效，请重新加载歌词"
+      },
+      {
+        "index": 6,
+        "title": "光年之外",
+        "error": "Error: 简谱排版失败："
+      },
+      {
+        "index": 7,
+        "title": "爱人错过",
+        "error": "Error: 简谱排版失败："
+      },
+      {
+        "index": 8,
+        "title": "大鱼 (唱片版)",
+        "error": "Error: 歌词时间或内容无效，请重新加载歌词"
+      },
+      {
+        "index": 15,
+        "title": "Stan",
+        "error": "Error: 歌词发音编码失败：Unknown phonemes ['24'] in word '24'"
+      },
+      {
+        "index": 19,
+        "title": "夜に駆ける",
+        "error": "Error: 歌词发音编码失败：Unknown phonemes ['「'] in word '「'"
+      }
+    ]
+  },
+  "verified": {
+    "passed": 20,
+    "failed": 0,
+    "exports": 40,
+    "notes": 10324,
+    "scoreRows": 1066,
+    "cacheLimitBytes": 2147483648,
+    "maxObservedCommittedCacheBytes": 2099107808,
+    "recognitionMs": {
+      "min": 15788,
+      "median": 34918,
+      "max": 76841
+    },
+    "layoutMs": {
+      "min": 3936,
+      "median": 8006,
+      "max": 22150
+    },
+    "maxMidiRoundTripErrorMs": 0.8757
+  },
+  "qualityObservations": [
+    {
+      "index": 5,
+      "title": "Play我呸 (Alesso Remix Version)",
+      "observation": "Chord output is highly concentrated; requires listening/reference-score review, not counted as recognition accuracy",
+      "label": "Bb",
+      "durationShare": 0.9898850558206703
+    }
+  ],
+  "songs": [
+    {
+      "index": 1,
+      "ncmId": "66842",
+      "title": "十年",
+      "artist": "陈奕迅",
+      "coverage": "华语抒情",
+      "language": "zh",
+      "duration": 205.42356009070295,
+      "chords": 105,
+      "notes": 308,
+      "scoreRows": 38,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 61580,
+      "layoutMs": 8381,
+      "wallMs": 79074,
+      "inferredMelodyKey": {
+        "tonic": 5,
+        "mode": "minor"
+      },
+      "sourceSha256": "8977aa7e5dfa1b5bd85c2e4101c3064d62a9ccb5a1911f451fd375cfbe2b15d7",
+      "pcmSha256": "1c1f9ce755ee6b574f063acd9b6716d23a8565038d5d31d2a1e3817fd70e09c4",
+      "maxAudioPeak": 1.0644917488098145,
+      "audioMixtureResidualRatio": 0.1154853541681905,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Ab",
+        "durationShare": 0.23212313168776136
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 2,
+      "ncmId": "454828887",
+      "title": "遇见",
+      "artist": "孙燕姿",
+      "coverage": "女声民谣流行",
+      "language": "zh",
+      "duration": 209.76,
+      "chords": 134,
+      "notes": 244,
+      "scoreRows": 25,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 25818,
+      "layoutMs": 4313,
+      "wallMs": 13243,
+      "inferredMelodyKey": {
+        "tonic": 8,
+        "mode": "major"
+      },
+      "sourceSha256": "f7fd55b3d4f093bc45fa5e6e30b4e65eb71f26f579104e2b031a67980b02d077",
+      "pcmSha256": "a3929115558a498dcbd3407362e218122162c8ab623efbb8dab33cfddf5bc7ce",
+      "maxAudioPeak": 0.820675253868103,
+      "audioMixtureResidualRatio": 0.13649411529958036,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Ab",
+        "durationShare": 0.2796529366895498
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 3,
+      "ncmId": "386175",
+      "title": "倔强",
+      "artist": "五月天",
+      "coverage": "华语摇滚",
+      "language": "zh",
+      "duration": 261.6184580498866,
+      "chords": 167,
+      "notes": 460,
+      "scoreRows": 53,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 33010,
+      "layoutMs": 8067,
+      "wallMs": 18904,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "99e4d649ef8e22d822f5946ac5a603b9342b6887c7412328afe8305be1f8eeb1",
+      "pcmSha256": "d66030c826f67a2f463fb4b916f7f14c8bf59db47f19ae78af56aacf4be61222",
+      "maxAudioPeak": 1.0554043054580688,
+      "audioMixtureResidualRatio": 0.07184024621974075,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "A",
+        "durationShare": 0.18511101399677246
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 4,
+      "ncmId": "28815250",
+      "title": "平凡之路",
+      "artist": "朴树",
+      "coverage": "民谣摇滚",
+      "language": "zh",
+      "duration": 302.1196371882086,
+      "chords": 177,
+      "notes": 481,
+      "scoreRows": 38,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 41177,
+      "layoutMs": 6584,
+      "wallMs": 15920,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "64959c7d108f7d1499d24ae915172beca719ba97c40743cd6921d42524da68d9",
+      "pcmSha256": "cade42ded7d75be0c4498e2c0d39a4240556cdd77d5a64102fd846db8c41a473",
+      "maxAudioPeak": 1.1981589794158936,
+      "audioMixtureResidualRatio": 0.16682437006140055,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "A",
+        "durationShare": 0.3124921004098329
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 5,
+      "ncmId": "432698987",
+      "title": "Play我呸 (Alesso Remix Version)",
+      "artist": "蔡依林 / Alesso",
+      "coverage": "中英混合舞曲／说唱",
+      "language": "zh-en",
+      "duration": 227.38632653061225,
+      "chords": 5,
+      "notes": 496,
+      "scoreRows": 44,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 15788,
+      "layoutMs": 6424,
+      "wallMs": 16115,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "major"
+      },
+      "sourceSha256": "253ee17843c3720c2b4f7fdf19ba6824a83f2f3dc37b6ffd49cd16af8201e57e",
+      "pcmSha256": "0d02066a7c1a910110f9eb121c7ecd9024f13b4846049fe2359792f1459df3aa",
+      "maxAudioPeak": 1.768276333808899,
+      "audioMixtureResidualRatio": 0.09779021129399343,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Bb",
+        "durationShare": 0.9898850558206703
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 6,
+      "ncmId": "449818741",
+      "title": "光年之外",
+      "artist": "G.E.M.邓紫棋",
+      "coverage": "高音流行",
+      "language": "zh",
+      "duration": 235.50503401360544,
+      "chords": 85,
+      "notes": 439,
+      "scoreRows": 57,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 33533,
+      "layoutMs": 8417,
+      "wallMs": 20010,
+      "inferredMelodyKey": {
+        "tonic": 4,
+        "mode": "major"
+      },
+      "sourceSha256": "ef871fb28b377c34225e66a4f06866a1254cc0f31cf6e9598c6692c7f7294ce8",
+      "pcmSha256": "59158d58c19bc7e6be814fa8197f9467379d24b083d34c874b144cdaa7bd2c38",
+      "maxAudioPeak": 1.0994141101837158,
+      "audioMixtureResidualRatio": 0.14225114024746374,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Amaj7",
+        "durationShare": 0.24330690101804617
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 7,
+      "ncmId": "1368754688",
+      "title": "爱人错过",
+      "artist": "告五人",
+      "coverage": "独立乐队",
+      "language": "zh",
+      "duration": 292.0748526077098,
+      "chords": 78,
+      "notes": 418,
+      "scoreRows": 53,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 37746,
+      "layoutMs": 8600,
+      "wallMs": 17908,
+      "inferredMelodyKey": {
+        "tonic": 10,
+        "mode": "minor"
+      },
+      "sourceSha256": "9518cead1a016d09c709a6408cf73c249fa278c4ffdfebaa626da30ea84ad8eb",
+      "pcmSha256": "74029ff7cabb9214cb500eb16e649a9c0c94f84ef5c633d2ede9eee5b64cd450",
+      "maxAudioPeak": 1.3685764074325562,
+      "audioMixtureResidualRatio": 0.08880341771882135,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Bbm",
+        "durationShare": 0.25341056221338
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 8,
+      "ncmId": "516823132",
+      "title": "大鱼 (唱片版)",
+      "artist": "周深",
+      "coverage": "假声／长拖音",
+      "language": "zh",
+      "duration": 317.59780045351476,
+      "chords": 122,
+      "notes": 241,
+      "scoreRows": 24,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 42842,
+      "layoutMs": 3936,
+      "wallMs": 13056,
+      "inferredMelodyKey": {
+        "tonic": 10,
+        "mode": "minor"
+      },
+      "sourceSha256": "033707deea1044584d7579856c6126eb69da1ad6b0bc5b8d5bdef884770eb152",
+      "pcmSha256": "e67248f2d1a53ff6ef23a79b028cf63fe81517951f2ff3cab4fbc5dc93c2b913",
+      "maxAudioPeak": 1.0605989694595337,
+      "audioMixtureResidualRatio": 0.1262486990482198,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Bbm",
+        "durationShare": 0.32670251447533843
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 9,
+      "ncmId": "513360721",
+      "title": "云烟成雨",
+      "artist": "房东的猫",
+      "coverage": "民谣",
+      "language": "zh",
+      "duration": 240.78290249433107,
+      "chords": 105,
+      "notes": 364,
+      "scoreRows": 42,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 33345,
+      "layoutMs": 6248,
+      "wallMs": 15872,
+      "inferredMelodyKey": {
+        "tonic": 11,
+        "mode": "major"
+      },
+      "sourceSha256": "ae44dac2baadbed28579da0aa9391a9b91d34b67c8291ff0745025652de69a6e",
+      "pcmSha256": "d406bb867a39c6f581221025864de88f5f8f46ae26ae4bafaabf43517025e3ec",
+      "maxAudioPeak": 1.1936228275299072,
+      "audioMixtureResidualRatio": 0.1257814206893351,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "B",
+        "durationShare": 0.16414330953279183
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 10,
+      "ncmId": "354738",
+      "title": "最炫民族风",
+      "artist": "凤凰传奇",
+      "coverage": "双主唱／说唱",
+      "language": "zh",
+      "duration": 283.99818594104306,
+      "chords": 213,
+      "notes": 622,
+      "scoreRows": 57,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 31941,
+      "layoutMs": 8643,
+      "wallMs": 18446,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "major"
+      },
+      "sourceSha256": "bafceab10fe81ce3ced2b2e04c70b0e580ca836695248a32688bc028efb7c4c5",
+      "pcmSha256": "e3d59ca5280922653c100605b3e95b9f1ab7254da42f751155e70eee57706665",
+      "maxAudioPeak": 1.3331704139709473,
+      "audioMixtureResidualRatio": 0.05929846344192233,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "C#m",
+        "durationShare": 0.2098893193402913
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 11,
+      "ncmId": "16435049",
+      "title": "Someone Like You",
+      "artist": "Adele",
+      "coverage": "钢琴／灵魂流行",
+      "language": "en",
+      "duration": 285.24,
+      "chords": 122,
+      "notes": 479,
+      "scoreRows": 68,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 40501,
+      "layoutMs": 11010,
+      "wallMs": 20499,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "f50ecf78103650ca41bb509773d8f602151d60b30b5f23224b6b30804642c83c",
+      "pcmSha256": "05f671fe41c344828856f8ab127279cc4dcc500b5ccbdd4d2ec1933c0734761b",
+      "maxAudioPeak": 1.0340994596481323,
+      "audioMixtureResidualRatio": 0.13555125646890961,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "D",
+        "durationShare": 0.2811667367830594
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 12,
+      "ncmId": "1355147933",
+      "title": "bad guy",
+      "artist": "Billie Eilish",
+      "coverage": "电子流行",
+      "language": "en",
+      "duration": 194.08784580498866,
+      "chords": 33,
+      "notes": 279,
+      "scoreRows": 47,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 24883,
+      "layoutMs": 6894,
+      "wallMs": 15504,
+      "inferredMelodyKey": {
+        "tonic": 7,
+        "mode": "minor"
+      },
+      "sourceSha256": "f9e3fde68d1f12b7da92b878bcdf39568d071731ece981f5eb3da99f9cbe4651",
+      "pcmSha256": "ccba6a3de908aaee3c5d5cb598eb41822a288e48515ffb5e53e83641c5e85ed8",
+      "maxAudioPeak": 1.4856266975402832,
+      "audioMixtureResidualRatio": 0.03707002098176687,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "Gm",
+        "durationShare": 0.603953325947972
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 13,
+      "ncmId": "25657276",
+      "title": "Just the Way You Are",
+      "artist": "Bruno Mars",
+      "coverage": "R&B流行",
+      "language": "en",
+      "duration": 220.734126984127,
+      "chords": 40,
+      "notes": 365,
+      "scoreRows": 54,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 36303,
+      "layoutMs": 7945,
+      "wallMs": 18020,
+      "inferredMelodyKey": {
+        "tonic": 5,
+        "mode": "major"
+      },
+      "sourceSha256": "6e0970178fde183cde1d67f4b3c76a927d8206bab9069227ec8e1f5340274999",
+      "pcmSha256": "c625731c4ac1d6498484c9d3eba6e1b471ca99dce26526f9f41d031499f6a235",
+      "maxAudioPeak": 1.197216510772705,
+      "audioMixtureResidualRatio": 0.10375059915421207,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "F",
+        "durationShare": 0.5163412044943818
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 14,
+      "ncmId": "16686599",
+      "title": "Numb",
+      "artist": "Linkin Park",
+      "coverage": "新金属",
+      "language": "en",
+      "duration": 187.52,
+      "chords": 84,
+      "notes": 384,
+      "scoreRows": 35,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 27631,
+      "layoutMs": 5706,
+      "wallMs": 15444,
+      "inferredMelodyKey": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "ad0872afe65b5cb7770b056563994188ff0a3e0b3dfea9fe514d9fec9d654e08",
+      "pcmSha256": "1ea082300883ba7322118bcb24227c0a388c2768426d05ec0369d395d025c20e",
+      "maxAudioPeak": 1.1944899559020996,
+      "audioMixtureResidualRatio": 0.11453265874707103,
+      "cacheBytes": 1564521728,
+      "dominantChord": {
+        "label": "E",
+        "durationShare": 0.24125426621160398
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 15,
+      "ncmId": "17572422",
+      "title": "Stan",
+      "artist": "Eminem / Dido",
+      "coverage": "说唱／副歌",
+      "language": "en",
+      "duration": 404.06666666666666,
+      "chords": 309,
+      "notes": 1769,
+      "scoreRows": 137,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 76841,
+      "layoutMs": 22150,
+      "wallMs": 48639,
+      "inferredMelodyKey": {
+        "tonic": 11,
+        "mode": "major"
+      },
+      "sourceSha256": "1a086b01e5f12f748ef2865d1e8db8d3e65af49f4bb9c4b29e2e600a62e4bd27",
+      "pcmSha256": "603fbd0f4265638f750dbb0c8899a49ef8edcea821ddd97ac021b07ec30710d5",
+      "maxAudioPeak": 1.4307529926300049,
+      "audioMixtureResidualRatio": 0.03821635405237438,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "Emaj7",
+        "durationShare": 0.30763900346477396
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 16,
+      "ncmId": "26349642",
+      "title": "Get Lucky",
+      "artist": "Daft Punk / Pharrell Williams / Nile Rodgers",
+      "coverage": "放克／迪斯科",
+      "language": "en",
+      "duration": 369.6848979591837,
+      "chords": 179,
+      "notes": 810,
+      "scoreRows": 114,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 45722,
+      "layoutMs": 15930,
+      "wallMs": 26510,
+      "inferredMelodyKey": {
+        "tonic": 11,
+        "mode": "minor"
+      },
+      "sourceSha256": "c60265cc79c02be45b0cdc9e0ecf46b5b9cc01d7d7be8580df4567b4c5e7227e",
+      "pcmSha256": "b828f905fa36cefbd4dd457fab181b95bb7bb424cec3f2e5b5151a000fa3296c",
+      "maxAudioPeak": 1.3451679944992065,
+      "audioMixtureResidualRatio": 0.07625248993816099,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "D",
+        "durationShare": 0.25032128851045793
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 17,
+      "ncmId": "1868553",
+      "title": "Bohemian Rhapsody",
+      "artist": "Queen",
+      "coverage": "多段式摇滚／合唱",
+      "language": "en",
+      "duration": 355.1956462585034,
+      "chords": 129,
+      "notes": 666,
+      "scoreRows": 67,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 55836,
+      "layoutMs": 10679,
+      "wallMs": 21732,
+      "inferredMelodyKey": {
+        "tonic": 3,
+        "mode": "major"
+      },
+      "sourceSha256": "75a3a0528ff8acdf6953f7597820f8acb9bf1806abb01a5b32bf826a558c2bbe",
+      "pcmSha256": "e29bb525173a6fcbe59014e361e241abf7b162a19abafdfc69ccbc617c85dbd8",
+      "maxAudioPeak": 0.9168177247047424,
+      "audioMixtureResidualRatio": 0.12904888180757026,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "Bb",
+        "durationShare": 0.2681339171896449
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 18,
+      "ncmId": "22489132",
+      "title": "Don't Know Why",
+      "artist": "Norah Jones",
+      "coverage": "爵士流行",
+      "language": "en",
+      "duration": 187.6,
+      "chords": 102,
+      "notes": 230,
+      "scoreRows": 25,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 31079,
+      "layoutMs": 4132,
+      "wallMs": 12206,
+      "inferredMelodyKey": {
+        "tonic": 10,
+        "mode": "major"
+      },
+      "sourceSha256": "a3cfc980fb6f823fee349945670a9f5eb3e7c28c03b28480375becb34f9d4a25",
+      "pcmSha256": "18275db426caa5526b379712330fbb4e819a1ee0214a04804a4c883548cf3c35",
+      "maxAudioPeak": 0.7136585712432861,
+      "audioMixtureResidualRatio": 0.10280453052059038,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "Bbmaj7",
+        "durationShare": 0.1611407249466952
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 19,
+      "ncmId": "1409311773",
+      "title": "夜に駆ける",
+      "artist": "YOASOBI",
+      "coverage": "日语电子流行",
+      "language": "ja",
+      "duration": 261.0133106575964,
+      "chords": 279,
+      "notes": 802,
+      "scoreRows": 56,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 42871,
+      "layoutMs": 9402,
+      "wallMs": 18729,
+      "inferredMelodyKey": {
+        "tonic": 0,
+        "mode": "minor"
+      },
+      "sourceSha256": "d66147017348ee84388ab5803ac7d6f144977412d3ce93932147b2cc3364f888",
+      "pcmSha256": "537c807b1b54ccf2a67d7394c0670d3cdb59bb7b97b5f80b39709c541c11820a",
+      "maxAudioPeak": 1.2657604217529297,
+      "audioMixtureResidualRatio": 0.12442257628089011,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "Abmaj7",
+        "durationShare": 0.19094811630270211
+      },
+      "outcome": "passed"
+    },
+    {
+      "index": 20,
+      "ncmId": "1902315758",
+      "title": "残響散歌",
+      "artist": "Aimer",
+      "coverage": "日语摇滚",
+      "language": "ja",
+      "duration": 184.89814058956915,
+      "chords": 150,
+      "notes": 467,
+      "scoreRows": 32,
+      "melodyAlgorithm": "vocal2midi-tifa-game-medium-rhythm-v4",
+      "recognitionMs": 20378,
+      "layoutMs": 5700,
+      "wallMs": 15974,
+      "inferredMelodyKey": {
+        "tonic": 8,
+        "mode": "minor"
+      },
+      "sourceSha256": "8539f03d4cf883a3094824319b2407279628b2d488742475126c4b56f00e7281",
+      "pcmSha256": "57a58b7cec2233f4985f473c33f3cae90212e1db3db74caaabdde616de8113b1",
+      "maxAudioPeak": 1.1286535263061523,
+      "audioMixtureResidualRatio": 0.12116127574307424,
+      "cacheBytes": 2099107808,
+      "dominantChord": {
+        "label": "F#",
+        "durationShare": 0.1631168377563523
+      },
+      "outcome": "passed"
+    }
+  ]
+}

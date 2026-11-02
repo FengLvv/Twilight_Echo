@@ -35,8 +35,13 @@ def reuse_group(previous, key, lines, word_base):
     return None
 
 
+def phrase_base(beat):
+    # Bar identity follows the same 1/8-beat rounding used for note placement.
+    return (round(beat * 8) // 32) * 4
+
+
 def score_key(rows):
-    base = int(rows[0][1]['beat'] // 4) * 4
+    base = phrase_base(rows[0][1]['beat'])
     return digest([dict(beat=round(row['beat']-base, 8), durationBeats=row['durationBeats'], lyric=row.get('lyric',''))
                    for _, row in rows])
 

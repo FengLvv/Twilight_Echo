@@ -1,1 +1,1 @@
-export * from '../../../core/plugins/rhine-vendor/album-introductions.mjs'
+export * from '../../adapters/plugins/rhine-vendor/album-introductions.mjs'

@@ -106,7 +106,7 @@ function installDom(options: {
 
 const { useSideMenuClearance } = (await import(
   new URL('../app/useSideMenuClearance.ts', import.meta.url).href
-)) as typeof import('../app/useSideMenuClearance')
+)) as typeof import('../app/useSideMenuClearance.ts')
 
 function measure(options: Parameters<typeof installDom>[0]): number {
   installDom(options)

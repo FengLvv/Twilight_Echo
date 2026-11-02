@@ -8,6 +8,7 @@ import ts from 'typescript'
 import type { LocalLibraryWatchChange } from '../../shared/localLibraryScan.ts'
 import { LibraryWatcherPoller } from './libraryWatcherPolling.ts'
 import * as extensions from './watcherExtensions.ts'
+import * as portablePath from '../../shared/portablePath.ts'
 
 function fixture(
   options: {
@@ -26,7 +27,7 @@ function fixture(
   const watchCalls: { folder: string; recursive: boolean }[] = []
   const watch = Object.assign(new EventEmitter(), { close() {} })
   const exports: {
-    createLibraryWatchers?: typeof import('../../core/library/watcher.ts').createLibraryWatchers
+    createLibraryWatchers?: typeof import('../../core/library/watcherPort.ts').createLibraryWatchers
   } = {}
   const dependencies: Record<string, unknown> = {
     'node:fs': {
@@ -43,14 +44,16 @@ function fixture(
       existsSync: () => true
     },
     'node:path': path,
+    '../../../shared/portablePath.ts': portablePath,
     './watcherExtensions.ts': extensions,
-    './watcherPolling.ts': { LibraryWatcherPoller }
+    './watcherPolling.ts': { LibraryWatcherPoller },
+    '../../../core/library/watcherPolling.ts': { LibraryWatcherPoller }
   }
   runInNewContext(
     ts.transpileModule(
-      readFileSync(new URL('../../core/library/watcher.ts', import.meta.url), 'utf8'),
+      readFileSync(new URL('../adapters/library/watcher.ts', import.meta.url), 'utf8'),
       {
-        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true }
       }
     ).outputText,
     {

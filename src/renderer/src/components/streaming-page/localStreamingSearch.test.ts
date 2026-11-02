@@ -10,7 +10,7 @@ const {
   searchLocalStreamingSongs
 } = (await import(
   new URL('./localStreamingSearch.ts', import.meta.url).href
-)) as typeof import('./localStreamingSearch')
+)) as typeof import('./localStreamingSearch.ts')
 
 function track(id: string, patch: Partial<Track> = {}): Track {
   return {

@@ -436,6 +436,8 @@ function parseDocument(input: string): ParsedVoice[] {
   const visit = (node: Node): void => {
     if (node.nodeType === 1 && localName(node) === 'p') {
       const element = node as Element
+      const paragraphRole = roleOf(element)
+      if (paragraphRole === 'x-translation' || paragraphRole === 'x-roman') return
       const currentSourceGroup = sourceGroup++
       const start = parseTime(element.getAttribute('begin'))
       const end = parseTime(element.getAttribute('end'), start ?? 0)
@@ -450,8 +452,7 @@ function parseDocument(input: string): ParsedVoice[] {
             if (value) auxiliary[layer] = { ...value, time: interval.time }
           }
         }
-        voices.push(
-          ...parsePrimaryChildren(
+        const paragraphVoices = parsePrimaryChildren(
             element,
             interval.time,
             interval.endTime,
@@ -459,12 +460,16 @@ function parseDocument(input: string): ParsedVoice[] {
             agent,
             currentSourceGroup
           )
-        )
+        if (paragraphRole === 'x-bg')
+          paragraphVoices.forEach(voice => { voice.role = 'background' })
+        voices.push(...paragraphVoices)
       }
     }
     for (let child = node.firstChild; child; child = child.nextSibling) visit(child)
   }
-  visit(document.documentElement)
+  // The head carries credits and linked auxiliary text, never sung rows.
+  for (let child = document.documentElement.firstChild; child; child = child.nextSibling)
+    if (child.nodeType === 1 && localName(child) === 'body') visit(child)
   return voices
 }
 
@@ -547,6 +552,7 @@ export function parseAmlTtml(input: string): LyricLine[] {
       translation: lineTranslation,
       romanization: lineRomanization,
       timed: true,
+      origin: { format: 'amll-ttml', kind: 'lyric' },
       words: voices.length === 1 ? visibleLead.words : undefined,
       rowKey: `amll:${rowIndex}:${Math.round(row.time * 1000)}`,
       voices

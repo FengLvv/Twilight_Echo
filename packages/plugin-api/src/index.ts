@@ -827,6 +827,17 @@ export interface TwilightMediaProviderRegistration {
     playlistId: string | number,
     context?: TwilightProviderRequestContext
   ): Promise<void>
+  /** Read current account ownership and the provider's live collection state. */
+  fetchPlaylistSubscriptionState?(
+    playlistId: number | string,
+    requestContext?: TwilightProviderRequestContext
+  ): Promise<{ owned: boolean; subscribed: boolean }>
+  /** Set the desired cloud collection state; this never deletes a playlist. */
+  subscribePlaylist?(
+    playlistId: number | string,
+    subscribe: boolean,
+    requestContext?: TwilightProviderRequestContext
+  ): Promise<void>
   addTracksToPlaylist?(
     playlistId: string | number,
     trackIds: Array<string | number>,

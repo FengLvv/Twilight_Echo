@@ -5,7 +5,7 @@ import type { Track } from '../../types/music.ts'
 
 const { useTrackMultiSelect, isTrackListShortcutTarget } = (await import(
   new URL('./useTrackMultiSelect.ts', import.meta.url).href
-)) as typeof import('./useTrackMultiSelect')
+)) as typeof import('./useTrackMultiSelect.ts')
 
 test('list shortcuts stay within the owning noneditable surface and yield to menus and dialogs', () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'HTMLElement')

@@ -10,7 +10,7 @@ const {
   projectManagedLyrics
 } = (await import(
   new URL('./lyricsManagement.ts', import.meta.url).href
-)) as typeof import('./lyricsManagement')
+)) as typeof import('./lyricsManagement.ts')
 
 test('lyrics management defaults to showing integrated translations', () => {
   assert.equal(DEFAULT_LYRICS_MANAGEMENT.showOriginal, true)

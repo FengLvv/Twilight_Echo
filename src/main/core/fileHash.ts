@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export { hashFile } from '../../core/persistence/fileHash.ts'
+export { hashFile } from '../adapters/persistence/fileHash.ts'

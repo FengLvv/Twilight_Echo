@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { RemoteDevicePairing, type RemoteTrustDocument } from './devicePairing.ts'
-import { RemoteHttpServer } from './httpServer.ts'
+import { RemoteHttpServer } from '../../main/adapters/cast/httpServer.ts'
 import { createPersistentDevicePairing } from '../../main/remote/deviceTrust.ts'
 
 test('only a desktop approval plus the private claim secret yields a device credential', () => {

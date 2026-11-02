@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/downloads/downloadTargets.ts'
+export * from '../adapters/downloads/downloadTargets.ts'

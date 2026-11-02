@@ -1,0 +1,191 @@
+{
+  "date": "2026-11-01",
+  "executable": "dist/study-continuity/win-unpacked/TwilightEcho.exe",
+  "automaticAnalysis": {
+    "defaults": [],
+    "choices": [
+      "six",
+      "chords",
+      "melody"
+    ],
+    "delayMs": 700,
+    "changesPlaybackSource": false,
+    "progress": "tasks-and-notifications"
+  },
+  "verification": {
+    "node": 490,
+    "electronBehavior": 4,
+    "python": {
+      "tests": 55,
+      "passed": 50,
+      "skippedPronunciationPack": 5
+    },
+    "workerStages": 8,
+    "types": [
+      "core",
+      "node",
+      "web"
+    ],
+    "nativeRuntime": true,
+    "nativePerformance": true,
+    "hardware": [
+      {
+        "kind": "wav",
+        "muted": true,
+        "switches": 20,
+        "devicePauseMs": 0,
+        "maxHandoffMs": 17.107100000000003,
+        "regressions": 0
+      },
+      {
+        "kind": "flac",
+        "muted": true,
+        "switches": 20,
+        "devicePauseMs": 0,
+        "maxHandoffMs": 16.07009999999991,
+        "regressions": 0
+      }
+    ]
+  },
+  "pitch": {
+    "seconds": 77.77,
+    "oldNotes": 187,
+    "newNotes": 192,
+    "oldChromaticSeconds": 14.269999749958515,
+    "newChromaticSeconds": 4.289999902248383,
+    "quantization": {
+      "algorithm": "tuning-scale-aware-v1",
+      "tuningCents": -10,
+      "scaleCoverage": 0.9309,
+      "scaleAssistedNotes": 6
+    },
+    "sameRunRawChromaticSeconds": 13.439999766647816,
+    "quantizationMs": 0.1482999650761485
+  },
+  "package": {
+    "checkedUtc": "2026-11-01T13:34:57.072Z",
+    "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\study-continuity\\win-unpacked\\TwilightEcho.exe",
+    "bytes": 239410176,
+    "executableSha256": "9127db1b19ee1fe025ac99629fb7307a3b6d42a2fe1755fd3abe5fd199a2de0f",
+    "asarSha256": "6f3e30dd9a74baf7a8c1e44372a74bc4e8441fd01dd92e56f115834e434e127d",
+    "compiledFilesCompared": 264,
+    "resources": [
+      {
+        "name": "lyric_credits.json",
+        "sha256": "ae4294c7b808e375c44e10cb68553b4c3894d079fc7695af333728c3b47f1ce6"
+      },
+      {
+        "name": "lyric_line_models.json",
+        "sha256": "a6de85052780e543f9e0e8fe8c1784add9810e0b5561402fc8dfe55244ef9d02"
+      },
+      {
+        "name": "vocal_lyric_classifier.py",
+        "sha256": "d7509bc952c6997441331229b2cd347d5539a9c9df7f9fe531754a66483aab10"
+      },
+      {
+        "name": "vocal_lyrics.py",
+        "sha256": "c0b6fea37e9d32e9691695f6e45e1464c22f65ffb5dbac1db532550de998acde"
+      },
+      {
+        "name": "vocal_pipeline.py",
+        "sha256": "fef1fc91c10c9f5c8240fb17003fdc2fcda9e6e97dc927b534b1fe61802d00c4"
+      },
+      {
+        "name": "vocal_pitch.py",
+        "sha256": "59b7386074a300ad5a094c2738bd0b581f8da6c565c39753b03cd780622b3de9"
+      },
+      {
+        "name": "vocal_score.py",
+        "sha256": "40d778e3d2deed63f32fe1de6eca9e1ae7ceff8d34d091187c9189c457cb69ed"
+      },
+      {
+        "name": "vocal_melody.py",
+        "sha256": "405dc0e1278a7aa02124e802957523afec428f711cd1ab8b13008f67f2b664f3"
+      },
+      {
+        "name": "vocal_cache.py",
+        "sha256": "5676fe0c79a2592c16538752fbf282be2c29254c9ff18085d28a0409417713bd"
+      },
+      {
+        "name": "worker.py",
+        "sha256": "14641b1a237680686b60aeb98d8fe2c9cd93d7e0cfb353d8bd8ceadcc2dcfc79"
+      }
+    ],
+    "native": [
+      {
+        "name": "twilight-audio-engine.dll",
+        "bytes": 26570240,
+        "sha256": "57c2bed4639444715e8b20ff5e372217521fecd9567d7b2b5f617dbd6ff52605"
+      },
+      {
+        "name": "twilight_audio_node.node",
+        "bytes": 229888,
+        "sha256": "594559f5fa0e504d255467bd48dd96766b936abf07add4391089fd955c16b259"
+      }
+    ]
+  },
+  "smoke": {
+    "ok": true,
+    "isolatedProfile": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\study-continuity-20261101\\app-profile",
+    "boots": 2,
+    "normalExits": 2,
+    "steps": [
+      {
+        "command": "app start --executable C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\study-continuity\\win-unpacked\\TwilightEcho.exe",
+        "ok": true
+      },
+      {
+        "command": "call study.automation --payload {}",
+        "ok": true
+      },
+      {
+        "command": "call study.setAutomation --payload {\"stages\":[\"six\",\"chords\",\"melody\"]}",
+        "ok": true
+      },
+      {
+        "command": "call study.setCachePolicy --payload {\"preloadNext\":false}",
+        "ok": true
+      },
+      {
+        "command": "call study.automation --payload {}",
+        "ok": true
+      },
+      {
+        "command": "app stop",
+        "ok": true
+      },
+      {
+        "command": "app start --executable C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\study-continuity\\win-unpacked\\TwilightEcho.exe",
+        "ok": true
+      },
+      {
+        "command": "call study.automation --payload {}",
+        "ok": true
+      },
+      {
+        "command": "call study.cache --payload {}",
+        "ok": true
+      },
+      {
+        "command": "call study.setAutomation --payload {\"stages\":[]}",
+        "ok": true
+      },
+      {
+        "command": "call study.automation --payload {}",
+        "ok": true
+      },
+      {
+        "command": "call study.state --payload {}",
+        "ok": true
+      },
+      {
+        "command": "app stop",
+        "ok": true
+      }
+    ]
+  },
+  "limits": [
+    "Muted WASAPI hardware checks are not subjective listening or all ASIO/DSD hardware coverage.",
+    "Chromatic duration is not independently labeled pitch accuracy."
+  ]
+}

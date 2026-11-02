@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
-import { OpraCatalog, OPRA_DATABASE_URL } from './opraCatalog.ts'
+import { OpraCatalog, OPRA_DATABASE_URL } from '../../main/adapters/audio/opraCatalog.ts'
 
 const catalogText = [
   { type: 'vendor', id: 'vendor', data: { name: 'Vendor' } },

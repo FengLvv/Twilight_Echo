@@ -1,12 +1,12 @@
 import { join } from 'node:path'
-import { AutoMixStemInstaller as CoreInstaller } from '../../core/audio/autoMixStemInstaller.ts'
+import { AutoMixStemInstaller as CoreInstaller } from '../adapters/audio/autoMixStemInstaller.ts'
 import { probeStemRuntime } from './autoMixStemRuntime.ts'
 import { decodeStemZipLzma } from './autoMixStemZipLzma.ts'
 
 export {
   managedStemPackDirectories,
   validateStemArchivePath
-} from '../../core/audio/autoMixStemInstaller.ts'
+} from '../adapters/audio/autoMixStemInstaller.ts'
 
 /** Compatibility for the current main owner until the production Core switch. */
 export class AutoMixStemInstaller extends CoreInstaller {

@@ -929,7 +929,7 @@ test('the download directory setting stays authorized from the picker to the dow
   )
   const pluginIpc = readFileSync(new URL('../../../main/ipc/plugins.ts', import.meta.url), 'utf8')
   const downloadManager = readFileSync(
-    new URL('../../../core/downloads/providerDownloadManager.ts', import.meta.url),
+    new URL('../../../main/adapters/downloads/providerDownloadManager.ts', import.meta.url),
     'utf8'
   )
   const preload = readFileSync(

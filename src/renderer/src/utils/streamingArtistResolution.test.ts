@@ -12,7 +12,7 @@ const {
   resolveLinkedStreamingArtist
 } = (await import(
   new URL('./streamingArtistResolution.ts', import.meta.url).href
-)) as typeof import('./streamingArtistResolution')
+)) as typeof import('./streamingArtistResolution.ts')
 
 test('resolves the primary artist from provider multi-artist labels', () => {
   assert.equal(getPrimaryStreamingArtistName('Artist A / Artist B'), 'Artist A')

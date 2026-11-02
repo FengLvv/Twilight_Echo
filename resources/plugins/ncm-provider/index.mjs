@@ -143,6 +143,8 @@ export async function activate(context) {
     isTrackLiked,
     createPlaylist,
     deletePlaylist,
+    fetchPlaylistSubscriptionState,
+    subscribePlaylist,
     addTracksToPlaylist,
     removeTracksFromPlaylist
   })
@@ -2893,6 +2895,34 @@ async function deletePlaylist(playlistId, requestContext) {
     assertWriteOk(data, owned ? '删除歌单失败' : '取消收藏歌单失败')
     ownedPlaylistIds = new Set([...ownedPlaylistIds].filter((entry) => entry !== id))
     invalidatePlaylistCaches(id)
+  })
+}
+
+async function fetchPlaylistSubscriptionState(playlistId) {
+  const id = requirePlaylistId(playlistId)
+  const [library, data] = await Promise.all([
+    fetchUserLibrary(),
+    requestAuthedRead(`/playlist/detail/dynamic?id=${id}&timestamp=${Date.now()}`, { label: 'playlist subscription' })
+  ])
+  assertWriteOk(data, '读取歌单收藏状态失败')
+  const ownPlaylist = library.likedPlaylist?.id === id ? library.likedPlaylist : library.playlists.find(p => p.id === id)
+  const owned = ownPlaylist?.owned === true
+  const subscribed = data.subscribed ?? data.body?.subscribed
+  if (!owned && typeof subscribed !== 'boolean') {
+    throw new Error('网易云未返回有效的歌单收藏状态，请重试')
+  }
+  return { owned, subscribed: subscribed === true }
+}
+
+async function subscribePlaylist(playlistId, subscribe, requestContext) {
+  const id = requirePlaylistId(playlistId)
+  if (typeof subscribe !== 'boolean') throw new Error('歌单收藏状态无效')
+  return runIdempotentProviderWrite('subscribePlaylist', [id, subscribe], requestContext, async () => {
+    const data = await requestAuthed(
+      `/playlist/subscribe?t=${subscribe ? 1 : 2}&id=${id}&timestamp=${Date.now()}`, requestContext
+    )
+    throwIfRequestAborted(requestContext)
+    assertWriteOk(data, subscribe ? '收藏歌单失败' : '取消收藏歌单失败')
   })
 }
 

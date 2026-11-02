@@ -4,10 +4,10 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { CoreAnalysisService } from './analysisService.ts'
+import { CoreAnalysisService } from '../../main/composition/audio/analysisService.ts'
 import { LibraryDatabase } from '../../main/library/libraryDatabase.ts'
 import { libraryTrack } from '../playback/libraryTrack.ts'
-import type { LoudnessAnalysisManager } from './loudnessAnalysisManager.ts'
+import type { LoudnessAnalysisManager } from './loudnessAnalysisManagerPort.ts'
 import type { BpmAnalysisResult } from '../../shared/audioEngineTypes.ts'
 
 const result: BpmAnalysisResult = {

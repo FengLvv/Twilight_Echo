@@ -20,7 +20,7 @@ class FilterPunctuation(Preprocessor):
         for t in tokens:
             part: list[str] = []
             for c in t:
-                if c in self._punctuation_set:
+                if c in self._punctuation_set or (unicodedata.category(c).startswith('P') and c not in "'-"):
                     if part:
                         result.append("".join(part))
                         part = []
@@ -28,7 +28,14 @@ class FilterPunctuation(Preprocessor):
                     part.append(c)
             if part:
                 result.append("".join(part))
-        return result
+        # Preserve hyphens/apostrophes within lexical words, but never ask an
+        # LSTM to invent a pronunciation for an isolated '-' or '--'.
+        cleaned = []
+        for fragment in result:
+            words = [word for word in fragment.split() if any(c.isalnum() for c in word)]
+            if words:
+                cleaned.append(' '.join(words))
+        return cleaned
 
 
 @preprocessor(id="lowercase")

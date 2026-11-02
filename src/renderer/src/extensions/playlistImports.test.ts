@@ -154,7 +154,7 @@ test('plugin imports route through Core with a permission gate and serialized ap
     'utf8'
   )
   assert.match(coreEntry, /importPlaylists: \(request\) => playlists\.importFromPlugin\(request\)/)
-  const manager = readFileSync(new URL('../../../core/plugins/manager.ts', import.meta.url), 'utf8')
+  const manager = readFileSync(new URL('../../../main/adapters/plugins/manager.ts', import.meta.url), 'utf8')
   assert.match(manager, /requirePermission\(id, 'library:write', 'library\.importPlaylists'\)/)
   const service = readFileSync(
     new URL('../../../core/playlists/service.ts', import.meta.url),

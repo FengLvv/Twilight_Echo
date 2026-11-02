@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { resolveLyricsWithSources } = (await import(
   new URL('./lyricSourceResolution.ts', import.meta.url).href
-)) as typeof import('./lyricSourceResolution')
+)) as typeof import('./lyricSourceResolution.ts')
 
 const localTrack = {
   id: 'local:abc',

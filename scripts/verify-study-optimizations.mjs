@@ -56,7 +56,7 @@ try {
   }
   evidence.edited={timing:edited.timings.melody,metrics:edited.melody.timings}
   evidence.checks.partialContextAndScoreReuse=true
-  const before=await call('residency',{})
+  await call('residency',{})
   await call('standby',{})
   const cached=await call('analyze',{...params,previous:edited,lyrics:JSON.stringify(changed)})
   assert.equal(cached.timings.melody.cacheHit,true)

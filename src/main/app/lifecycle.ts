@@ -89,7 +89,7 @@ import {
   applyAutoLaunch,
   registerPlayerShortcuts,
   syncTrayState
-} from '../integrations/shortcutsTray.ts'
+} from '../integrations/shortcutsTray'
 import { applyDiscordRpcSetting } from '../integrations/discord.ts'
 import {
   isAfterglowModeActive,

@@ -5,7 +5,7 @@ import type { SearchSourceOption } from './useStreamingSearch.ts'
 
 const { useStreamingSearch } = (await import(
   new URL('./useStreamingSearch.ts', import.meta.url).href
-)) as typeof import('./useStreamingSearch')
+)) as typeof import('./useStreamingSearch.ts')
 
 const localTrack = {
   id: 'local:moon',
@@ -35,6 +35,36 @@ const providerTrack = {
   lyrics: null,
   source: 'ncm'
 }
+
+test('NetEase default search and pagination retain the exact provider order including versions', async t => {
+  const pages = [
+    [{ ...providerTrack, id: 'ncm:live', title: 'Moon River (Live)' }, providerTrack],
+    [{ ...providerTrack, id: 'ncm:cover', artist: 'Another singer' }]
+  ]
+  const calls: number[] = []
+  const search = useStreamingSearch({
+    initialSource: 'ncm',
+    searchSongs: async () => { throw Error('Unexpected combined search') },
+    searchUnifiedSongs: async () => { throw Error('Unexpected local ranking') },
+    searchProviderSongs: async (id, query, limit, offset) => {
+      assert.equal(id, 'ncm'); assert.equal(query, 'moon'); assert.equal(limit, 30)
+      calls.push(offset ?? 0)
+      return { tracks: pages[offset ? 1 : 0], total: 31 }
+    },
+    searchPlaylists: async () => ({ playlists: [], total: 0 }),
+    searchArtists: async () => ({ artists: [], total: 0 }),
+    searchSources: ref([{ id: 'ncm', label: '网易云', available: true, supportedTypes: ['songs'] }]),
+    playTrack: () => {}
+  })
+  t.after(search.clearSearch)
+  search.searchQuery.value = 'moon'
+  await search.performSearch('moon')
+  assert.deepEqual(search.searchResults.value.map(t => t.id), ['ncm:live', 'ncm:moon'])
+  search.onPageChange({ first: 30 })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.deepEqual(search.searchResults.value.map(t => t.id), ['ncm:cover'])
+  assert.deepEqual(calls, [0, 30])
+})
 
 const defaultSources = ref<SearchSourceOption[]>([
   {

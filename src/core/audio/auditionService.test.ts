@@ -3,7 +3,7 @@ import test from 'node:test'
 import { CoreAuditionService } from './auditionService.ts'
 import { DspAuditionManager, type DspAuditionContext } from './dspAuditionManager.ts'
 import { CoreAudioOutputService, type CoreOutputEngine } from './outputService.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
 import { DEFAULT_DSP_OUTPUT_STAGE, type DspGraphConfig } from '../../shared/dspGraph.ts'
 import { isCoreRequest } from '../../shared/coreProtocol.ts'
 

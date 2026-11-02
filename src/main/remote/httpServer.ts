@@ -4,8 +4,8 @@ import { networkInterfaces } from 'node:os'
 import {
   RemoteHttpServer as PortableRemoteHttpServer,
   type RemoteHttpServerOptions as PortableOptions
-} from '../../core/cast/httpServer.ts'
-export * from '../../core/cast/httpServer.ts'
+} from '../adapters/cast/httpServer.ts'
+export * from '../adapters/cast/httpServer.ts'
 export type RemoteHttpServerOptions = Partial<Pick<PortableOptions, 'staticRoot' | 'addresses'>> &
   Omit<PortableOptions, 'staticRoot' | 'addresses'>
 

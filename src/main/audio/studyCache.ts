@@ -4,12 +4,22 @@ import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { STUDY_MELODY_ALGORITHM, STUDY_SCORE_LAYOUT, type StudyResult, type StudyStage, type StudyTrack } from '../../shared/musicStudy.ts'
 import { VOCAL_MODEL_HASHES } from './studyModelRegistry.ts'
+import credits from '../../../resources/music-study/lyric_credits.json' with { type: 'json' }
+import lyricLineModel from '../../../resources/music-study/lyric_line_models.json' with { type: 'json' }
+
+export function studyVocalKeys(policy=credits,structured=false) {
+  if(structured)return [STUDY_MELODY_ALGORITHM,...Object.keys(VOCAL_MODEL_HASHES).sort()]
+  const canonical=Object.fromEntries(Object.keys(policy).sort().map(key=>[key,policy[key as keyof typeof policy]]))
+  const hash=createHash('sha256').update(JSON.stringify(canonical)).digest('hex')
+  return [STUDY_MELODY_ALGORITHM,'lyric-credit-policy:'+hash,
+    'lyric-line-policy:'+lyricLineModel.manifestSha256+':'+lyricLineModel.files['tokenizer.json'],...Object.keys(VOCAL_MODEL_HASHES).sort()]
+}
 
 export const studySignature = (keys: string[], parent: string, fingerprints: Record<string, string>) =>
   createHash('sha256').update(JSON.stringify({ keys: keys.map(key => fingerprints[key] ?? key), parent })).digest('hex')
 
 /** Artifact validity follows provenance, never the continued existence of its input WAV. */
-export function createStudyCacheValidator() {
+export function createStudyCacheValidator(policy=credits) {
   const hashes = new Map<string, { version: string; hash: string }>()
   async function digest(path: string) {
     const info = await stat(path), version = `${info.size}:${info.mtimeMs}:${info.ctimeMs}`
@@ -53,7 +63,7 @@ export function createStudyCacheValidator() {
     if (result.harmonicStems.length && signatures.chords === signature(chordKeys, six + '|' + result.harmonicStems.join('|'))) ready.push('chords')
     if (signatures.originalChords === signature(chordKeys, result.sourceSha256)) ready.push('originalChords')
     const notesReady = result.melody?.algorithm === STUDY_MELODY_ALGORITHM &&
-        signatures.notes === signature([STUDY_MELODY_ALGORITHM, ...Object.keys(VOCAL_MODEL_HASHES).sort()], six + '|' + result.melody.lyricsKey)
+        signatures.notes === signature(studyVocalKeys(policy,result.melody.lyricFilter?.mode==='structured'), six + '|' + result.melody.lyricsKey)
     if (notesReady && result.cache.notesHash && signatures.score === STUDY_SCORE_LAYOUT + '|' + result.cache.notesHash)
       ready.push('melody')
     return { ready, notesReady }

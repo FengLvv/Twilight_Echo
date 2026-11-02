@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../shared/appSettings.ts'
 import type { AudioEngineConfig } from '../../shared/audioEngineTypes.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
 import type { DeviceProfileCommit } from './deviceProfiles.ts'
 import type { AudioOutputCommit } from './audioEngineTypes.ts'
 import { buildEffectiveAudioProcessingSettings } from './audioProcessingEffective.ts'

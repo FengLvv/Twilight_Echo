@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { AutoMixStemService as CoreStemService } from '../../core/audio/autoMixStemService.ts'
+import { AutoMixStemService as CoreStemService } from '../adapters/audio/autoMixStemService.ts'
 import { runAutoMixStemWorker } from './autoMixStemRuntime.ts'
-export * from '../../core/audio/autoMixStemService.ts'
+export * from '../adapters/audio/autoMixStemService.ts'
 
 /** Compatibility constructor for the legacy owner, removed at production cutover. */
 export class AutoMixStemService extends CoreStemService {

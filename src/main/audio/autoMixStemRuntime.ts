@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
-import type { StemRuntimeProbe } from '../../core/audio/autoMixStemCapabilities.ts'
+import type { StemRuntimeProbe } from '../../core/audio/autoMixStemCapabilitiesPort.ts'
 
 export function probeStemRuntime(
   directory: string,

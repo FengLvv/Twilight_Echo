@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { CoreSettingsRepository } from '../../../../core/persistence/settingsRepository.ts'
+import { CoreSettingsRepository } from '../../../../main/composition/persistence/settingsRepository.ts'
 import type { EntityMetadataPolicyView } from '../../../../shared/entityMetadata.ts'
 import {
   defaultMusicIdentificationSettings,

@@ -1,4 +1,4 @@
-import type { LyricWord, LyricVoiceMetadata, ParsedTimedLyricLine } from './lyricTypes.ts'
+import type { LyricWord, LyricVoiceMetadata, ParsedTimedLyricLine, LyricOrigin } from './lyricTypes.ts'
 
 const LINE_TIMESTAMP_RE = /\[(\d{1,3}):(\d{2})(?:[.:](\d{2,3}))?\]/g
 const WORD_TIMESTAMP_RE = /<(\d{1,3}):(\d{2})(?:[.:](\d{2,3}))?>/g
@@ -156,7 +156,7 @@ function parseTimestampParts(min: string, sec: string, frac?: string): number {
  */
 export function parseNeteaseJsonLyricLine(
   raw: string
-): { time: number | null; text: string } | null {
+): { time: number | null; text: string; origin: LyricOrigin } | null {
   const trimmed = raw.trim()
   if (!trimmed || trimmed[0] !== '{' || !NETEASE_JSON_LINE_RE.test(trimmed)) return null
   try {
@@ -174,7 +174,7 @@ export function parseNeteaseJsonLyricLine(
     const timeMs = typeof parsed.t === 'number' && Number.isFinite(parsed.t) ? parsed.t : null
     // t < 0 is NetEase credit / static metadata (作词 / 作曲 / 制作), not a playhead time.
     const time = timeMs != null && timeMs >= 0 ? timeMs / 1000 : null
-    return { time, text }
+    return { time, text, origin: { format: 'netease-json', kind: timeMs != null && timeMs < 0 ? 'metadata' : 'unknown' } }
   } catch {
     return null
   }
@@ -232,10 +232,10 @@ export function parseYrc(yrc: string | null | undefined): ParsedTimedLyricLine[]
     const jsonLine = parseNeteaseJsonLyricLine(trimmed)
     if (jsonLine) {
       if (jsonLine.time != null) {
-        timed.push({ time: jsonLine.time, text: jsonLine.text })
+        timed.push({ time: jsonLine.time, text: jsonLine.text, origin: jsonLine.origin })
       } else {
         // Credits (t:-1) are shown once at the top with t=0 so they don't scroll as timed lines.
-        credits.push({ time: 0, text: jsonLine.text })
+        credits.push({ time: 0, text: jsonLine.text, origin: jsonLine.origin })
       }
       continue
     }
@@ -275,7 +275,7 @@ export function parseYrc(yrc: string | null | undefined): ParsedTimedLyricLine[]
   return credits.length > 0 ? [...credits, ...timed] : timed
 }
 
-export function parseTimedLrc(lrc: string | null | undefined): ParsedTimedLyricLine[] {
+export function parseTimedLrc(lrc: string | null | undefined, options: {includeEmpty?: boolean} = {}): ParsedTimedLyricLine[] {
   if (!lrc) return []
 
   const hasYrcWords = /^\[\d+,\d+\]/m.test(lrc) && /\(\d+,\d+,\d+\)/.test(lrc)
@@ -299,9 +299,9 @@ export function parseTimedLrc(lrc: string | null | undefined): ParsedTimedLyricL
     const jsonLine = parseNeteaseJsonLyricLine(trimmed)
     if (jsonLine) {
       if (jsonLine.time != null) {
-        lines.push({ time: jsonLine.time, text: jsonLine.text })
+        lines.push({ time: jsonLine.time, text: jsonLine.text, origin: jsonLine.origin })
       } else {
-        credits.push({ time: 0, text: jsonLine.text })
+        credits.push({ time: 0, text: jsonLine.text, origin: jsonLine.origin })
       }
       continue
     }
@@ -334,7 +334,7 @@ export function parseTimedLrc(lrc: string | null | undefined): ParsedTimedLyricL
     }
 
     const text = source.replace(lineRe, '').trim()
-    if (!text || timestamps.length === 0) continue
+    if ((!text && !options.includeEmpty) || timestamps.length === 0) continue
 
     const hasInlineTimestamps = timestamps.some((timestamp, index) => {
       if (index === 0) return timestamp.index > 0

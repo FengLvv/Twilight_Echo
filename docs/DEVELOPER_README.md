@@ -1,6 +1,6 @@
 # Twilight Echo 技术文档
 
-本文档面向 Twilight Echo 维护者，说明仓库结构、运行架构、关键数据流、性能约束和验证命令。插件系统的权威契约以 [twilight-echo-plugin-spec.md](./twilight-echo-plugin-spec.md) 为准；本文只描述 app 仓库如何接入和承载插件能力。
+本文档面向 Twilight Echo 维护者，说明仓库结构、运行架构、关键数据流、性能约束和验证命令。整体分层、进程所有权和功能接入方式见 [应用架构与演进约束](./application-architecture.md)。插件系统的权威契约以 [twilight-echo-plugin-spec.md](./twilight-echo-plugin-spec.md) 为准；本文只描述 app 仓库如何接入和承载插件能力。
 
 应用设置的跨领域编排由 `src/main/app/settingsRuntime.ts` 承担：IPC 设置、主题和遥控入口通过它应用设置与同步集成；`audio/state.ts` 只负责音频状态持久化、DSP 生效和播放事件。窗口背景计算是 `app/windowAppearance.ts` 的纯函数，窗口创建不再导入音频状态。架构门禁使用 TypeScript AST 检查 main 的静态运行时 import/re-export 循环；类型引用和延迟 `import()` 不属于初始化依赖。
 
@@ -107,13 +107,16 @@ Twilight Echo 是 Electron + Vue 3 + TypeScript 应用，使用 electron-vite �
 
 首页音源切换不依赖登录态；音乐库未登录时在页头显示切换入口。音源选择器使用浏览器顶层 popover，保留主题样式，按视口空间限制高度并独立滚动，不受资料卡片的裁剪影响。验证命令：`pnpm run test:native-menus`。
 
-Electron main 侧有五个构建入口，均在 `electron.vite.config.ts` 中声明：
+Electron main 侧有八个构建入口，均在 `electron.vite.config.ts` 中声明；它们并非八个必定常驻的进程：
 
 - `index` -> `src/main/index.ts` -> `src/main/app/lifecycle.ts`
-- `pluginHost` -> `src/main/pluginHost.ts`
+- `musicCore` -> `src/main/coreProcess/entry.ts`
+- `diagnosticWriter` -> `src/main/diagnostics/writerWorker.ts`
+- `pluginHost` -> `src/main/plugins/host.ts`
 - `audioEngineService` -> `src/main/audioEngineService.ts`
 - `audioAnalysisService` -> `src/main/audioAnalysisService.ts`
 - `libraryScanService` -> `src/main/library/libraryScanService.ts`
+- `libraryDatabaseService` -> `src/main/library/libraryDatabaseService.ts`
 
 `audioAnalysisService` 使用独立 `utilityProcess` worker pool 执行 BPM/loudness 完整文件解码。其有界优先级队列使用 aging 防止低优先级任务饥饿，并为等待任务设置 deadline；队列满时更高有效优先级可驱逐最差等待项。并发上限、取消、watchdog 和 worker 重启均与实时 `audioEngineService` 隔离，离线分析不得进入播放 RPC 队列。BPM/loudness manager 在 cache commit 期间收到取消时会按精确值条件回滚，且不得广播 completed 事件。
 
@@ -127,14 +130,16 @@ Electron main 侧有五个构建入口，均在 `electron.vite.config.ts` 中声
 
 旧 JSON 路径仍使用 `libraryIndexCoordinator`：所有进入 `cover-cache` 的封面统一限制为 500 px 宽 JPEG（`COVER_THUMBNAIL_WIDTH`）：主进程导入直接缩放；utilityProcess 没有 `nativeImage`，扫描 worker 先按原尺寸落盘，`libraryIndexCoordinator` 在批次进入累加器前经 `normalizeCachedCoverHandle` 换成缩略图句柄（`fs:scanMusicFiles` 同样在返回前替换），worker 写下的原图文件保留不清理。主进程的 `libraryIndexCoordinator` 持久化 `path + size + mtime` 快速索引：启动只解析新增、变化或索引缺失的文件；文件 watcher 事件按 canonical path 合并后进入串行队列；完整 metadata/封面重扫只能由用户在设置页显式启动，并支持进度、暂停、继续和取消。大扫描通过有界批次传输 identity 与解析结果，进度按时间/文件数节流；元数据通过可随机定位的文件 tokenizer 读取，跳过音频载荷但保留尾部标签与封面；无 CUE 的目录复用枚举阶段的 dependency signature，避免逐曲同步重读目录。单文件解析和扫描 worker 均有 watchdog；暂停期间停用 worker watchdog。完整 identity 快照扫描在 worker 重启后保留主进程已收到的结果批次及 identity 快照，仅解析尚未完成的文件，进度累计已完成文件数；当前阻塞路径跳过并在下次扫描重试，watch 局部扫描仍重新核对变化路径。此旧路径的恢复检查点仅在当前扫描任务内有效，不跨应用重启持久化。扫描提交前必须重查曲库 revision、授权 roots 与 exclusions；发生 drift 时丢弃旧结果并重规划，禁止把已移除目录或 TE-0.4 排除项重新写回。
 
-主进程负责窗口生命周期、单实例锁、IPC 注册、设置持久化、本地库扫描、桌面歌词、快捷键托盘、Discord RPC、NCM API 启动和音频引擎编排。
+Electron 主进程负责窗口生命周期、单实例锁、IPC、桌面歌词、快捷键托盘、Discord RPC、平台能力及服务监督。业务播放／队列／来源解析／分析调度由独立的 `musicCore` 承担；扫描、数据库、原生音频与离线音频分析由各自服务执行，不应把这些工作理解为都在 Electron 主进程中运行。
 
 preload 位于 `src/preload/index.ts`，通过 `contextBridge` 暴露受控 API。renderer 不直接访问 Electron、Node 或主进程内部模块。
 
 renderer 位于 `src/renderer/src/`，入口是 `main.ts` 与 `App.vue`。主要状态分布：
 
-- `stores/usePlayerStore.ts`：播放队列、当前曲目、播放状态、音频输出、可视化轮询、播放会话恢复。
-- `stores/useMusicStore.ts`：本地曲库、艺术家/专辑/文件夹派生集合、歌单、收藏、曲库修复与元数据补全。
+- `stores/coreConnection.ts`：Core 连接、状态投影、查询背压和命令提交。
+- `stores/usePlayerStore.ts`：Core 播放投影的兼容入口；实际状态适配在 `stores/player/`，队列／播放会话的权威 owner 在 Core。
+- `stores/useMusicStore.ts`：Core 曲库查询适配和界面派生集合，不另持有整份权威曲库。
+- `stores/musicStudy.ts`：分析任务摘要与当前读取歌曲的结果／显示投影；推理调度与持久化由 Core 和宿主适配执行。
 - `stores/useProviderStore.ts`：插件 provider 注册状态、能力与健康度。
 - `providers/mediaProvider.ts`：统一 provider 抽象。
 - 流媒体主页以 `ui.streamingSections` 显式准入并校验 provider 实际注册的
@@ -288,7 +293,7 @@ Linux 播放条的 CSS 毛玻璃回退服从减少透明度、高对比度和强
 
 ## 插件边界
 
-插件运行在 `utilityProcess`，入口为 `src/main/pluginHost.ts`。插件只能通过版本化 `twilight` API 访问宿主能力，不得直接 import Electron、Node 内置模块或 app 内部实现。
+插件运行在 `utilityProcess`，当前构建入口为 `src/main/plugins/host.ts`。插件只能通过版本化 `twilight` API 访问宿主能力，不得直接 import Electron、Node 内置模块或 app 内部实现。
 
 宿主进程按需存在：`TwilightPluginManager` 用 `plugins/hostIdle.ts` 跟踪每个 JS 插件的活动（provider 调用、UI command、已订阅事件）；连续 5 分钟无活动且没有未完成 RPC 的宿主会被休眠（进程停止，provider/UI 贡献与事件订阅保留在内存快照中），下一次 provider 调用、UI command 或已订阅事件到达时透明唤醒，并发调用共享一次唤醒。休眠期间插件在 `list()` 里仍是 `enabled`，`plugin-state.json` 不变。贡献快照同时持久化到 `plugin-contributions.json`（含插件版本和入口文件 size:mtime）；下次启动若版本与入口文件签名都匹配，启用的插件直接以休眠态就绪而不 fork 进程，签名不符则照常冷启动。试激活、汽水音乐（登录态绑定宿主进程）与正在处理内部 NCM 请求的插件不会休眠；已订阅 `app:ready` 的休眠宿主会唤醒并在激活后收到事件，`app:before-quit` 不会唤醒休眠宿主。
 

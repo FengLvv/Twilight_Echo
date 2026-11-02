@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import {
   CoreMusicStudyService,
   type StudyPorts,
+  type StudyPreferences,
   type StudyRecord,
   type StudyWorkerStatus
 } from './musicStudyService.ts'
@@ -58,9 +60,10 @@ function fixture(initial: StudyRecord[] = []) {
   const ports: StudyPorts = {
     repository: {
       list: async () => [...saved.values()].map((r) => structuredClone(r)),
-      save: async (r) => {
+      saveSummary: async (r) => {
         saved.set(r.id, structuredClone(r))
       },
+      commitArtifacts: async (r) => { const revision = (r.artifactRevision ?? 0) + 1; saved.set(r.id, structuredClone({ ...r, artifactRevision: revision })); return revision },
       remove: async (id) => {
         saved.delete(id)
       }
@@ -131,6 +134,193 @@ function fixture(initial: StudyRecord[] = []) {
     }
   }
 }
+
+test('a producer result is acknowledged only after durable commit; a failed commit is retried without losing the worker payload', async () => {
+  const f = fixture()
+  const save = f.ports.repository.commitArtifacts
+  let fail = true, acknowledgements = 0
+  f.ports.repository.commitArtifacts = async record => {
+    if (fail) throw new Error('disk temporarily unavailable')
+    return save(record)
+  }
+  f.ports.acknowledge = async id => {
+    assert.equal(f.saved.get(id)?.artifactRevision, 1)
+    acknowledgements++
+  }
+  const project = (await f.service.create({}))!
+  await f.settle()
+  f.complete()
+  await f.tick()
+  assert.equal(acknowledgements, 0)
+  assert.equal((await f.service.project(project.id)).status, 'running')
+  fail = false
+  await f.tick()
+  assert.equal(acknowledgements, 1)
+  assert.deepEqual((await f.service.project(project.id)).result?.chords, result.chords)
+  await f.service.shutdown()
+})
+
+test('cancellation persists a newly completed stage even before the next progress poll', async () => {
+  const f = fixture(), project = (await f.service.create({}))!
+  await f.settle()
+  let acknowledged = false
+  f.ports.acknowledge = async id => {
+    assert.deepEqual(f.saved.get(id)?.result?.ready, ['six'])
+    assert.equal(f.saved.get(id)?.status, 'cancelled')
+    acknowledged = true
+  }
+  f.workerStatus({ running: true, progress: 0.5, stage: 'chords', resultRevision: 1,
+    result: { ...structuredClone(result), ready: ['six'] } })
+  await f.service.cancel(project.id)
+  assert.equal(acknowledged, true)
+  assert.equal((await f.service.project(project.id)).status, 'cancelled')
+  assert.deepEqual((await f.service.project(project.id)).result?.ready, ['six'])
+  await f.service.shutdown()
+})
+
+test('an interrupted worker retains completed six-track artifacts and advances other songs without automatically retrying the failed song', async () => {
+  const f = fixture()
+  let source = 0
+  f.ports.source = async () => ({ title: 'Song', source: { path: '/song.wav', identity: `song-${++source}` } })
+  const first = (await f.service.create({}))!
+  await f.settle()
+  const second = (await f.service.create({}))!
+  f.workerStatus({ running: false, progress: 0.5, stage: 'timeout', error: 'watchdog', interrupted: true, resultRevision: 1,
+    result: { ...structuredClone(result), ready: ['six'] } })
+  await f.tick()
+  assert.equal((await f.service.project(first.id)).status, 'interrupted')
+  assert.deepEqual((await f.service.project(first.id)).result?.ready, ['six'])
+  f.workerStatus({ running: true, progress: 0.1, stage: 'six' })
+  await f.tick()
+  assert.deepEqual(f.launched, [first.id, second.id])
+  await f.service.shutdown()
+})
+
+function automaticFixture(initial: StudyRecord[] = []) {
+  const f = fixture(initial), scheduled = new Map<() => void, number>()
+  f.ports.schedule = (callback, delay) => { scheduled.set(callback, delay); return () => { scheduled.delete(callback) } }
+  return { ...f, runAutomatic: async () => {
+    for (const [callback, delay] of scheduled) if (delay === 700) { scheduled.delete(callback); callback(); break }
+    await f.settle(); await f.settle()
+  } }
+}
+
+test('automatic analysis defaults off, waits for playback and queues selected stages without changing audio', async () => {
+  const f = automaticFixture()
+  assert.deepEqual(await f.service.automation(), { stages: [] })
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  assert.equal(f.saved.size, 0)
+  f.service.bindLyrics('logical-song', 'one', false)
+  await f.service.setAutomation({ stages: ['six', 'chords', 'melody'] })
+  await f.runAutomatic()
+  assert.equal(f.saved.size, 0)
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  const record = [...f.saved.values()][0]
+  assert.equal(record.operation, 'six')
+  assert.deepEqual(record.pending, ['chords', 'melody'])
+  assert.equal((await f.service.state({})).audition, null)
+  assert.equal((await f.service.lyricsDisplay('logical-song')).notationVisible, false)
+  f.service.bindLyrics('logical-song', 'one', false)
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  assert.equal(f.saved.size, 1)
+  assert.deepEqual([...f.saved.values()][0].pending, ['chords', 'melody'])
+  await f.service.shutdown()
+})
+
+test('automatic chord-only selection does not request melody, and turning off prevents future songs', async () => {
+  const f = automaticFixture()
+  await f.service.setAutomation({ stages: ['chords'] })
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  const record = [...f.saved.values()][0]
+  assert.equal(record.operation, 'chords')
+  assert.deepEqual(Object.keys(record.stages ?? {}), ['chords'])
+  await f.service.setAutomation({ stages: [] })
+  f.service.bindLyrics('logical-song', 'two', true)
+  await f.runAutomatic()
+  assert.equal(f.saved.size, 1)
+  await f.service.shutdown()
+})
+
+test('automatic source lookup cannot enqueue a track skipped while resolving its audio', async () => {
+  const f = automaticFixture()
+  let release!: () => void
+  f.ports.source = async () => { await new Promise<void>(resolve => { release = resolve }); return {
+    title: 'old', source: { path: '/old.wav', identity: 'logical-song' }
+  } }
+  await f.service.setAutomation({ stages: ['six'] })
+  f.service.bindLyrics('logical-song', 'old', true)
+  await f.runAutomatic()
+  f.service.bindLyrics('next-song', 'next', false)
+  release(); await f.settle(); await f.settle()
+  assert.equal(f.saved.size, 0)
+  assert.equal(f.launched.length, 0)
+  await f.service.shutdown()
+})
+
+test('automatic score reuse does not regenerate evicted six-track audio', async () => {
+  const cached = structuredClone(result)
+  cached.ready = ['melody']; cached.stems = []
+  cached.melody = { scores: [], notes: [], key: null, source: 'vocals', algorithm: 'vocal2midi-tifa-game-medium-rhythm-v10' }
+  const f = automaticFixture([{
+    id: 'cached', title: 'cached score', source: { identity: 'logical-song', path: '/test/song.wav' },
+    status: 'completed', stage: '分析完成', progress: 1, result: cached,
+    leadBacking: false, twoSingers: false, createdAt: 1, revision: 0, artifactRevision: 1,
+    lyrics: '[{"id":0,"start":0,"end":10,"text":"test"}]'
+  }])
+  await f.service.setAutomation({ stages: ['melody'] })
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  assert.equal(f.launched.length, 0)
+  assert.equal(f.saved.size, 1)
+  await f.service.shutdown()
+})
+
+test('automatic preferences survive display and cache edits and restore on startup', async () => {
+  const f = automaticFixture()
+  let preferences: StudyPreferences | null = null
+  f.ports.repository.loadPreferences = async () => preferences
+  f.ports.repository.savePreferences = async value => { preferences = structuredClone(value) }
+  await f.service.setAutomation({ stages: ['melody', 'six'] })
+  f.service.bindLyrics('logical-song', 'one')
+  await f.service.setLyricsDisplay({ songId: 'logical-song', mode: 'degrees', notationMode: 'staff' })
+  await f.service.setCachePolicy({ preloadNext: false })
+  assert.deepEqual((await f.ports.repository.loadPreferences())?.automaticStages, ['six', 'melody'])
+  const restored = new CoreMusicStudyService(f.ports)
+  assert.deepEqual(await restored.automation(), { stages: ['six', 'melody'] })
+  await restored.shutdown(); await f.service.shutdown()
+})
+
+test('missing score lyrics do not block automatically selected separation and chords, and score can retry', async () => {
+  const f = automaticFixture()
+  f.ports.lyrics = () => ''
+  await f.service.setAutomation({ stages: ['six', 'chords', 'melody'] })
+  f.service.bindLyrics('logical-song', 'one', true)
+  await f.runAutomatic()
+  const id = [...f.saved.keys()][0]
+  assert.equal(f.saved.get(id)?.operation, 'six')
+  assert.deepEqual(f.saved.get(id)?.pending, ['chords'])
+  assert.equal(f.saved.get(id)?.stages?.melody?.status, 'failed')
+  f.complete(); await f.runAutomatic(); await f.runAutomatic(); await f.runAutomatic()
+  assert.equal(f.saved.get(id)?.status, 'completed')
+  f.ports.lyrics = () => '[{"id":0,"start":0,"end":10,"text":"restored lyrics"}]'
+  await f.service.retry(id); await f.settle()
+  assert.equal(f.saved.get(id)?.operation, 'melody')
+  assert.match(f.saved.get(id)?.lyrics ?? '', /restored lyrics/)
+  await f.service.shutdown()
+})
+
+test('automation protocol accepts independent selections and rejects unknown or repeated stages', () => {
+  for (const stages of [[], ['six'], ['chords', 'melody'], ['six', 'chords', 'melody']])
+    assert.equal(validStudyPayload('study.setAutomation', { stages }), true)
+  for (const stages of [['twoSingers'], ['six', 'six'], 'six', null])
+    assert.equal(validStudyPayload('study.setAutomation', { stages }), false)
+  assert.equal(validStudyPayload('study.automation', {}), true)
+  assert.equal(validStudyPayload('study.setAutomation', { stages: [], extra: true }), false)
+})
 test('prefetch only follows the actual next input after analysis is enabled and foreground demand survives queue changes', async () => {
   const f = fixture()
   const timers = new Map<() => void, number>()
@@ -250,6 +440,34 @@ test('supplied timed lyrics validate before any background job is launched',asyn
   assert(!saved.pending?.includes('twoSingers'))
   await f.service.shutdown()
 })
+test('stale notes carried by a six-track result reserve recognition scratch space and evict older audio', async () => {
+  const f = fixture([{id:'older-audio',source:{path:'/old.wav',identity:'other'},status:'completed',
+    result:structuredClone(result)} as StudyRecord]), duration = 209.78938775510204, own = Math.ceil(209.76 * 44100 * 8 * 7)
+  let groups:Array<{id:string;kind:'six';bytes:number}>=[]
+  const removed:string[] = []
+  f.ports.audioInventory = async () => structuredClone(groups)
+  f.ports.removeAudio = async group => { removed.push(group.id);groups=groups.filter(g=>g.id!==group.id) }
+  f.ports.source = async () => ({title:'Song',source:{path:'/test/song.wav',identity:'logical-song',duration}})
+  f.ports.validate = async () => ({ready:['six'],notesReady:false})
+  const p = await f.service.submit({input:{kind:'local',id:'logical-song'},stages:['six','chords','melody'],lyrics:'[00:01]word'})
+  await f.settle()
+  const stale=structuredClone(result)
+  stale.ready=['six']
+  stale.melody={notes:[{start:1,end:2,midi:60}],scores:[],key:null,source:'vocals',
+    algorithm:'vocal2midi-tifa-game-medium-rhythm-v9',
+    lyricsKey:createHash('sha256').update(f.saved.get(p.id)!.lyrics!).digest('hex')}
+  stale.cache={signatures:{notes:'previous-model-fingerprint'},files:{}}
+  groups=[{id:p.id,kind:'six',bytes:own},
+    {id:'older-audio',kind:'six',bytes:2*1024**3-own-20*1024**2}]
+  f.workerStatus({running:false,progress:1,stage:'done',result:stale})
+  for(let i=0;i<8&&f.saved.get(p.id)?.operation!=='melody';i++)await f.tick()
+  assert.equal(f.saved.get(p.id)?.notesReady,false)
+  assert.equal(f.saved.get(p.id)?.operation,'melody')
+  assert.deepEqual(removed,['older-audio'])
+  assert(f.saved.get(p.id)!.budgetBytes! >= Math.ceil(duration*44100*8*7*1.02)+32*1024**2)
+  await f.service.shutdown()
+})
+
 test('vocal melody is opt-in, prepares six without chords and is reused when complete', async () => {
   const f = fixture()
   const p = await f.service.transcribeMelody('logical-song')
@@ -266,7 +484,7 @@ test('vocal melody is opt-in, prepares six without chords and is reused when com
     notes: [{ start: 0, end: 1, midi: 60 }],
     key: null,
     source: 'vocals',
-    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v2'
+    algorithm: 'vocal2midi-tifa-game-medium-rhythm-v10'
   }
   f.workerStatus({ running: false, progress: 1, stage: 'done', result: withMelody })
   await f.tick()
@@ -294,6 +512,7 @@ test('vocal melody is opt-in, prepares six without chords and is reused when com
       name: 'study.startWorker',
       payload: {
         id: 'project-1',
+        runId: 'test-run',
         source: '/test/source.wav',
         leadBacking: false,
         twoSingers: false,
@@ -408,7 +627,7 @@ test('lyric display shares controls between windows, persists mode and key, and 
   })
   assert.equal((await f.service.lyricsDisplay('logical-song')).notationVisible, false)
   assert.equal(f.launched.length, 1)
-  assert.deepEqual(preferences, { mode: 'degrees', notationMode: 'staff', cachePolicy: { limitBytes: 2 * 1024 ** 3, preloadNext: true } })
+  assert.deepEqual(preferences, { mode: 'degrees', notationMode: 'staff', cachePolicy: { limitBytes: 2 * 1024 ** 3, preloadNext: true }, automaticStages: [] })
   f.service.bindLyrics('logical-song', 'second')
   assert.deepEqual(await f.service.lyricsDisplay('logical-song'), {
     notationMode: 'staff',
@@ -612,6 +831,35 @@ test('cache validation retries missing stages and source replacement gets a fres
   const replaced = (await f.service.analyze('logical-song'))!
   assert.notEqual(replaced.id, first.id)
   await f.service.shutdown()
+})
+
+test('song summaries expose revisions without loading or transferring full notation artifacts', async () => {
+  const original = fixture()
+  const created = (await original.service.create({}))!
+  await original.settle()
+  original.complete()
+  await original.tick()
+  const record = structuredClone(original.saved.get(created.id)!)
+  await original.service.shutdown()
+  delete record.result
+  record.resultLoaded = false
+  const f = fixture([record])
+  let loads = 0
+  f.ports.repository.loadResult = async () => { loads++; return structuredClone(result) }
+  try {
+    const summary = await f.service.songSummary('logical-song')
+    assert.equal(summary?.id, created.id)
+    assert.equal(summary?.revision, record.revision)
+    assert.equal(summary?.result, undefined)
+    assert.equal('source' in summary!, false)
+    assert.equal(loads, 0)
+    assert.equal(await f.service.songSummary('missing-song'), null)
+    const project = await f.service.song('logical-song')
+    assert.deepEqual(project?.result, result)
+    assert.equal(loads, 1)
+    assert.equal((await f.service.songSummary('logical-song'))?.result, undefined)
+    assert.equal(loads, 1)
+  } finally { await f.service.shutdown() }
 })
 
 test('GPU jobs are queued once; result is durable and source paths never leave Core', async () => {

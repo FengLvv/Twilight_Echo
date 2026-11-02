@@ -7,7 +7,7 @@ import test from 'node:test'
 import { createDefaultSettings } from '../settings/normalization.ts'
 import { createDefaultPlaybackInfo, normalizeOutputConfig } from './audioEngineHelpers.ts'
 import { createLegacyDspGraph } from '../../shared/dspGraph.ts'
-import { CoreAudioDiagnosticsService } from './diagnosticsService.ts'
+import { CoreAudioDiagnosticsService } from '../../main/composition/audio/diagnosticsService.ts'
 
 const environment = {
   appName: 'TwilightEcho',

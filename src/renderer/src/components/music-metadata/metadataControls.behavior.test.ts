@@ -246,6 +246,7 @@ test('the original TaskCenter includes persistent counts while closed and cleari
   const Center = component('../TaskCenter.vue', {
     './music-metadata/MetadataTaskList.vue': { default: f.List },
     '../stores/coreConnection': { useCoreConnection: () => f.core },
+    '../stores/musicStudy.ts': { useMusicStudyProgress: () => ({ state: ref({ projects: [] }), activeCount: ref(0) }) },
     '../stores/useMusicStore': { useMusicStore: () => ({ libraryScanStatus: ref(empty), libraryMetadataEnrichmentStatus: ref(empty) }) },
     '../stores/useAppNoticeStore': { useAppNoticeStore: () => notices },
     '../stores/useDownloadTasks': { useDownloadTasks: () => ({ tasks: ref([]), error: ref(''), connect: () => () => {} }) },

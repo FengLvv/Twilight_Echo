@@ -69,7 +69,7 @@ test('notification dropdown retains tasks, actions and keyboard focus in light a
     )
     await writeFile(
       join(directory, 'runner.cjs'),
-      `const {app,BrowserWindow}=require('electron');app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:960,height:900,webPreferences:{contextIsolation:false,backgroundThrottling:false,offscreen:true}});try{await win.loadFile(process.argv.at(-1));for(const dark of [false,true]) {await win.webContents.executeJavaScript('window.runTaskCenterTests('+dark+')');for(const [width,height] of [[1360,900],[640,600],[360,320]]) {win.setSize(width,height);await win.webContents.executeJavaScript('window.checkTaskViewport('+width+','+height+')');if(process.env.TASK_CENTER_CAPTURE_DIR&&height>320){await win.webContents.executeJavaScript('new Promise(r=>setTimeout(r,80))');const image=await win.webContents.capturePage();require('node:fs').writeFileSync(require('node:path').join(process.env.TASK_CENTER_CAPTURE_DIR,'任务通知-'+(dark?'深色':'浅色')+'-'+width+'.png'),image.toPNG())}}await win.webContents.executeJavaScript('window.disposeTaskFixture()')}console.log('TASK_CENTER_OK');app.exit(0)}catch(error){console.error(error.stack);app.exit(1)}})`
+      `const {app,BrowserWindow}=require('electron');app.setPath('userData',require('node:path').join(__dirname,'profile'));app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:960,height:900,webPreferences:{contextIsolation:false,backgroundThrottling:false,offscreen:true}});try{await win.loadFile(process.argv.at(-1));for(const dark of [false,true]) {await win.webContents.executeJavaScript('window.runTaskCenterTests('+dark+')');for(const [width,height] of [[1360,900],[640,600],[360,320]]) {win.setSize(width,height);await win.webContents.executeJavaScript('window.checkTaskViewport('+width+','+height+')');if(process.env.TASK_CENTER_CAPTURE_DIR&&height>320){await win.webContents.executeJavaScript('new Promise(r=>setTimeout(r,80))');const image=await win.webContents.capturePage();require('node:fs').writeFileSync(require('node:path').join(process.env.TASK_CENTER_CAPTURE_DIR,'任务通知-'+(dark?'深色':'浅色')+'-'+width+'.png'),image.toPNG())}}await win.webContents.executeJavaScript('window.disposeTaskFixture()')}console.log('TASK_CENTER_OK');app.exit(0)}catch(error){console.error(error.stack);app.exit(1)}})`
     )
     const result = await promisify(execFile)(
       require('electron'),
@@ -129,6 +129,7 @@ window.runTaskCenterTests=async dark=>{
   let message,updateChanged,retries=0,revealed=0,installed=0,library=0,stops=0,disconnected=0;
   let snapshot=createInitialAppUpdateSnapshot();
   let state=coreSnapshot({epoch:'fixture-'+dark,downloads:{revision:0,active:0,total:0}}),downloadTasks=[];
+  let studySnapshot={projects:[],total:0,activeCount:0,environment:{ready:true,gpu:true},audition:null};
   const commands=[];
   const publish=patch=>{state={...state,...patch,sequence:state.sequence+1};message({connectionId:'fixture',message:{kind:'state',epoch:state.epoch,sequence:state.sequence,snapshot:state}})};
   const downloadsChanged=tasks=>{downloadTasks=tasks;publish({downloads:{revision:state.downloads.revision+1,total:tasks.length,active:tasks.filter(t=>t.status==='downloading').length}})};
@@ -139,10 +140,12 @@ window.runTaskCenterTests=async dark=>{
       onMessage:fn=>{message=fn;return()=>stops++},onStatus:()=>()=>stops++,
       disconnect:async()=>{disconnected++;return {ok:true}},cancel:async()=>({ok:true}),
       request:async(_id,request)=>{
+        if(request.name==='study.state')return {ok:true,value:studySnapshot};
         if(request.name==='metadata.entity.tasks')return {ok:true,value:{offset:0,total:0,counts:{queued:0,running:0,retry_wait:0,needs_review:0,blocked:0,failed:0,completed:0,cancelled:0},items:[]}};
         if(request.name==='downloads.page')return {ok:true,value:{...state.downloads,offset:0,items:downloadTasks}};
         if(request.name==='downloads.indexed')return {ok:true,value:{indexed:true}};
         commands.push(request);
+        if(request.name==='study.cancel'||request.name==='study.retry'){const song=studySnapshot.projects.find(s=>s.id===request.payload.id);song.status=request.name==='study.cancel'?'cancelled':'queued';studySnapshot.activeCount=studySnapshot.projects.filter(s=>['queued','running'].includes(s.status)).length;publish({studyRevision:(state.studyRevision??0)+1});return {ok:true}}
         if(request.name==='downloads.retry')retries++;
         else if(request.name==='downloads.reveal')revealed++;
         else if(request.name==='downloads.play')calls.push('play');
@@ -192,6 +195,11 @@ window.runTaskCenterTests=async dark=>{
   scan.value={state:'running',current:7,total:10,error:''};bell.click();await tick();button('.notice-history','清空记录').click();await tick();expect(scan.value.state==='running'&&!calls.includes('cancel'),'clearing history cancelled a live task');
   expect(![...document.querySelectorAll('.task-record')].some(el=>el.textContent.includes('下载旋律')),'cleared download result reappeared');
   store.pushNotice({kind:'success',message:'下载完成 · '+('长曲名与路径'.repeat(18)),presentation:'center',downloadTaskId:task('completed').id});store.pushNotice({kind:'info',message:'曲库扫描：已完成，新增 12 首歌曲。'});await tick();
+  const beforeStudy=store.activeTaskCount.value;studySnapshot={...studySnapshot,total:3,activeCount:1,projects:[{id:'study-active',songId:'a',title:'进行中的歌',status:'running'},{id:'study-done',songId:'b',title:'完成的歌',status:'completed'},{id:'study-failed',songId:'c',title:'失败的歌',status:'completed',stages:{melody:{status:'failed',error:'歌词尚未加载'}}}]};publish({studyRevision:(state.studyRevision??0)+1});await tick();
+  expect(!document.querySelector('.study-progress-btn')&&document.querySelectorAll('.study-task-row').length===3,'study tasks were not merged into notifications '+JSON.stringify({dark,open:opened(),rows:document.querySelectorAll('.study-task-row').length,requests:commands.slice(-3),cleared:[...store.clearedTaskResultKeys.value]}));expect(store.activeTaskCount.value===beforeStudy+1,'bell omits study tasks');
+  button('.notice-filters','进行中').click();await tick();expect(document.querySelectorAll('.study-task-row').length===1,'active study filter failed');button('.notice-filters','需处理').click();await tick();expect(document.querySelectorAll('.study-task-row').length===1&&document.querySelector('.study-task-row').textContent.includes('失败的歌'),'attention study filter failed');button('.notice-filters','全部').click();await tick();
+  document.querySelector('[aria-label="进行中的歌：识别中 · 点击取消"]').click();await tick();expect(commands.filter(c=>c.name.startsWith('study.')).at(-1).name==='study.cancel','study cancellation lost '+JSON.stringify(commands.slice(-3))+' '+document.querySelector('.task-error')?.textContent);document.querySelector('[aria-label="失败的歌：识别失败 · 点击重试"]').click();await tick();expect(commands.filter(c=>c.name.startsWith('study.')).at(-1).name==='study.retry','study retry lost');
+  studySnapshot={...studySnapshot,projects:[],total:0,activeCount:0};publish({studyRevision:(state.studyRevision??0)+1});await tick();
   dispose=()=>{const writes=commands.length;app.unmount();expect(stops===1,'task view did not release the update subscription');disposeCoreConnection();expect(stops===3&&disconnected===1,'window did not release its Core connection');expect(commands.length===writes,'unmount sent a business command');store.clearNotices()};
 }
 `

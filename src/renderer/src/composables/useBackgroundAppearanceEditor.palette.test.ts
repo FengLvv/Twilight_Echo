@@ -116,7 +116,7 @@ function fixture(
     cancelAnimationFrame: () => {}
   })
   const editor = api.useBackgroundAppearanceEditor({ embedded: true }) as ReturnType<
-    typeof import('./useBackgroundAppearanceEditor').useBackgroundAppearanceEditor
+    typeof import('./useBackgroundAppearanceEditor.ts').useBackgroundAppearanceEditor
   >
   const upload = (name = 'replacement.png') =>
     editor.importImage({

@@ -39,7 +39,7 @@ test('useTrackCoverSrc clears previous src and mints a fresh blob per track', as
   try {
     const { useTrackCoverSrc } = (await import(
       new URL('./trackCoverDisplay.ts', import.meta.url).href
-    )) as typeof import('./trackCoverDisplay')
+    )) as typeof import('./trackCoverDisplay.ts')
     const { ref, nextTick, computed } = await import('vue')
 
     const track = ref<{ id: string; cover: string | null; coverSource?: string | null } | null>({

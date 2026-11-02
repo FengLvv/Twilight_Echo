@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/plugins/indexService.ts'
+export * from '../adapters/plugins/indexService.ts'

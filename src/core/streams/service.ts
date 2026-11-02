@@ -1,4 +1,4 @@
-import type { RadioMediaService } from './radioMediaService.ts'
+import type { RadioMediaService } from './radioMediaServiceContract.ts'
 import { searchRadioBrowserStations, type RadioBrowserSearchOptions } from './radioBrowserClient.ts'
 import { radioStationToTrack, podcastEpisodeToTrack } from './tracks.ts'
 import {

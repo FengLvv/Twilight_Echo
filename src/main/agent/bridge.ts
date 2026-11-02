@@ -135,7 +135,7 @@ export async function startAgentBridge(options: AgentBridgeOptions) {
       try {
         const current = JSON.parse(await readFile(discovery, 'utf8'))
         if (current.instance === instance) await rm(discovery, { force: true })
-      } catch {}
+      } catch { /* Discovery may already be removed during shutdown. */ }
     }
   }
 }

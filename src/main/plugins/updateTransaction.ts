@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/plugins/updateTransaction.ts'
+export * from '../adapters/plugins/updateTransaction.ts'

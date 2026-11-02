@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/plugins/statePersistence.ts'
+export * from '../adapters/plugins/statePersistence.ts'

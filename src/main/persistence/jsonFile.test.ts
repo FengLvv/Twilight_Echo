@@ -10,7 +10,7 @@ const {
   corruptPathFor,
   loadJsonFileWithBackup,
   writeJsonFileAtomic
-} = (await import(new URL('./jsonFile.ts', import.meta.url).href)) as typeof import('./jsonFile')
+} = (await import(new URL('./jsonFile.ts', import.meta.url).href)) as typeof import('./jsonFile.ts')
 
 type TestData = { version: number; value: string }
 

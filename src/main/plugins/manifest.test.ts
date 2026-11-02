@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const { compareSemver, isCompatibleTwilightRange, toManifest, validatePluginManifest } =
-  (await import(new URL('./manifest.ts', import.meta.url).href)) as typeof import('./manifest')
+  (await import(new URL('./manifest.ts', import.meta.url).href)) as typeof import('./manifest.ts')
 
 const validManifest = {
   id: 'com.example.hello',

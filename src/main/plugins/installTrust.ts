@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/plugins/installTrust.ts'
+export * from '../adapters/plugins/installTrust.ts'

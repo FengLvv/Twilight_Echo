@@ -4,12 +4,19 @@ import hashlib
 import json
 import os
 
-ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v2'
+ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v10'
 
 
-def model_keys():
+def model_keys(lyrics=None):
     registry = json.loads(Path(__file__).with_name('vocal_models.json').read_text(encoding='utf-8'))
-    return [ALGORITHM] + sorted(registry['files'])
+    keys=[ALGORITHM] + sorted(registry['files'])
+    rows=json.loads(lyrics) if lyrics is not None else []
+    if rows and all((row.get('origin') or {}).get('format')=='amll-ttml' for row in rows):
+        return keys
+    policy=json.loads(Path(__file__).with_name('lyric_credits.json').read_text(encoding='utf-8'))
+    policy_hash=hashlib.sha256(json.dumps(policy,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode('utf-8')).hexdigest()
+    from vocal_lyric_classifier import policy_key
+    return [ALGORITHM, 'lyric-credit-policy:'+policy_hash, policy_key()] + sorted(registry['files'])
 
 
 def lyrics_key(lyrics):
@@ -56,7 +63,7 @@ def invoke(phase, *, model_pack, progress, directory, payload):
 
 
 def recognize(*, model_pack, progress, lyrics, directory, previous=None, parent=''):
-    reusable = {key: previous[key] for key in ('notes','reuse') if key in (previous or {})}
+    reusable = {key: previous[key] for key in ('algorithm','notes','reuse') if key in (previous or {})}
     return invoke('notes', model_pack=model_pack, progress=progress,
                   directory=directory, payload={'lyrics': lyrics, 'previous': reusable, 'parent': parent})
 

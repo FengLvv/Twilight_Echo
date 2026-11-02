@@ -13,7 +13,7 @@ import type { EntityMetadataDatabaseApi } from '../../shared/entityMetadata.ts'
 import { CoreEntityMetadataService } from './entityMetadataService.ts'
 import { MusicBrainzWikiProvider } from './entityMetadataProvider.ts'
 import { PlatformIdentificationProvider } from './musicIdentificationProvider.ts'
-import { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import { CoreSettingsRepository } from '../../main/composition/persistence/settingsRepository.ts'
 import { isCoreRequest, coreOperation } from '../../shared/coreProtocol.ts'
 
 const provider = {

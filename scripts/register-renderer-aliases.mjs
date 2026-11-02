@@ -32,5 +32,3 @@ registerHooks({
     return resolved
   }
 })
-
-await import('../src/adapters-node/index.ts')

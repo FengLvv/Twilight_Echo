@@ -317,6 +317,8 @@ const PROVIDER_METHOD_CAPABILITIES: Partial<
   isTrackLiked: 'library',
   createPlaylist: 'library',
   deletePlaylist: 'library',
+  fetchPlaylistSubscriptionState: 'library',
+  subscribePlaylist: 'library',
   addTracksToPlaylist: 'library',
   removeTracksFromPlaylist: 'library'
 }

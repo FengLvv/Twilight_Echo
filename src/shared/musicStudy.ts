@@ -1,7 +1,7 @@
 import type { CoreQueueTrackInput } from './coreQueueSubmission.ts'
 
-export const STUDY_MELODY_ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v2'
-export const STUDY_SCORE_LAYOUT = 'lyric-phrase-v2'
+export const STUDY_MELODY_ALGORITHM = 'vocal2midi-tifa-game-medium-rhythm-v10'
+export const STUDY_SCORE_LAYOUT = 'lyric-phrase-v4'
 
 export const STUDY_STEMS = [
   'drums',
@@ -22,6 +22,7 @@ export const DEFAULT_STUDY_CACHE_POLICY: StudyCachePolicy = { limitBytes: 2 * 10
 export interface StudyAudioGroup { id: string; kind: 'six' | 'leadBacking' | 'twoSingers'; bytes: number }
 export interface StudyCacheStatus extends StudyCachePolicy {
   usedBytes: number; reservedBytes: number; protectedBytes: number; resultBytes: number
+  memory?: import('./leasedLru.ts').CacheMetrics
 }
 export interface StudyRuntimeStatus {
   state: 'stopped' | 'warming' | 'ready' | 'failed'; pid: number | null
@@ -51,6 +52,9 @@ export const STUDY_STAGES = [
   'melody'
 ] as const
 export type StudyStage = (typeof STUDY_STAGES)[number]
+export const STUDY_AUTOMATIC_STAGES = ['six', 'chords', 'melody'] as const
+export type StudyAutomaticStage = (typeof STUDY_AUTOMATIC_STAGES)[number]
+export interface StudyAutomationPolicy { stages: StudyAutomaticStage[] }
 export interface StudyLyricDisplay {
   notationMode?: 'numbered' | 'staff'
   notationVisible: boolean
@@ -88,6 +92,8 @@ export type StudyStatus =
   | 'failed'
   | 'cancelled'
   | 'interrupted'
+  | 'cancelling'
+  | 'recovering'
 export interface StudyChord {
   start: number
   end: number
@@ -110,6 +116,7 @@ export interface StudyResult {
       start: number
       end: number
       midi: number
+      pitchMidi?: number
       lineId?: number
       wordId?: number
       lyric?: string
@@ -118,6 +125,14 @@ export interface StudyResult {
     }>
     key: { tonic: number; mode: 'major' | 'minor' } | null
     algorithm: string
+    pitchQuantization?: { algorithm: string; tuningCents: number; scaleCoverage: number; scaleAssistedNotes: number }
+    lyricFilter?: {
+      mode: 'structured' | 'heuristic'
+      activity: {algorithm:string;status:'estimated'|'uncertain'|'skipped';start:number|null;end:number|null;margin:number;
+        levelDb?:number;contrastDb?:number;thresholdDb?:number;medianStemRatioDb?:number}
+      excluded: Array<{id:number;reason:'before_vocals'|'after_vocals'|'source_metadata'|'credit'|'non_lyric_classifier'}>
+      classifier?: {algorithm:string;policy:string;threshold:number;uniqueLines:number;candidates:number[];protected:number[];rejected:number;abstained:boolean;reused:boolean;elapsedMs:number}
+    }
     source: 'vocals'
     tempo?: number
     lyricsKey?: string
@@ -159,6 +174,8 @@ export interface StudyProjectSummary {
   leadBacking: boolean
   twoSingers: boolean
   revision: number
+  /** Changes only when committed analysis content changes, never for progress or mixing. */
+  artifactRevision: number
   songId?: string
   stages?: Partial<Record<StudyStage, StudyStageState>>
   sixReady?: boolean
@@ -225,6 +242,7 @@ export interface StudyExport {
   stems: StudyTrack[]
 }
 export interface StudyCommands {
+  'study.setAutomation': StudyAutomationPolicy
   'study.setCachePolicy': Partial<StudyCachePolicy>
   'study.clearAudioCache': Record<string, never>
   'study.exportSources': { id: string; outputDirectory: string }
@@ -246,10 +264,12 @@ export interface StudyCommands {
   'study.analyzeChords': { id: string; stems: StudyTrack[] }
 }
 export interface StudyQueries {
+  'study.automation': { input: Record<string, never>; output: StudyAutomationPolicy }
   'study.cache': { input: Record<string, never>; output: StudyCacheStatus }
   'study.runtime': { input: Record<string, never>; output: StudyRuntimeStatus }
   'study.lyricsDisplay': { input: { songId: string }; output: StudyLyricDisplay }
   'study.song': { input: { songId: string }; output: StudyProject | null }
+  'study.songSummary': { input: { songId: string }; output: StudyProjectSummary | null }
   'study.state': { input: { offset?: number; limit?: number }; output: StudyState }
   'study.project': { input: { id: string }; output: StudyProject }
 }
@@ -263,6 +283,7 @@ export interface StudyPlatformOperations {
   'study.startWorker': {
     input: {
       id: string
+      runId: string
       source: string
       start?: number
       end?: number
@@ -299,10 +320,22 @@ export interface StudyPlatformOperations {
       progress: number
       stage: string
       error?: string
-      result?: StudyResult
+      runId: string
+      generation: number
+      resultAvailable: boolean
+      interrupted?: boolean
+      recovering?: boolean
       phase?: StudyStage
       resultRevision?: number
     }
+  }
+  'study.workerResult': {
+    input: { id: string; runId: string; generation: number; resultRevision: number }
+    output: StudyResult | null
+  }
+  'study.ackWorkerResult': {
+    input: { id: string; runId: string; generation: number; resultRevision: number; terminal: boolean }
+    output: void
   }
   'study.cancelWorker': { input: { id: string }; output: void }
   'study.removeFiles': { input: { id: string }; output: void }
@@ -333,8 +366,13 @@ export function validStudyPayload(name: string, p: unknown): boolean {
   switch (name) {
     case 'study.runtime':
     case 'study.cache':
+    case 'study.automation':
     case 'study.clearAudioCache':
       return !Object.keys(p).length
+    case 'study.setAutomation':
+      return keys(p, ['stages']) && Array.isArray(p.stages) && p.stages.length <= STUDY_AUTOMATIC_STAGES.length &&
+        p.stages.every(stage => STUDY_AUTOMATIC_STAGES.includes(stage as StudyAutomaticStage)) &&
+        new Set(p.stages).size === p.stages.length
     case 'study.setCachePolicy':
       return keys(p, ['limitBytes', 'preloadNext']) && Object.keys(p).length > 0 &&
         (p.limitBytes === undefined || number(p.limitBytes, 128 * 1024 ** 2, 1024 ** 4) && Number.isSafeInteger(p.limitBytes)) &&
@@ -375,6 +413,7 @@ export function validStudyPayload(name: string, p: unknown): boolean {
     case 'study.analyze':
     case 'study.transcribeMelody':
     case 'study.song':
+    case 'study.songSummary':
       return (
         keys(p, ['songId']) &&
         typeof p.songId === 'string' &&

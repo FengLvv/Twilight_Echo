@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/cast/chromecastClient.ts'
+export * from '../adapters/cast/chromecastClient.ts'

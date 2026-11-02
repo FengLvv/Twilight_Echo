@@ -10,7 +10,7 @@ const {
   parsePodcastTrackId
 } = (await import(
   new URL('./podcastSubscriptions.ts', import.meta.url).href
-)) as typeof import('./podcastSubscriptions')
+)) as typeof import('./podcastSubscriptions.ts')
 
 test('podcast subscriptions document validates and clones', () => {
   const document = clonePodcastSubscriptionsDocument({

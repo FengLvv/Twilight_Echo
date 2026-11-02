@@ -9,7 +9,7 @@ const {
   useOnboardingFlow
 } = (await import(
   new URL('./useOnboardingFlow.ts', import.meta.url).href
-)) as typeof import('./useOnboardingFlow')
+)) as typeof import('./useOnboardingFlow.ts')
 
 test('early completion only writes visited sections', () => {
   const choices = createDefaultOnboardingChoices()

@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/audio/bpmAnalysisManager.ts'
+export * from '../adapters/audio/bpmAnalysisManager.ts'

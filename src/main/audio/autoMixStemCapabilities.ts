@@ -1,6 +1,6 @@
-import { AutoMixStemDetector as CoreStemDetector } from '../../core/audio/autoMixStemCapabilities.ts'
+import { AutoMixStemDetector as CoreStemDetector } from '../adapters/audio/autoMixStemCapabilities.ts'
 import { probeStemRuntime } from './autoMixStemRuntime.ts'
-export * from '../../core/audio/autoMixStemCapabilities.ts'
+export * from '../adapters/audio/autoMixStemCapabilities.ts'
 export { probeStemRuntime } from './autoMixStemRuntime.ts'
 
 export class AutoMixStemDetector extends CoreStemDetector {

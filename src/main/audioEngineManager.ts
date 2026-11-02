@@ -1079,7 +1079,7 @@ export class AudioEngineManager extends EventEmitter {
 
   configureDsp<T>(
     operation: (
-      configuration: import('../core/audio/dspService.ts').CoreDspConfiguration
+      configuration: import('../core/audio/dspServicePort.ts').CoreDspConfiguration
     ) => Promise<T>
   ): Promise<T> {
     return this.changeAudioConfiguration(() => operation(this.dsp))
@@ -1340,10 +1340,11 @@ export class AudioEngineManager extends EventEmitter {
     source: string,
     startTime = 0,
     requested?: () => boolean,
-    initiallyPaused = false
+    initiallyPaused = false,
+    followPlaybackClock = false
   ): Promise<AudioEnginePlayResult> {
     this.autoMixCoordinator?.invalidate('playback_changed')
-    return this.playback.play(source, startTime, requested, initiallyPaused)
+    return this.playback.play(source, startTime, requested, initiallyPaused, followPlaybackClock)
   }
 
   async togglePause(): Promise<void> {
@@ -1650,8 +1651,8 @@ export class AudioEngineManager extends EventEmitter {
     return this.playback.getUpcomingTrack()
   }
 
-  async getPlaybackInfo(): Promise<PlaybackInfo> {
-    return this.playback.getPlaybackInfo()
+  async getPlaybackInfo(fresh = false): Promise<PlaybackInfo> {
+    return this.playback.getPlaybackInfo(fresh)
   }
 
   /** Export must never start or probe an unresponsive service. */

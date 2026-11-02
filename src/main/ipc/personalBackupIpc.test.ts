@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import ts from 'typescript'
 import { isRecord, remapPersonalPaths, type PersonalBackup } from '../../shared/personalBackup.ts'
-import { checkRestoreOptions } from '../../core/persistence/personalBackup.ts'
+import { checkRestoreOptions } from '../adapters/persistence/personalBackup.ts'
 
 function fixture() {
   const trusted = {}, calls: string[] = []

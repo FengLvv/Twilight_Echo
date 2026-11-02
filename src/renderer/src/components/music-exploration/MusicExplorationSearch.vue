@@ -7,9 +7,9 @@ const core = useCoreConnection()
 const view = createExplorationSearchView((query, signal) => core.query('exploration.query', query, signal))
 const state = view.state, scope = ref<'library' | 'catalog'>('library'), selected = ref('')
 const MusicExplorationPanel = defineAsyncComponent(() => import('./MusicExplorationPanel.vue'))
-watch(() => [props.query, scope.value, core.state.value?.epoch, core.state.value?.explorationRevision,
-  core.state.value?.catalogRevision, core.state.value?.libraryRevision, core.state.value?.entityMetadataRevision,
-  core.state.value?.pluginsRevision] as const, () => { selected.value = ''; void view.setQuery(props.query, scope.value) }, { immediate: true })
+watch([() => props.query, () => scope.value, () => core.state.value?.epoch, () => core.state.value?.explorationRevision,
+  () => core.state.value?.catalogRevision, () => core.state.value?.libraryRevision, () => core.state.value?.entityMetadataRevision,
+  () => core.state.value?.pluginsRevision], () => { selected.value = ''; void view.setQuery(props.query, scope.value) }, { immediate: true })
 onBeforeUnmount(() => view.dispose())
 </script>
 

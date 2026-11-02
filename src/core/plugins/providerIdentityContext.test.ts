@@ -24,7 +24,7 @@ interface ContextManager extends EventEmitter {
   registerProviderFromPlugin(id: string, message: unknown): unknown
 }
 function fixture() {
-  const source = readFileSync(new URL('./manager.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../main/adapters/plugins/manager.ts', import.meta.url), 'utf8')
   const ast = ts.createSourceFile('manager.ts', source, ts.ScriptTarget.Latest, true)
   const declaration = ast.statements.find(
     (n): n is ts.ClassDeclaration =>
@@ -242,7 +242,7 @@ test('production manager context changes prevent reuse of the previous account s
 
 function sessionFixture() {
   const id = 'com.twilightecho.provider.ncm'
-  const source = readFileSync(new URL('./manager.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../main/adapters/plugins/manager.ts', import.meta.url), 'utf8')
   const ast = ts.createSourceFile('manager.ts', source, ts.ScriptTarget.Latest, true)
   const declaration = ast.statements.find((n): n is ts.ClassDeclaration =>
     ts.isClassDeclaration(n) && n.name?.text === 'TwilightPluginManager')!

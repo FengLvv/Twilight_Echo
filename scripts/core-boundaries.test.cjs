@@ -172,73 +172,26 @@ test('no HTMLAudio playback implementation or environment-variable enablement re
   assert.deepEqual(violations, [])
 })
 
-test('Green-zone Portable Core slice never imports Legacy Node I/O shim (src/core/ports/index.ts) and ratchet count never grows', () => {
-  const greenZonePrefixes = [
-    'src/core/application.ts',
-    'src/core/projections.ts',
-    'src/core/portableSlice.ts',
-    'src/core/portableEmbeddedHost.ts',
-    'src/core/playback/',
-    'src/core/settings/',
-    'src/core/catalog/',
-    'src/core/search/',
-    'src/core/bookmarks/',
-    'src/core/listening/',
-    'src/core/workspace/',
-    'src/core/lyrics/',
-    'src/core/providers/ncmApi.ts',
-    'src/core/providers/ncmServerBinding.ts',
-    'src/core/playlists/service.ts',
-    'src/core/playlists/controller.ts',
-    'src/core/playlists/views.ts',
-    'src/core/playlists/sqlView.ts',
-    'src/core/playlists/recordingVersions.ts',
-    'src/core/playlists/submission.ts'
-  ]
-  const isGreenZone = (relativePath) =>
-    greenZonePrefixes.some((prefix) =>
-      prefix.endsWith('/') ? relativePath.startsWith(prefix) : relativePath === prefix
-    )
+test('all Core domains have zero legacy Node I/O shim consumers', () => {
+  const violations = files(path.join(ROOT, 'src/core'))
+    .filter((file) => /ports\/index/.test(fs.readFileSync(file, 'utf8')))
+    .map(rel)
+  assert.deepEqual(violations, [])
+  assert.equal(fs.existsSync(path.join(ROOT, 'src/core/ports/index.ts')), false)
+  assert.equal(fs.existsSync(path.join(ROOT, 'src/adapters-node/index.ts')), false)
+})
 
-  const greenZoneViolations = []
-  const legacyShimImporters = []
-
-  for (const file of files(path.join(ROOT, 'src/core'))) {
-    const relativeFile = rel(file)
-    if (relativeFile === 'src/core/ports/index.ts') continue
-    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
-    let importsLegacyNodeShim = false
-
-    function visit(node) {
-      const specifier =
-        ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
-          ? node.moduleSpecifier
-          : null
-      if (specifier && ts.isStringLiteral(specifier) && specifier.text.startsWith('.')) {
-        const resolved = rel(path.resolve(path.dirname(file), specifier.text))
-        if (resolved === 'src/core/ports/index.ts' || resolved === 'src/core/ports/index') {
-          importsLegacyNodeShim = true
-        }
-      }
-      ts.forEachChild(node, visit)
-    }
-    visit(source)
-
-    if (importsLegacyNodeShim) {
-      legacyShimImporters.push(relativeFile)
-      if (isGreenZone(relativeFile)) {
-        greenZoneViolations.push(relativeFile)
-      }
-    }
+test('domain contracts contain no executable implementation or registration', () => {
+  const violations = []
+  for (const file of files(path.join(ROOT, 'src/core')).filter((f) =>
+    /(?:Port|Contract)\.ts$/.test(f)
+  )) {
+    const emitted = ts
+      .transpileModule(fs.readFileSync(file, 'utf8'), {
+        compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext }
+      })
+      .outputText.trim()
+    if (emitted && emitted !== 'export {};') violations.push(rel(file))
   }
-
-  assert.deepEqual(
-    greenZoneViolations,
-    [],
-    'Green-zone Portable Core modules must not depend on the Legacy Node I/O shim (src/core/ports/index.ts)'
-  )
-  assert.ok(
-    legacyShimImporters.length <= 65,
-    `Legacy Node I/O shim consumer count grew from baseline 65 to ${legacyShimImporters.length}`
-  )
+  assert.deepEqual(violations, [])
 })

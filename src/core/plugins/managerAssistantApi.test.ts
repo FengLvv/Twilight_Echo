@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 import { normalizePluginPlaylistImportRequest } from '../../shared/pluginPlaylistImport.ts'
 
-const source = readFileSync(new URL('./manager.ts', import.meta.url), 'utf8').replaceAll(
+const source = readFileSync(new URL('../../main/adapters/plugins/manager.ts', import.meta.url), 'utf8').replaceAll(
   '\r\n',
   '\n'
 )

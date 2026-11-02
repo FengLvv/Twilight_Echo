@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { shouldReserveLyricsColumn } = (await import(
   new URL('./nowPlayingLayout.ts', import.meta.url).href
-)) as typeof import('./nowPlayingLayout')
+)) as typeof import('./nowPlayingLayout.ts')
 
 test('reserves lyric column while local track lyrics are still lazy-loading', () => {
   assert.equal(

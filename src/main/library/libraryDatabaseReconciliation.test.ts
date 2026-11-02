@@ -205,7 +205,7 @@ test('schema mismatches, malformed authorities and invalid bounds fail without m
   const db = new DatabaseSync(':memory:')
   t.after(() => db.close())
   db.exec('PRAGMA user_version=27')
-  assert.throws(() => reconcileMusicLibrary(db), /schemas 28 and 29/)
+  assert.throws(() => reconcileMusicLibrary(db), /schemas 28, 29 and 30/)
   assert.equal(db.isTransaction, false)
   assert.equal(db.prepare('PRAGMA user_version').get()!.user_version, 27)
   assert.throws(() => reconcileMusicLibrary(db, { exampleLimit: 101 }), /exampleLimit/)

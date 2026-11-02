@@ -11,7 +11,7 @@ const {
   isSidebarItemActiveForProvider
 } = (await import(
   new URL('./streamingNavigation.ts', import.meta.url).href
-)) as typeof import('./streamingNavigation')
+)) as typeof import('./streamingNavigation.ts')
 
 test('the unified library accepts implemented personal libraries without a legacy unified opt-in', () => {
   const providers = [

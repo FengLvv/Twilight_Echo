@@ -16,7 +16,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-let handler: (method: string) => Promise<unknown> = async () => undefined
+let handler: (method: string, args?: unknown[]) => Promise<unknown> = async () => undefined
 let chooseFiles: () => Promise<unknown[]> = async () => []
 const provider = { id: 'ncm', name: 'Test NCM', capabilities: [], supportedMethods: [] }
 let listProviders = async () => [provider]
@@ -41,7 +41,7 @@ const coreApi: CoreBridgeApi = {
         value = await listProviders()
         break
       case 'providers.call':
-        value = await handler(request.payload.method)
+        value = await handler(request.payload.method, request.payload.args)
         break
       case 'ncm.cloud.chooseUploadFiles':
         value = await chooseFiles()
@@ -94,6 +94,34 @@ const playlist = { id: 100, name: 'A private playlist', cover: null, trackCount:
 test.beforeEach(() => {
   handler = async () => undefined
   store.setLogin(account(1))
+})
+
+test('visible search rows read provider likes without downloading favorite tracks', async () => {
+  const requests: number[] = []
+  handler = async (method, args) => {
+    assert.equal(method, 'isTrackLiked')
+    requests.push(Number(args?.[0])); return args?.[0] === 9
+  }
+  await store.refreshLikedStates([{ ncmSongId: 9 }, { ncmSongId: 10 }] as never)
+  assert.deepEqual(requests, [9, 10])
+  assert.equal(store.isTrackLiked(9), true)
+  assert.equal(store.isTrackLiked(10), false)
+  store.syncLikedIds([{ ncmSongId: 11 }] as never)
+  assert.equal(store.isTrackLiked(9), true, 'a later liked-playlist page must not erase earlier known likes')
+})
+
+test('a delayed row refresh cannot overwrite a newer player favorite toggle or another account', async () => {
+  const pending = deferred<boolean>()
+  handler = async () => pending.promise
+  const refresh = store.refreshLikedStates([{ ncmSongId: 9 }] as never)
+  store.applyLikedState(9, true)
+  pending.resolve(false); await refresh
+  assert.equal(store.isTrackLiked(9), true)
+  const old = deferred<boolean>()
+  handler = async () => old.promise
+  const stale = store.refreshLikedStates([{ ncmSongId: 9 }] as never)
+  store.setLogin(account(2)); old.resolve(true); await stale
+  assert.equal(store.isTrackLiked(9), false)
 })
 
 test('NCM startup login waits for actual provider registration', async () => {
@@ -372,6 +400,7 @@ test('late account mutations never modify the new account collections', async ()
     ['fetchLikedTracksPage', () => store.fetchLikedTracksPage(), { tracks: [{ ncmSongId: 9 }] }],
     ['createPlaylist', () => store.createPlaylist('A'), playlist],
     ['deletePlaylist', () => store.deletePlaylist(100), undefined],
+    ['subscribePlaylist', () => store.subscribePlaylist(playlist, true), undefined],
     ['addTracksToPlaylist', () => store.addTracksToPlaylist(100, [9]), undefined],
     ['removeTracksFromPlaylist', () => store.removeTracksFromPlaylist(100, [9]), undefined]
   ]
@@ -396,4 +425,32 @@ test('account changes discard a pending cloud file picker result', async () => {
   files.resolve([{ handle: 'account-a' }])
   assert.deepEqual(await result, [])
   assert.deepEqual(store.cloudSelectedFiles.value, [])
+})
+
+test('playlist subscription updates only the cloud playlist list after confirmation', async () => {
+  const calls: unknown[][] = []
+  handler = async (method, args) => { calls.push([method, ...(args ?? [])]) }
+  store.userPlaylists.value = [{ ...playlist, id: 200 }]
+  await store.subscribePlaylist(playlist, true)
+  await store.subscribePlaylist(playlist, true)
+  assert.deepEqual(store.userPlaylists.value.map(p => p.id), [100, 200])
+  assert.equal(store.userPlaylists.value[0].owned, false)
+  assert.equal(store.libraryLoaded.value, false, 'a partial collection update is not a full library')
+  await store.subscribePlaylist(playlist, false)
+  assert.deepEqual(store.userPlaylists.value.map(p => p.id), [200])
+  assert.deepEqual(calls.map(call => call.slice(0, 3)), [
+    ['subscribePlaylist', 100, true], ['subscribePlaylist', 100, true], ['subscribePlaylist', 100, false]
+  ])
+})
+
+test('older cloud library reads cannot undo a confirmed playlist subscription', async () => {
+  const old = await pending('fetchUserLibrary', () => store.fetchUserLibrary())
+  await store.subscribePlaylist(playlist, true)
+  old.response.resolve({ likedPlaylist: null, playlists: [] })
+  await old.result
+  assert.equal(store.userPlaylists.value[0].id, playlist.id)
+  assert.equal(store.libraryLoading.value, false)
+  handler = async () => { throw Error('服务拒绝收藏') }
+  await assert.rejects(store.subscribePlaylist(playlist, false), /服务拒绝收藏/)
+  assert.equal(store.userPlaylists.value[0].id, playlist.id)
 })

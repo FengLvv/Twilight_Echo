@@ -13,7 +13,7 @@ const props = defineProps<{
   position: number
 }>()
 const emit = defineEmits<{
-  change: []
+  change: [track: StudyTrack, setting: NonNullable<StudyMix['tracks'][StudyTrack]>]
   family: [mode: StudyMix['mode']]
   split: [kind: 'leadBacking' | 'twoSingers']
   environment: []
@@ -76,11 +76,13 @@ const rows = computed<StudyTrack[]>(
 const ready = computed(() => studyReady(props.project?.result, 'six'))
 const running = computed(() => ['running', 'queued'].includes(props.project?.status ?? ''))
 function setting(track: StudyTrack) {
-  return props.tracks[track] ?? (props.tracks[track] = { gain: 1, mute: false, solo: false })
+  return props.tracks[track] ?? { gain: 1, mute: false, solo: false }
+}
+function update(track: StudyTrack, patch: Partial<NonNullable<StudyMix['tracks'][StudyTrack]>>) {
+  emit('change', track, { ...setting(track), ...patch })
 }
 function toggle(track: StudyTrack, key: 'mute' | 'solo') {
-  setting(track)[key] = !setting(track)[key]
-  emit('change')
+  update(track, { [key]: !setting(track)[key] })
 }
 function split(kind: 'leadBacking' | 'twoSingers') {
   splitOpen.value = false
@@ -183,7 +185,7 @@ function split(kind: 'leadBacking' | 'twoSingers') {
           >
             <PlayerControlIcon :name="setting(track).mute ? 'muted' : 'volume'" /></button
           ><input
-            v-model.number="setting(track).gain"
+            :value="setting(track).gain"
             :disabled="!ready"
             :aria-label="names[track] + '音量'"
             type="range"
@@ -196,7 +198,7 @@ function split(kind: 'leadBacking' | 'twoSingers') {
                 ? '静音'
                 : `${(20 * Math.log10(setting(track).gain)).toFixed(1)} dB`
             "
-            @input="emit('change')"
+            @input="update(track, { gain: Number(($event.target as HTMLInputElement).value) })"
           /><output
             >{{
               setting(track).gain === 0 ? '−∞' : (20 * Math.log10(setting(track).gain)).toFixed(1)

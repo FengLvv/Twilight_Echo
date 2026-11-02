@@ -69,7 +69,7 @@ test('pruning retains pinned current/preloaded files and active writer parts eve
 })
 
 test('ncm cache write path streams to .part and only renames the finished file', () => {
-  const source = readFileSync(new URL('../../core/providers/ncmCache.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../adapters/providers/ncmCache.ts', import.meta.url), 'utf8')
   // Streaming: no whole-file arrayBuffer buffering remains.
   assert.doesNotMatch(source, /await res\.arrayBuffer\(\)/)
   assert.match(source, /Readable\.fromWeb\(res\.body/)
@@ -89,7 +89,7 @@ test('ncm cache write path streams to .part and only renames the finished file',
 })
 
 test('ncm cache lookups run on an in-memory index instead of a per-play directory scan', () => {
-  const source = readFileSync(new URL('../../core/providers/ncmCache.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../adapters/providers/ncmCache.ts', import.meta.url), 'utf8')
   const lookup = extractFunction(source, 'getCachedNcmSong')
   // 8.3: 命中路径不再 readdirSync；索引由目录快照惰性构建，写入/淘汰同步维护。
   assert.match(lookup, /getNcmCacheEntryName\(songId\)/)
@@ -111,7 +111,7 @@ test('ncm cache lookups run on an in-memory index instead of a per-play director
 })
 
 test('ncm cache downloads supersede in-flight ones and start after a skip-window delay', () => {
-  const source = readFileSync(new URL('../../core/providers/ncmCache.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../adapters/providers/ncmCache.ts', import.meta.url), 'utf8')
   const cacheWrite = extractFunction(source, 'cacheNcmSong')
   // 8.1②：新解析抢占所有进行中的下载（AbortController map + 全部 abort 后 clear）。
   assert.match(source, /const activeCacheDownloads = new Map<number, AbortController>\(\)/)

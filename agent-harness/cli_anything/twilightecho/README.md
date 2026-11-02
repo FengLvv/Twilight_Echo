@@ -1,7 +1,7 @@
 # Twilight Echo CLI-Anything
 
 Control the real Twilight Echo application from an agent or terminal. The harness
-exposes all 392 registered Core operations across 52 domains, plus background
+exposes all 395 registered Core operations across 52 domains, plus background
 analysis, batch processing, native score exports and preview bundles.
 
 Python is a client of the running application. Playback, provider credentials,
@@ -83,6 +83,16 @@ actions; a successful CLI transport is not permission to publish or send content
 
 ## Analyze, retrieve and export
 
+Automatic analysis during playback is opt-in. Independent stages are `six`,
+`chords`, and `melody`; dependencies and cached results are managed by Core.
+This setting starts background work without enabling stem playback.
+
+```powershell
+cli-anything-twilightecho --json call study.automation --payload '{}'
+cli-anything-twilightecho --json call study.setAutomation --payload '{"stages":["six","chords","melody"]}'
+cli-anything-twilightecho --json call study.setAutomation --payload '{"stages":[]}'
+```
+
 Analysis models remain loaded between songs. Audio has a default 2 GiB LRU
 budget; clearing it retains compressed chords, raw notes and final scores.
 Cached annotation queries need no stem audio. Missing stems are regenerated
@@ -145,6 +155,25 @@ boundaries; note statistics are computed from the selected interval. Model
 outputs and inferred major/minor keys are estimates, not confirmed music theory
 or vocal technique judgments. Instrument WAV paths are available through
 `music artifacts`; audio can be exported through `music export-stems`.
+
+Explicit NetEase static metadata is excluded from vocal transcription by source
+semantics; timed JSON without a semantic type stays eligible. Existing credit
+and vocal-range rules remain active. TiFA alignment scores failed the supplied
+text versus wrong-text validation and are available only in offline experiment
+scripts, not as production lyric-validity judgments.
+
+AMLL-compatible TTML uses the primary lead voice and its source timing directly;
+background lyrics remain visible and do not block notation. Structured inputs
+skip credit words, MiniLM and outer-vocal filtering. Timed NetEase text uses
+source/credit rules, then the local CPU MiniLM-v2 classifier, with vocal-boundary
+filtering last. Classifier candidates overlapping the estimated vocal span are
+retained; only wholly exterior candidates can narrow the 0.8-second margin.
+Uncertain activity authorizes no classifier deletion. `melody.lyricFilter`
+records the mode, candidate/protected IDs and actual exclusions. MiniLM loads
+only for fallback cleanup and is released when the vocal runtime enters standby.
+Install the supplied model package with `scripts/install-lyric-line-model.ps1
+-SourceDirectory MODEL_DIRECTORY -Root ANALYSIS_RUNTIME`; weights stay outside
+the application package. This step performs no speech-to-text transcription.
 
 Score exports use the same player components and native Electron printing:
 

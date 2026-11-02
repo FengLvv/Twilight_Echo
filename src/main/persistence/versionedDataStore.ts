@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/persistence/versionedDataStore.ts'
+export * from '../adapters/persistence/versionedDataStore.ts'

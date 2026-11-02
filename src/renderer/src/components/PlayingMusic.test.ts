@@ -433,13 +433,13 @@ test('player bar smooths progress between player store ticks and snaps large jum
   assert.match(seekProgress, /<SmoothedProgressFill[^>]*:percent="percent"/)
 })
 
-test('visualizer mode uses a full viewport stage without changing the regular stage cap', () => {
+test('visualizer fills its scroll container without changing the regular stage cap', () => {
   const source = readFileSync(new URL('./PlayingMusic.vue', import.meta.url), 'utf8')
 
   assert.match(source, /class="stage stage--visualizer playback-visualizer-view"/)
   assert.match(source, /\.stage \{[\s\S]*width: min\(100%, 1560px\)/)
-  assert.match(source, /\.stage--visualizer \{[\s\S]*width: 100vw/)
-  assert.match(source, /\.stage--visualizer \{[\s\S]*height: 100vh/)
+  assert.match(source, /\.stage--visualizer \{[\s\S]*width: 100%/)
+  assert.match(source, /\.stage--visualizer \{[\s\S]*height: 100%/)
   assert.match(source, /\.stage--visualizer \{[\s\S]*max-width: none/)
   assert.match(source, /\.stage--visualizer \{[\s\S]*padding: 0/)
   assert.match(source, /\.stage--visualizer \{[\s\S]*margin: 0/)

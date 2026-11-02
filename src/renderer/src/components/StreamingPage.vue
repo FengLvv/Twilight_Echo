@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import {useStreamingViewport} from './streaming-page/useStreamingViewport.ts'
+import { usePlaylistSubscription } from './streaming-page/usePlaylistSubscription.ts'
+
 import {
   computed,
   defineAsyncComponent,
@@ -247,32 +250,7 @@ const streamingViewKey = computed(() => {
   }
 })
 
-// Scroll offsets per streamingViewKey, saved on forward navigation and restored
-// when the user navigates back (Transition after-enter, once layout exists).
-const SAVED_SCROLL_POSITION_LIMIT = 32
-const savedScrollPositions = new Map<string, number>()
-
-function saveStreamingScrollPosition(): void {
-  const el = streamingContentRef.value
-  if (!el) return
-  // 封顶：深层详情导航只进不出会让这个 Map 无界增长；超出时淘汰最旧条目，
-  // 回退到顶部滚动的代价可接受。
-  savedScrollPositions.delete(streamingViewKey.value)
-  savedScrollPositions.set(streamingViewKey.value, el.scrollTop)
-  while (savedScrollPositions.size > SAVED_SCROLL_POSITION_LIMIT) {
-    const oldest = savedScrollPositions.keys().next().value
-    if (oldest === undefined) break
-    savedScrollPositions.delete(oldest)
-  }
-}
-
-function restoreStreamingScrollPosition(): void {
-  const saved = savedScrollPositions.get(streamingViewKey.value)
-  if (saved == null) return
-  savedScrollPositions.delete(streamingViewKey.value)
-  const el = streamingContentRef.value
-  if (el) el.scrollTop = saved
-}
+const {saveStreamingScrollPosition,restoreStreamingScrollPosition}=useStreamingViewport(streamingContentRef,()=>streamingViewKey.value)
 
 function beginDetailTransition(): void {
   streamingTransitionName.value = 'stream-detail-forward'
@@ -724,18 +702,33 @@ const {
   followUser,
   likeTrack,
   isTrackLiked,
+  refreshLikedStates,
+  applyLikedState,
   syncLikedIds,
   createPlaylist: createNcmPlaylist,
   deletePlaylist: deleteNcmPlaylist,
+  fetchPlaylistSubscriptionState,
+  subscribePlaylist: subscribeNcmPlaylist,
   addTracksToPlaylist: addNcmTracksToPlaylist,
   removeTracksFromPlaylist: removeNcmTracksFromPlaylist,
   checkLogin
 } = useNcmStore()
 
+const { control: playlistSubscriptionControl, toggle: togglePlaylistSubscription } = usePlaylistSubscription({
+  playlist: () => currentDetail.value?.type === 'playlist' ? currentDetail.value.playlist : null,
+  enabled: () => detailProviderId.value === NCM_PROVIDER_ID && isLoggedIn.value &&
+    !!mediaProviders.get(NCM_PROVIDER_ID)?.subscribePlaylist &&
+    !!mediaProviders.get(NCM_PROVIDER_ID)?.fetchPlaylistSubscriptionState,
+  scope: () => [profile.value, mediaProviders.getGeneration(NCM_PROVIDER_ID)],
+  captureSession: captureNcmSession,
+  fetchState: fetchPlaylistSubscriptionState,
+  subscribe: subscribeNcmPlaylist
+})
+
 const playbackStore = usePlayerStore()
 const { currentTrack, playTrack, startPersonalizedStream, formatTime } = playbackStore
 
-function playCloudSong(song: import('../stores/useNcmStore.ts').NcmCloudSong): void {
+function playCloudSong(song: import('../stores/useNcmStore').NcmCloudSong): void {
   playTrack(
     song.track,
     cloudSongs.value.map((item) => item.track)
@@ -764,7 +757,7 @@ async function startCloudUpload(handle: string): Promise<void> {
 }
 
 async function startCloudDownload(
-  song: import('../stores/useNcmStore.ts').NcmCloudSong
+  song: import('../stores/useNcmStore').NcmCloudSong
 ): Promise<void> {
   try {
     await downloadCloudSong(song)
@@ -932,6 +925,7 @@ const {
   onPageChange,
   onSearchTrackClick
 } = useStreamingSearch({
+  initialSource: 'ncm',
   searchAlbums: albumSearch.searchAlbums,
   searchLocalAlbums: albumSearch.searchLocalAlbums,
   searchProviderAlbums: albumSearch.searchProviderAlbums,
@@ -1020,6 +1014,10 @@ const showBilibiliTrackLikes = computed(
 )
 
 watch(providerFavoriteChange, (change) => {
+  if (change?.providerId === 'ncm') {
+    applyLikedState(Number(String(change.trackId).replace(/^ncm:/, '')), change.liked)
+    return
+  }
   if (change?.providerId !== 'bili') return
   const state = externalStates.bili
   if (state) state.libraryLoaded = false
@@ -2409,8 +2407,9 @@ const multiSelect = useTrackMultiSelect({
 const { selectedIds, selectedCount, hasSelection, isSelected, clearSelection, getSelectedTracks } =
   multiSelect
 
-watch([streamingListTracks, musicStore.playlistsRevision], async ([tracks]) => {
+watch([streamingListTracks, musicStore.playlistsRevision, isLoggedIn], async ([tracks]) => {
   try {
+    await refreshLikedStates(tracks)
     for (let offset = 0; offset < tracks.length; offset += 200)
       await musicStore.getFavoriteTrackStates(tracks.slice(offset, offset + 200))
   } catch (error) {
@@ -4002,6 +4001,8 @@ onMounted(async () => {
                 :show-track-likes="showBilibiliTrackLikes"
                 :favorite-provider-label="showBilibiliTrackLikes ? 'Bilibili' : '网易云'"
                 :loading="detailLoading && detailTracks.length === 0"
+                :playlist-subscription="playlistSubscriptionControl"
+                @subscribe-playlist="togglePlaylistSubscription"
                 :has-selection="hasSelection"
                 :selected-count="selectedCount"
                 :selection-all-favorited="selectionAllFavorited"

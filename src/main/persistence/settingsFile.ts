@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/persistence/settingsFile.ts'
+export * from '../adapters/persistence/settingsFile.ts'

@@ -104,17 +104,19 @@ test('the IPC delivery and the DOM delivery of one press only move one step', ()
 
 test('the shell wires both mouse history paths onto the shared navigation stacks', () => {
   const app = readFileSync(new URL('../App.vue', import.meta.url), 'utf8')
+  const lifecycle = readFileSync(new URL('./useAppWindowLifecycle.ts', import.meta.url), 'utf8')
 
   assert.match(app, /back: \(\) => backStack\.goBack\(\)/)
   assert.match(app, /forward: \(\) => navigation\.goForwardPage\(\)/)
-  assert.match(app, /window\.api\.app\.onHistoryCommand\(routeHistoryCommand\.run\)/)
+  assert.match(app, /useAppWindowLifecycle\(\{navigate:applyExternalNavigation,history:routeHistoryCommand/)
+  assert.match(lifecycle, /window\.api\.app\.onHistoryCommand\(options\.history\.run\)/)
   assert.match(
-    app,
-    /window\.addEventListener\('mouseup', routeHistoryCommand\.handleMouseUp, true\)/
+    lifecycle,
+    /window\.addEventListener\('mouseup', options\.history\.handleMouseUp, true\)/
   )
-  assert.match(app, /removeHistoryCommandListener\?\.\(\)/)
+  assert.match(lifecycle, /disposers\.splice\(0\)\.reverse\(\)/)
   assert.match(
-    app,
-    /window\.removeEventListener\('mouseup', routeHistoryCommand\.handleMouseUp, true\)/
+    lifecycle,
+    /window\.removeEventListener\('mouseup', options\.history\.handleMouseUp, true\)/
   )
 })

@@ -3,13 +3,13 @@ import test from 'node:test'
 import { EventEmitter } from 'node:events'
 import { createServer } from 'node:http'
 import { connect as tlsConnect } from 'node:tls'
-import { dlnaStatus, dlnaPlay } from './dlnaClient.ts'
+import { dlnaStatus, dlnaPlay } from '../../main/adapters/cast/dlnaClient.ts'
 import {
   chromecastLoad,
   chromecastStatus,
   chromecastStop,
   chromecastStopReceiver
-} from './chromecastClient.ts'
+} from '../../main/adapters/cast/chromecastClient.ts'
 import type { CastDevice } from './castBackend.ts'
 
 test('DLNA sampling uses actual transport and source position; cancellation interrupts SOAP', async (t) => {

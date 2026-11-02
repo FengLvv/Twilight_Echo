@@ -16,7 +16,7 @@ import {
   type ThemeProfileV2,
   type ThemeWindowDefaults
 } from '../../shared/theme.ts'
-import type { ThemeLibraryRepository } from '../persistence/themeLibraryRepository.ts'
+import type { ThemeLibraryRepository } from '../persistence/themeLibraryRepositoryContract.ts'
 import {
   createInheritedThemeSettingsPatch,
   createThemePlayerBarSettingsPatch

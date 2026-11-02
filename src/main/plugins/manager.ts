@@ -1,12 +1,12 @@
 import { app, utilityProcess } from 'electron'
-import { TwilightPluginManager as CorePluginManager } from '../../core/plugins/manager.ts'
-import type { TwilightPluginManagerOptions as CorePluginManagerOptions } from '../../core/plugins/manager.ts'
+import { TwilightPluginManager as CorePluginManager } from '../adapters/plugins/manager.ts'
+import type { TwilightPluginManagerOptions as CorePluginManagerOptions } from '../../core/plugins/managerPort.ts'
 import type { PluginHostProcess } from '../../core/plugins/platform.ts'
-import { PluginSettingsRepository } from '../../core/plugins/settingsRepository.ts'
+import { PluginSettingsRepository } from '../adapters/plugins/settingsRepository.ts'
 import { protectJsonValue, unprotectJsonValue } from '../security/secureStorage.ts'
 import { providerPlaybackIdentities } from '../audio/providerPlaybackIdentity.ts'
 import { createPluginManagerPlatform } from './platform.ts'
-export type { TwilightProviderCallOptions } from '../../core/plugins/manager.ts'
+export type { TwilightProviderCallOptions } from '../../core/plugins/managerPort.ts'
 export interface TwilightPluginManagerOptions extends Omit<
   CorePluginManagerOptions,
   'platform' | 'settings' | 'recordPlaybackIdentity'

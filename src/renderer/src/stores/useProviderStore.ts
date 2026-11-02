@@ -58,9 +58,9 @@ export interface ProviderUiMetadata {
     icon: string
     method: string
   }>
-  streamingHome?: import('../../../shared/providerHome').ProviderHomePresentation
-  streamingDiscovery?: import('../../../shared/providerHome').ProviderDiscoveryPresentation
-  streamingSections?: import('../../../shared/providerHome').ProviderStreamingSection[]
+  streamingHome?: import('../../../shared/providerHome.ts').ProviderHomePresentation
+  streamingDiscovery?: import('../../../shared/providerHome.ts').ProviderDiscoveryPresentation
+  streamingSections?: import('../../../shared/providerHome.ts').ProviderStreamingSection[]
   streamingLibraryTab?: boolean
   streamingSearch?: boolean
   /** 接入统一音乐库切换器（资料卡音源下拉），不再占侧边栏独立条目 */

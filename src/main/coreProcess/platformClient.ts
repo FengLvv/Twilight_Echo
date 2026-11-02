@@ -42,6 +42,7 @@ export class CorePlatformClient {
       | 'automix.probeInstall'
       | 'automix.decodeArchiveEntry'
       | 'automix.runWorker'
+      | 'study.cancelWorker'
       | 'files.trashAudio'
       | 'themes.deleteAssets'
       | 'themes.copyAssets'
@@ -106,8 +107,8 @@ export class CorePlatformClient {
           dispose()
           reject(new Error(`${name} timed out; outcome may be unknown`))
         },
-        name === 'audio.confirmWindowsRestart' ||
-          name === 'study.environment' || name === 'study.choosePack' || name === 'study.chooseSource' || name === 'study.captureLocal' || name === 'study.exportFiles' ||
+        name === 'study.environment' ? 660_000 : name === 'audio.confirmWindowsRestart' ||
+          name === 'study.choosePack' || name === 'study.chooseSource' || name === 'study.captureLocal' || name === 'study.exportFiles' ||
           name === 'remote.confirmDevice' ||
           name === 'ncm.officialLogin' ||
           name === 'ncm.chooseUploadFiles' ||

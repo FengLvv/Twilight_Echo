@@ -1,4 +1,15 @@
 import test from 'node:test'
+import { numberedOctaveShift } from '../../../shared/lyrics/numberedNotation.ts'
+
+test('a Bb vocal part uses one readable register across all rows and retains absolute MIDI', () => {
+  const notes = [53, 58, 60, 62, 65].map((midi, i) => ({ midi, start: i, end: i + 1 }))
+  const key = { tonic: 10, mode: 'major' as const }
+  const shift = numberedOctaveShift(notes, key)
+  assert.equal(shift, 12)
+  assert.deepEqual(notes.map(n => n.midi), [53, 58, 60, 62, 65])
+  assert.deepEqual(numberedNote(60 + shift, key), { label: '2', octave: 0 })
+  assert.deepEqual(numberedNote(53 + shift, key), { label: '5', octave: -1 })
+})
 import assert from 'node:assert/strict'
 import { numberedNote, activeVocalNote, buildLyricNoteRows } from './numberedNotes.ts'
 test('numbered notation keeps accidentals and octaves and uses relative-major do for minor', () => {

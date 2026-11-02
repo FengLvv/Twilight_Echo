@@ -1,6 +1,7 @@
 """Japanese kana and MeCab G2P converters with shared pronunciation rules."""
 
 from itertools import product
+from functools import lru_cache
 from pathlib import Path
 
 from ..registry import converter
@@ -225,7 +226,9 @@ _KANA_TO_ROMAJI: dict[str, str] = {
 
 _HIRAGANA_START = 0x3041
 _KATAKANA_START = 0x30A1
-_KANA_SPAN = 0x5E
+# Only letters through ヶ have a hiragana counterpart at this offset.
+# In particular, ー must remain a long-vowel mark, not become ゜.
+_KANA_SPAN = 0x56
 
 
 def _kata_to_hira(text: str) -> str:
@@ -243,6 +246,10 @@ def _kata_to_hira(text: str) -> str:
 _CONSONANT_LEADING = frozenset(
     "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ"
 )
+
+# These are kana readings emitted by our own table, rather than arbitrary
+# romaji input. Some table entries combine several dictionary syllables.
+_KANA_SCRIPTS = frozenset(_KANA_TO_ROMAJI.values())
 
 
 def _apply_sokuon(romaji_list: list[str]) -> list[str]:
@@ -290,6 +297,11 @@ class JapaneseKanaConverter(PronunciationScriptDictionaryConverter):
     ) -> None:
         super().__init__(dict_path=dict_path)
         self._double_written_sokuon = double_written_sokuon
+        self._consonant_phones = tuple(sorted({
+            phone for pronunciations in self._script_dict.values()
+            for pronunciation in pronunciations for phone in pronunciation
+            if phone and all(char in _CONSONANT_LEADING for char in phone)
+        }, key=lambda phone: (-len(phone), phone)))
 
     def find(self, text: str) -> tuple[int, int] | None:
         return find_run(text, is_kana)
@@ -302,9 +314,49 @@ class JapaneseKanaConverter(PronunciationScriptDictionaryConverter):
         # Single consonants from gemination pass through directly
         if len(script) == 1 and script in _CONSONANT_LEADING:
             return [[G2PGroup(script=script, phonemes=[script])]]
+        if script in _KANA_SCRIPTS:
+            paths = self._compound_script_paths(script)
+            if paths:
+                return paths
         raise KeyError(
             f"Script token {script!r} not found in script-to-phoneme dict."
         )
+
+    def _compound_script_paths(self, script: str) -> list[G2PPath]:
+        """Compose a known kana reading from existing dictionary sounds.
+
+        For example, aa -> a + a and kaa -> ka + a. Preserve dictionary
+        alternatives, vowel repetitions and the original single group, so
+        small-kana spellings keep their lyric ownership and are never dropped.
+        """
+        @lru_cache(maxsize=None)
+        def parts(offset: int):
+            if offset == len(script):
+                return []
+            # Prefer whole syllables. A nonterminal n is an onset, whereas
+            # the standalone dictionary key n denotes moraic N (ん).
+            for end in range(len(script), offset, -1):
+                token = script[offset:end]
+                if len(token) == 1 and token in _CONSONANT_LEADING:
+                    continue
+                pronunciations = self._script_dict.get(token)
+                if pronunciations:
+                    rest = parts(end)
+                    if rest is not None:
+                        return [pronunciations, *rest]
+            for phone in self._consonant_phones:
+                if script.startswith(phone, offset):
+                    rest = parts(offset + len(phone))
+                    if rest is not None:
+                        return [[[phone]], *rest]
+            return None
+
+        segments = parts(0)
+        if not segments:
+            return []
+        return [[G2PGroup(script=script, phonemes=[
+            phone for pronunciation in combination for phone in pronunciation
+        ])] for combination in product(*segments)]
 
     def text_to_scripts(self, words: list[str]) -> list[list[str]]:
         # Convert katakana to hiragana for unified lookup

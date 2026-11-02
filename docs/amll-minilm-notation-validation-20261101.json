@@ -1,0 +1,1838 @@
+{
+  "date": "2026-11-01",
+  "algorithm": "vocal2midi-tifa-game-medium-rhythm-v9",
+  "flow": {
+    "amll": "structured lead -> notation",
+    "fallback": "source/credit -> MiniLM candidates -> vocal-time protection and outer filtering -> notation",
+    "speechToText": false
+  },
+  "parity": {
+    "loadMs": 1185,
+    "rows": 231,
+    "mismatches": [],
+    "structuredKeyParity": true,
+    "heuristicKeyParity": true
+  },
+  "classifierReplay": {
+    "songs": 50,
+    "rows": 2604,
+    "candidates": 33,
+    "protected": 19,
+    "extraRemoved": 4,
+    "baselineSungRegressions": [],
+    "perSong": [
+      {
+        "title": "十年",
+        "ncmId": "66842",
+        "rows": 38,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 25,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": false,
+          "elapsedMs": 993
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 38,
+        "excluded": []
+      },
+      {
+        "title": "遇见",
+        "ncmId": "454828887",
+        "rows": 25,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 17,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 27
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 25,
+        "excluded": []
+      },
+      {
+        "title": "倔强",
+        "ncmId": "386175",
+        "rows": 53,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 32,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 47
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 53,
+        "excluded": []
+      },
+      {
+        "title": "平凡之路",
+        "ncmId": "28815250",
+        "rows": 38,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 29,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 51
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 38,
+        "excluded": []
+      },
+      {
+        "title": "Play我呸 (Alesso Remix Version)",
+        "ncmId": "432698987",
+        "rows": 44,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 27,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 48
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 44,
+        "excluded": []
+      },
+      {
+        "title": "光年之外",
+        "ncmId": "449818741",
+        "rows": 57,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 33,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 50
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 57,
+        "excluded": []
+      },
+      {
+        "title": "爱人错过",
+        "ncmId": "1368754688",
+        "rows": 53,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 10,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 18
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 53,
+        "excluded": []
+      },
+      {
+        "title": "大鱼 (唱片版)",
+        "ncmId": "516823132",
+        "rows": 24,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 15,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 31
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 24,
+        "excluded": []
+      },
+      {
+        "title": "云烟成雨",
+        "ncmId": "513360721",
+        "rows": 42,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 21,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 34
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 42,
+        "excluded": []
+      },
+      {
+        "title": "最炫民族风",
+        "ncmId": "354738",
+        "rows": 57,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 25,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 42
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 57,
+        "excluded": []
+      },
+      {
+        "title": "Someone Like You",
+        "ncmId": "16435049",
+        "rows": 68,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 38,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 57
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 68,
+        "excluded": []
+      },
+      {
+        "title": "bad guy",
+        "ncmId": "1355147933",
+        "rows": 47,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 61
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 47,
+        "excluded": []
+      },
+      {
+        "title": "Just the Way You Are",
+        "ncmId": "25657276",
+        "rows": 54,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 33,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 50
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 54,
+        "excluded": []
+      },
+      {
+        "title": "Numb",
+        "ncmId": "16686599",
+        "rows": 35,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 21,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 40
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 35,
+        "excluded": []
+      },
+      {
+        "title": "Stan",
+        "ncmId": "17572422",
+        "rows": 137,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 106,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 230
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 137,
+        "excluded": []
+      },
+      {
+        "title": "Get Lucky",
+        "ncmId": "26349642",
+        "rows": 114,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 25,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 46
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 114,
+        "excluded": []
+      },
+      {
+        "title": "Bohemian Rhapsody",
+        "ncmId": "1868553",
+        "rows": 67,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 64,
+          "candidates": [
+            65,
+            68,
+            70
+          ],
+          "rejected": 0,
+          "protected": [
+            65,
+            68,
+            70
+          ],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 118
+        },
+        "extraRemoved": [],
+        "protected": [
+          {
+            "id": 65,
+            "start": 328.2,
+            "end": 329.01,
+            "text": "Lead & Backing Vocals : Freddie Mercury"
+          },
+          {
+            "id": 68,
+            "start": 330.12,
+            "end": 330.6,
+            "text": "Bass Guitar : John Deacon"
+          },
+          {
+            "id": 70,
+            "start": 343.14,
+            "end": 345.3,
+            "text": "Operatic Vocals : Freddie Mercury （Middle Register） / Brian May （Low Register） / Roger Taylor （High Register）"
+          }
+        ],
+        "kept": 67,
+        "excluded": []
+      },
+      {
+        "title": "Don't Know Why",
+        "ncmId": "22489132",
+        "rows": 25,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 16,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 27
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 25,
+        "excluded": []
+      },
+      {
+        "title": "夜に駆ける",
+        "ncmId": "1409311773",
+        "rows": 56,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 54,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 96
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 56,
+        "excluded": []
+      },
+      {
+        "title": "残響散歌",
+        "ncmId": "1902315758",
+        "rows": 32,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 30,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 52
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 32,
+        "excluded": []
+      },
+      {
+        "title": "贝加尔湖畔",
+        "ncmId": "109998",
+        "rows": 17,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 17,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 31
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 17,
+        "excluded": []
+      },
+      {
+        "title": "海阔天空",
+        "ncmId": "1357375695",
+        "rows": 33,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 17,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 30
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 33,
+        "excluded": []
+      },
+      {
+        "title": "Hotel California",
+        "ncmId": "1302701468",
+        "rows": 58,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 55,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 89
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 58,
+        "excluded": []
+      },
+      {
+        "title": "Stairway To Heaven",
+        "ncmId": "1833372266",
+        "rows": 70,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 66,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 101
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 70,
+        "excluded": []
+      },
+      {
+        "title": "Fix You",
+        "ncmId": "22447802",
+        "rows": 31,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 20,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 32
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 31,
+        "excluded": []
+      },
+      {
+        "title": "when the party's over",
+        "ncmId": "1355149438",
+        "rows": 28,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 18,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 28
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 28,
+        "excluded": []
+      },
+      {
+        "title": "Lemon",
+        "ncmId": "536622304",
+        "rows": 42,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 35,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 54
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 42,
+        "excluded": []
+      },
+      {
+        "title": "紅蓮華",
+        "ncmId": "1360592706",
+        "rows": 44,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 62
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 44,
+        "excluded": []
+      },
+      {
+        "title": "First Love",
+        "ncmId": "22786083",
+        "rows": 32,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 26,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 46
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 32,
+        "excluded": []
+      },
+      {
+        "title": "Rolling in the Deep",
+        "ncmId": "16435051",
+        "rows": 53,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 39,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 65
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 53,
+        "excluded": []
+      },
+      {
+        "title": "如愿",
+        "ncmId": "1888381008",
+        "rows": 44,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [
+            5,
+            6
+          ],
+          "rejected": 2,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 58
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 42,
+        "excluded": [
+          {
+            "id": 5,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 6,
+            "reason": "non_lyric_classifier"
+          }
+        ]
+      },
+      {
+        "title": "这世界那么多人",
+        "ncmId": "1842025914",
+        "rows": 36,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 23,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 40
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 36,
+        "excluded": []
+      },
+      {
+        "title": "起风了",
+        "ncmId": "1330348068",
+        "rows": 58,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 43,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 72
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 58,
+        "excluded": []
+      },
+      {
+        "title": "孤勇者",
+        "ncmId": "1901371647",
+        "rows": 57,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 40,
+          "candidates": [
+            10,
+            11,
+            12,
+            13,
+            14
+          ],
+          "rejected": 3,
+          "protected": [
+            13,
+            14
+          ],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 71
+        },
+        "extraRemoved": [],
+        "protected": [
+          {
+            "id": 13,
+            "start": 14.4,
+            "end": 19.56,
+            "text": "联合出品：拳头游戏/腾讯游戏/腾讯视频"
+          },
+          {
+            "id": 14,
+            "start": 19.56,
+            "end": 22.31,
+            "text": "出品监制：霍锦 卢泓宇"
+          }
+        ],
+        "kept": 54,
+        "excluded": [
+          {
+            "id": 10,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 11,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 12,
+            "reason": "non_lyric_classifier"
+          }
+        ]
+      },
+      {
+        "title": "山海",
+        "ncmId": "411314659",
+        "rows": 16,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 11,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 16
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 16,
+        "excluded": []
+      },
+      {
+        "title": "凄美地",
+        "ncmId": "436346833",
+        "rows": 52,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 53
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 52,
+        "excluded": []
+      },
+      {
+        "title": "如果可以",
+        "ncmId": "1890530891",
+        "rows": 34,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 22,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 40
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 34,
+        "excluded": []
+      },
+      {
+        "title": "刻在我心底的名字",
+        "ncmId": "1472921626",
+        "rows": 47,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 34,
+          "candidates": [
+            46,
+            47,
+            49,
+            51,
+            52,
+            55
+          ],
+          "rejected": 6,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 53
+        },
+        "extraRemoved": [
+          {
+            "id": 46,
+            "start": 294.221,
+            "end": 294.485,
+            "text": "管乐录音师：黄雨勋"
+          },
+          {
+            "id": 47,
+            "start": 294.485,
+            "end": 294.774,
+            "text": "管乐录音室：梦想之翼创意多媒体工作室"
+          }
+        ],
+        "protected": [],
+        "kept": 41,
+        "excluded": [
+          {
+            "id": 46,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 47,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 49,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 51,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 52,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 55,
+            "reason": "non_lyric_classifier"
+          }
+        ]
+      },
+      {
+        "title": "漠河舞厅",
+        "ncmId": "1430319727",
+        "rows": 46,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 29,
+          "candidates": [
+            11
+          ],
+          "rejected": 0,
+          "protected": [
+            11
+          ],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 45
+        },
+        "extraRemoved": [],
+        "protected": [
+          {
+            "id": 11,
+            "start": 49.793,
+            "end": 53.214,
+            "text": "出品方：众乐纪"
+          }
+        ],
+        "kept": 46,
+        "excluded": []
+      },
+      {
+        "title": "Blinding Lights",
+        "ncmId": "1406633327",
+        "rows": 35,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 23,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 41
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 35,
+        "excluded": []
+      },
+      {
+        "title": "Levitating",
+        "ncmId": "1433934518",
+        "rows": 89,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 33,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 55
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 89,
+        "excluded": []
+      },
+      {
+        "title": "Shape of You",
+        "ncmId": "451703096",
+        "rows": 95,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 37,
+          "candidates": [
+            108
+          ],
+          "rejected": 1,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 69
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 92,
+        "excluded": [
+          {
+            "id": 108,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 109,
+            "reason": "after_vocals"
+          },
+          {
+            "id": 115,
+            "reason": "after_vocals"
+          }
+        ]
+      },
+      {
+        "title": "Uptown Funk",
+        "ncmId": "29722263",
+        "rows": 103,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 55,
+          "candidates": [
+            99,
+            103,
+            107,
+            109,
+            111,
+            112
+          ],
+          "rejected": 2,
+          "protected": [
+            99,
+            103,
+            107,
+            109
+          ],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 88
+        },
+        "extraRemoved": [
+          {
+            "id": 111,
+            "start": 267.455,
+            "end": 267.623,
+            "text": "Engineers : Mark Ronson / Boo Mitchell / Charles Moniz / Wayne Gordon / Josh Blair / Inaam Haq"
+          },
+          {
+            "id": 112,
+            "start": 267.623,
+            "end": 267.80734693877554,
+            "text": "Additional Engineering : Ken Lewis / Devin Nakao / Matthew Stevens / Riccardo Damian"
+          }
+        ],
+        "protected": [
+          {
+            "id": 99,
+            "start": 265.57,
+            "end": 265.795,
+            "text": "Lead Vocals : Bruno Mars"
+          },
+          {
+            "id": 103,
+            "start": 266.191,
+            "end": 266.342,
+            "text": "Linn Drum : Mark Ronson"
+          },
+          {
+            "id": 107,
+            "start": 266.795,
+            "end": 266.955,
+            "text": "Tenor Saxophone : Neal Sugarman / Dwayne Dagger"
+          },
+          {
+            "id": 109,
+            "start": 267.144,
+            "end": 267.293,
+            "text": "Trombone : Ray Mason / Kameron Whalum"
+          }
+        ],
+        "kept": 101,
+        "excluded": [
+          {
+            "id": 111,
+            "reason": "non_lyric_classifier"
+          },
+          {
+            "id": 112,
+            "reason": "non_lyric_classifier"
+          }
+        ]
+      },
+      {
+        "title": "Billie Jean",
+        "ncmId": "21178262",
+        "rows": 51,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 40,
+          "candidates": [
+            43,
+            44,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "rejected": 0,
+          "protected": [
+            43,
+            44,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 73
+        },
+        "extraRemoved": [],
+        "protected": [
+          {
+            "id": 43,
+            "start": 226.62,
+            "end": 230.1,
+            "text": "Lead & Backing Vocals : Michael Jackson"
+          },
+          {
+            "id": 44,
+            "start": 233.07,
+            "end": 239.64,
+            "text": "Vocal, Rhythm, Synthesizer & String Arrangements : Michael Jackson"
+          },
+          {
+            "id": 48,
+            "start": 247.62,
+            "end": 248.43,
+            "text": "Lyricon : Tom Scott"
+          },
+          {
+            "id": 49,
+            "start": 248.43,
+            "end": 253.8,
+            "text": "E-mu Emulator : Michael Boddicker"
+          },
+          {
+            "id": 50,
+            "start": 253.8,
+            "end": 255.33,
+            "text": "Rhodes Piano : Greg Phillinganes"
+          },
+          {
+            "id": 51,
+            "start": 255.33,
+            "end": 259.8,
+            "text": "Yamaha CS-80 Synthesizer : Michael Jackson"
+          },
+          {
+            "id": 52,
+            "start": 260.31,
+            "end": 264.51,
+            "text": "Synthesizer : Greg Phillinganes / Greg Smith / Bill Wolfer"
+          },
+          {
+            "id": 53,
+            "start": 264.51,
+            "end": 267.27,
+            "text": "Synthesizer Programming : Bill Wolfer"
+          },
+          {
+            "id": 54,
+            "start": 267.27,
+            "end": 276.15,
+            "text": "String Arrangement : Jerry Hey"
+          }
+        ],
+        "kept": 51,
+        "excluded": []
+      },
+      {
+        "title": "Smells Like Teen Spirit",
+        "ncmId": "4208530",
+        "rows": 52,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 23,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 34
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 52,
+        "excluded": []
+      },
+      {
+        "title": "Hallelujah",
+        "ncmId": "18604663",
+        "rows": 60,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 31,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 54
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 60,
+        "excluded": []
+      },
+      {
+        "title": "Pretender",
+        "ncmId": "1365924378",
+        "rows": 53,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 39,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 63
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 53,
+        "excluded": []
+      },
+      {
+        "title": "群青",
+        "ncmId": "1472480890",
+        "rows": 75,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 70,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 102
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 75,
+        "excluded": []
+      },
+      {
+        "title": "打上花火",
+        "ncmId": "496869422",
+        "rows": 45,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 57
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 45,
+        "excluded": []
+      },
+      {
+        "title": "白日",
+        "ncmId": "1347630432",
+        "rows": 82,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 66,
+          "candidates": [],
+          "rejected": 0,
+          "protected": [],
+          "abstained": false,
+          "reused": true,
+          "elapsedMs": 113
+        },
+        "extraRemoved": [],
+        "protected": [],
+        "kept": 82,
+        "excluded": []
+      }
+    ]
+  },
+  "integration": [
+    {
+      "index": 1,
+      "ncmId": "1294899297",
+      "title": "I Love You So",
+      "artist": "The Walters",
+      "coverage": "AMLL 主唱与伴唱",
+      "language": "en",
+      "outcome": "passed",
+      "stageTimings": {
+        "six": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 25,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 13515,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 669
+          }
+        },
+        "melody": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 53763,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 52981,
+            "layoutMs": 776
+          }
+        }
+      },
+      "startedAt": "2026-11-01T09:59:39.131Z",
+      "projectId": "bc058f97-c2c5-4b20-b1c9-f9c66e4a9ddc",
+      "duration": 160.23968253968255,
+      "chords": 74,
+      "notes": 188,
+      "scoreRows": 19,
+      "key": {
+        "tonic": 10,
+        "mode": "major"
+      },
+      "sourceSha256": "2a7259a43e0a4527332d12e4fe4509601a5b9f74ca84639867d1d8ea6e8ce287",
+      "notesHash": "e6badf9aa2a2843e9294a127899d1475d228fb16e521d9f046b8fe662b0191e1",
+      "timings": {
+        "six": {
+          "elapsedMs": 24,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "elapsedMs": 13515,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 669
+          }
+        },
+        "melody": {
+          "elapsedMs": 53763,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 52981,
+            "layoutMs": 776
+          }
+        }
+      },
+      "melodyTimings": {
+        "importsAndModelMs": 22621,
+        "alignmentMs": 7894,
+        "pitchMs": 5709,
+        "activityMs": 0,
+        "lyricClassifierMs": 0,
+        "beatMs": 6602,
+        "reusedGroups": 0,
+        "processedGroups": 3
+      },
+      "preparation": {
+        "mode": "structured",
+        "activity": "skipped",
+        "excluded": 0
+      },
+      "audio": {
+        "frames": 7066570,
+        "sampleRate": 44100,
+        "channels": 2,
+        "peaks": {
+          "original": 1.0157995223999023,
+          "vocals": 0.9888803362846375,
+          "drums": 1.0665150880813599,
+          "bass": 0.5244358777999878,
+          "guitar": 0.884467363357544,
+          "piano": 0.11410834640264511,
+          "other": 0.574525773525238
+        },
+        "mixtureResidualRatio": 0.09626350779101948
+      },
+      "audioVerification": "current run",
+      "exports": {
+        "numbered": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\01-1294899297\\exports\\TwilightEcho-score-bc058f97-5b0fbaacc3",
+          "pdfBytes": 82076
+        },
+        "staff": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\01-1294899297\\exports\\TwilightEcho-score-bc058f97-792e96d174",
+          "pdfBytes": 181976
+        }
+      },
+      "cache": {
+        "limitBytes": 2147483648,
+        "preloadNext": false,
+        "usedBytes": 1051120504,
+        "reservedBytes": 0,
+        "protectedBytes": 0,
+        "resultBytes": 58570
+      },
+      "wallMs": 110350,
+      "completedAt": "2026-11-01T10:01:29.482Z"
+    },
+    {
+      "index": 2,
+      "ncmId": "1888381008",
+      "title": "如愿",
+      "artist": "王菲",
+      "coverage": "华语／弦乐",
+      "language": "zh",
+      "outcome": "passed",
+      "stageTimings": {
+        "six": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 35,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 7264,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 620
+          }
+        },
+        "melody": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 31674,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 31043,
+            "layoutMs": 623
+          }
+        }
+      },
+      "startedAt": "2026-11-01T10:01:29.484Z",
+      "projectId": "d264bb49-3088-4d0b-ae32-56790ef1a59e",
+      "duration": 265.3836054421769,
+      "chords": 130,
+      "notes": 337,
+      "scoreRows": 42,
+      "key": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "22836da03abf505a8b466bb8ee01edcec80892b13a8edfc74518ed9f40fa6cfb",
+      "notesHash": "79088391132e9d895e8aac9a0cf7d09cf352a1603995aeb167864de159685cbd",
+      "timings": {
+        "six": {
+          "elapsedMs": 33,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "elapsedMs": 7264,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 620
+          }
+        },
+        "melody": {
+          "elapsedMs": 31674,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 31043,
+            "layoutMs": 623
+          }
+        }
+      },
+      "melodyTimings": {
+        "importsAndModelMs": 1591,
+        "alignmentMs": 5576,
+        "pitchMs": 9943,
+        "activityMs": 507,
+        "lyricClassifierMs": 971,
+        "beatMs": 493,
+        "reusedGroups": 0,
+        "processedGroups": 6
+      },
+      "preparation": {
+        "mode": "heuristic",
+        "activity": "estimated",
+        "excluded": 2,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 36,
+          "candidates": [
+            5,
+            6
+          ],
+          "rejected": 2,
+          "protected": [],
+          "abstained": false,
+          "reused": false,
+          "elapsedMs": 971
+        }
+      },
+      "audio": {
+        "frames": 11703417,
+        "sampleRate": 44100,
+        "channels": 2,
+        "peaks": {
+          "original": 1.1098586320877075,
+          "vocals": 0.8737627863883972,
+          "drums": 0.9002649784088135,
+          "bass": 0.6806530952453613,
+          "guitar": 0.5633426904678345,
+          "piano": 0.344772607088089,
+          "other": 0.3828909695148468
+        },
+        "mixtureResidualRatio": 0.09806698640775045
+      },
+      "audioVerification": "current run",
+      "exports": {
+        "numbered": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\02-1888381008\\exports\\TwilightEcho-score-d264bb49-b5ad06805f",
+          "pdfBytes": 115443
+        },
+        "staff": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\02-1888381008\\exports\\TwilightEcho-score-d264bb49-cd9088d6ec",
+          "pdfBytes": 438522
+        }
+      },
+      "cache": {
+        "limitBytes": 2147483648,
+        "preloadNext": false,
+        "usedBytes": 1051120504,
+        "reservedBytes": 0,
+        "protectedBytes": 0,
+        "resultBytes": 58735
+      },
+      "wallMs": 44713,
+      "completedAt": "2026-11-01T10:02:14.199Z"
+    },
+    {
+      "index": 3,
+      "ncmId": "1472921626",
+      "title": "刻在我心底的名字",
+      "artist": "卢广仲",
+      "coverage": "华语／发行制作",
+      "language": "zh",
+      "outcome": "passed",
+      "stageTimings": {
+        "six": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 6610,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 746
+          }
+        },
+        "chords": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 7927,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 746
+          }
+        },
+        "melody": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 47027,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 40050,
+            "layoutMs": 6970
+          }
+        }
+      },
+      "startedAt": "2026-11-01T10:02:14.200Z",
+      "projectId": "44a048d3-a2cd-4546-8e64-067e4f0b05c8",
+      "duration": 320.16580498866216,
+      "chords": 117,
+      "notes": 396,
+      "scoreRows": 41,
+      "key": {
+        "tonic": 10,
+        "mode": "major"
+      },
+      "sourceSha256": "1ad2b8bdf80f8bd771f1858ea2f3c7fd5d6d47abde61619691856cb6deec253b",
+      "notesHash": "e9f81648f8c76c14a1090621fb58b05ed5937a9b4b5c25f2e29f6ddf9ae99b9e",
+      "timings": {
+        "six": {
+          "elapsedMs": 44,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "elapsedMs": 7927,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 746
+          }
+        },
+        "melody": {
+          "elapsedMs": 47027,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 40050,
+            "layoutMs": 6970
+          }
+        }
+      },
+      "melodyTimings": {
+        "importsAndModelMs": 1444,
+        "alignmentMs": 6181,
+        "pitchMs": 14322,
+        "activityMs": 582,
+        "lyricClassifierMs": 744,
+        "beatMs": 730,
+        "reusedGroups": 0,
+        "processedGroups": 7
+      },
+      "preparation": {
+        "mode": "heuristic",
+        "activity": "estimated",
+        "excluded": 6,
+        "classifier": {
+          "algorithm": "minilm-v2-real650",
+          "policy": "lyric-line-policy:932b3b807be386dcc3e3b8e404548907cca809297037d1ef0fe319bcdb92190f:a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+          "threshold": 0.9992046760154724,
+          "uniqueLines": 34,
+          "candidates": [
+            46,
+            47,
+            49,
+            51,
+            52,
+            55
+          ],
+          "rejected": 6,
+          "protected": [],
+          "abstained": false,
+          "reused": false,
+          "elapsedMs": 744
+        }
+      },
+      "audio": {
+        "frames": 14119312,
+        "sampleRate": 44100,
+        "channels": 2,
+        "peaks": {
+          "original": 0.9893273711204529,
+          "vocals": 0.737069308757782,
+          "drums": 0.6906992197036743,
+          "bass": 0.5623505115509033,
+          "guitar": 0.5193577408790588,
+          "piano": 0.3965260982513428,
+          "other": 0.7581566572189331
+        },
+        "mixtureResidualRatio": 0.18762678858507623
+      },
+      "audioVerification": "current run",
+      "exports": {
+        "numbered": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\03-1472921626\\exports\\TwilightEcho-score-44a048d3-4691431640",
+          "pdfBytes": 141240
+        },
+        "staff": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\amll-lead-20261101\\integration\\results-minilm\\03-1472921626\\exports\\TwilightEcho-score-44a048d3-69213a1f0f",
+          "pdfBytes": 343152
+        }
+      },
+      "cache": {
+        "limitBytes": 2147483648,
+        "preloadNext": false,
+        "usedBytes": 1841802592,
+        "reservedBytes": 0,
+        "protectedBytes": 0,
+        "resultBytes": 96836
+      },
+      "wallMs": 82305,
+      "completedAt": "2026-11-01T10:03:36.507Z"
+    }
+  ],
+  "exports": [
+    {
+      "index": 1,
+      "title": "I Love You So",
+      "notation": "numbered",
+      "notes": 188,
+      "rows": 19,
+      "midiMaxTimeErrorMs": 0.7509
+    },
+    {
+      "index": 1,
+      "title": "I Love You So",
+      "notation": "staff",
+      "notes": 188,
+      "rows": 19,
+      "midiMaxTimeErrorMs": 0.7509
+    },
+    {
+      "index": 2,
+      "title": "如愿",
+      "notation": "numbered",
+      "notes": 337,
+      "rows": 42,
+      "midiMaxTimeErrorMs": 0.6261
+    },
+    {
+      "index": 2,
+      "title": "如愿",
+      "notation": "staff",
+      "notes": 337,
+      "rows": 42,
+      "midiMaxTimeErrorMs": 0.6261
+    },
+    {
+      "index": 3,
+      "title": "刻在我心底的名字",
+      "notation": "numbered",
+      "notes": 396,
+      "rows": 41,
+      "midiMaxTimeErrorMs": 0.8343
+    },
+    {
+      "index": 3,
+      "title": "刻在我心底的名字",
+      "notation": "staff",
+      "notes": 396,
+      "rows": 41,
+      "midiMaxTimeErrorMs": 0.8343
+    }
+  ],
+  "cacheReuse": [
+    {
+      "title": "I Love You So",
+      "completedWithoutInference": true,
+      "notesHashUnchanged": true,
+      "elapsedMs": 502
+    },
+    {
+      "title": "如愿",
+      "completedWithoutInference": true,
+      "notesHashUnchanged": true,
+      "elapsedMs": 455
+    },
+    {
+      "title": "刻在我心底的名字",
+      "completedWithoutInference": true,
+      "notesHashUnchanged": true,
+      "elapsedMs": 465
+    }
+  ],
+  "checks": {
+    "node": 256,
+    "python": 56,
+    "renderer": 13,
+    "typeProjects": 3,
+    "packageClosure": 255
+  },
+  "runtimeModelDirectory": "D:/Tools/TwilightEchoToolchain/study/models/lyric-line",
+  "executable": "dist/study-amll-minilm/win-unpacked/TwilightEcho.exe"
+}

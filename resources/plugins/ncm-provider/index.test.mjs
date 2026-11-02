@@ -2606,6 +2606,46 @@ test('create delete and track mutations call NetEase playlist write endpoints', 
   }
 })
 
+test('playlist subscription reads account state and uses explicit idempotent subscribe/unsubscribe writes', async () => {
+  const calls = []
+  const provider = await activateProvider(async (path) => {
+    const url = parseRequest(path); calls.push(url)
+    if (url.pathname === '/login/status') return { code: 200, data: { code: 200, profile: { userId: 1001 } } }
+    if (url.pathname === '/user/playlist') return { code: 200, playlist: [{ id: 11, userId: 1001, name: '自己的' }] }
+    if (url.pathname === '/playlist/detail/dynamic') return { code: 200, subscribed: true }
+    return { code: 200 }
+  })
+  try {
+    assert.deepEqual(await provider.fetchPlaylistSubscriptionState(11), { owned: true, subscribed: true })
+    assert.deepEqual(await provider.fetchPlaylistSubscriptionState(22), { owned: false, subscribed: true })
+    const context = { signal: new AbortController().signal, idempotencyKey: 'subscribe-22' }
+    await provider.subscribePlaylist(22, true, context)
+    await provider.subscribePlaylist(22, true, context)
+    await provider.subscribePlaylist(22, false)
+    assert.deepEqual(calls.filter(url => url.pathname === '/playlist/subscribe').map(url => [url.searchParams.get('id'), url.searchParams.get('t')]), [['22', '1'], ['22', '2']])
+    assert.equal(calls.some(url => url.pathname === '/playlist/delete'), false)
+    await assert.rejects(provider.subscribePlaylist(22, 'true'), /状态无效/)
+    await assert.rejects(provider.fetchPlaylistSubscriptionState(-1), /ID 无效/)
+  } finally { ncmProvider.deactivate() }
+})
+
+test('playlist subscription rejects missing state, upstream errors and anonymous writes', async () => {
+  let provider = await activateProvider(async path => {
+    const url = parseRequest(path)
+    if (url.pathname === '/login/status') return { code: 200, data: { code: 200, profile: { userId: 1001 } } }
+    if (url.pathname === '/user/playlist') return { code: 200, playlist: [] }
+    if (url.pathname === '/playlist/detail/dynamic') return { code: 200, subscribed: null }
+    return { code: 403, message: '无权操作该歌单' }
+  })
+  try {
+    await assert.rejects(provider.fetchPlaylistSubscriptionState(22), /有效.*收藏状态/)
+    await assert.rejects(provider.subscribePlaylist(22, true), /无权操作/)
+  } finally { ncmProvider.deactivate() }
+  provider = await activateProvider(async () => { throw Error('Unexpected network') }, new Map())
+  try { await assert.rejects(provider.subscribePlaylist(22, true), /请先登录/) }
+  finally { ncmProvider.deactivate() }
+})
+
 test('artist and user follow actions call NetEase follow endpoints', async () => {
   const requests = []
   const provider = await activateProvider(async (path) => {

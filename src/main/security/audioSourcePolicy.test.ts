@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { classifyAudioSource } = (await import(
   new URL('./audioSourcePolicy.ts', import.meta.url).href
-)) as typeof import('./audioSourcePolicy')
+)) as typeof import('./audioSourcePolicy.ts')
 
 test('native audio source policy accepts local paths and HTTP(S) streams', () => {
   assert.deepEqual(classifyAudioSource('C:\\Music\\track.flac'), {

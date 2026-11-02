@@ -4,9 +4,9 @@ import {
   createSftpSystemAdapter as createAdapter,
   sftpBatch,
   type SftpBatchRunner
-} from '../../../core/network/adapters/sftpSystemAdapter.ts'
+} from '../../adapters/network/adapters/sftpSystemAdapter.ts'
 import { runSftpBatch } from '../systemRunners.ts'
-export * from '../../../core/network/adapters/sftpSystemAdapter.ts'
+export * from '../../adapters/network/adapters/sftpSystemAdapter.ts'
 export function createSftpSystemAdapter(
   deps: { runBatch?: SftpBatchRunner; tempDir?: string } = {}
 ): ReturnType<typeof createAdapter> {

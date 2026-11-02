@@ -2,8 +2,8 @@ import { tmpdir } from 'node:os'
 import {
   OutputTest as CoreOutputTest,
   type OutputTestDependencies
-} from '../../core/audio/outputTest.ts'
-export * from '../../core/audio/outputTest.ts'
+} from '../adapters/audio/outputTest.ts'
+export * from '../adapters/audio/outputTest.ts'
 
 export class OutputTest extends CoreOutputTest {
   constructor(dependencies: Omit<OutputTestDependencies, 'temporaryDirectory' | 'timers'>) {

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough, Writable } from 'node:stream'
 import test from 'node:test'
-import { uploadToNos, type SelectedFileGrant } from './cloudTransferIo.ts'
+import { uploadToNos, type SelectedFileGrant } from '../../main/adapters/ncm/cloudTransferIo.ts'
 
 function deferred() {
   let resolve!: () => void

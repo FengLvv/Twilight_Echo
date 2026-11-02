@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { repairMovedLocalTracks, findProviderRematchCandidate } = (await import(
   new URL('./libraryRepair.ts', import.meta.url).href
-)) as typeof import('./libraryRepair')
+)) as typeof import('./libraryRepair.ts')
 
 const missingLocalTrack = {
   id: 'local:oldhash',

@@ -224,7 +224,7 @@ export interface AppSettings {
   uiDensity: UiDensity
   appBackground: AppBackgroundSettings
   /** Independent foreground and out-of-bounds decoration channels for every widget. */
-  appearanceLayers?: import('./appearanceLayers').AppearanceLayersSettings
+  appearanceLayers?: import('./appearanceLayers.ts').AppearanceLayersSettings
   cardAppearance: CardAppearanceSettings
   /** Switches navigation and playback controls between standard surfaces and liquid glass. */
   surfaceMaterial: SurfaceMaterial

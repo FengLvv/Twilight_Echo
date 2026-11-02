@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { buildProviderHealthPresentation } = (await import(
   new URL('./providerHealthPresentation.ts', import.meta.url).href
-)) as typeof import('./providerHealthPresentation')
+)) as typeof import('./providerHealthPresentation.ts')
 
 const healthy = {
   available: true,

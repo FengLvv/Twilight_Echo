@@ -5,8 +5,8 @@ import { getNativeAddonCandidates } from '../audio/nativeBinding.ts'
 import {
   Vst3CatalogService as Catalog,
   type Vst3ModuleScanner
-} from '../../core/audio/vst3Catalog.ts'
-export * from '../../core/audio/vst3Catalog.ts'
+} from '../adapters/audio/vst3Catalog.ts'
+export * from '../adapters/audio/vst3Catalog.ts'
 export class Vst3CatalogService extends Catalog {
   constructor(
     root: string,

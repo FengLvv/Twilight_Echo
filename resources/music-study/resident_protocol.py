@@ -19,12 +19,27 @@ def serve(handler):
     pending = queue.Queue()
     requests = {}
     lock, output_lock = threading.Lock(), threading.Lock()
+    finished = threading.Event()
+    state = dict(active=None, progress=0, signature=None)
 
     def write(value):
+        event = value.get('event') or {}
+        if event.get('kind') == 'progress':
+            signature = (event.get('phase'), event.get('stage'), event.get('progress'))
+            with lock:
+                if state['signature'] != signature:
+                    state['signature'] = signature
+                    state['progress'] += 1
         line = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
         with output_lock:
             sys.stdout.write(line + '\n')
             sys.stdout.flush()
+
+    def heartbeat():
+        while not finished.wait(2):
+            with lock:
+                value = dict(kind='heartbeat', requestId=state['active'], progressToken=state['progress'])
+            write(value)
 
     def execute():
         while True:
@@ -34,7 +49,9 @@ def serve(handler):
             identifier = request['id']
             with lock:
                 cancelled = requests[identifier]
+                state['active'] = identifier
             bind(cancelled, lambda value: write(dict(id=identifier, event=value)))
+            write(dict(kind='started', requestId=identifier))
             try:
                 if cancelled.is_set():
                     raise Cancelled('任务已取消')
@@ -47,6 +64,7 @@ def serve(handler):
             finally:
                 with lock:
                     requests.pop(identifier, None)
+                    state['active'] = None
 
     def read_requests():
         try:
@@ -77,4 +95,8 @@ def serve(handler):
     # CUDA/ONNX initialization and inference stay on the process main thread.
     # The reader handles cancellation while a model releases the GIL.
     threading.Thread(target=read_requests, name='study-control', daemon=True).start()
-    execute()
+    threading.Thread(target=heartbeat, name='study-heartbeat', daemon=True).start()
+    try:
+        execute()
+    finally:
+        finished.set()

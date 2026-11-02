@@ -3,13 +3,13 @@ import {
   isActiveLibraryPathExcluded,
   isLibraryPathMutationInProgress
 } from './libraryRepository.ts'
-import { createLibraryWatchers } from '../../core/library/watcher.ts'
+import { createLibraryWatchers } from '../adapters/library/watcher.ts'
 export type {
   LibraryWatcherFolderStatus,
   LibraryWatcherMode,
   LibraryWatcherState
 } from '../../shared/localLibraryScan.ts'
-export { LIBRARY_WATCH_EXTENSIONS } from '../../core/library/watcher.ts'
+export { LIBRARY_WATCH_EXTENSIONS } from '../adapters/library/watcher.ts'
 
 const watchers = createLibraryWatchers({
   platform: process.platform,

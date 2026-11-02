@@ -11,6 +11,7 @@ import {
 import type { VocalNote } from '../utils/numberedNotes.ts'
 import { numberedNote } from '../utils/numberedNotes.ts'
 import type { ChordKey } from '../utils/chordDegrees.ts'
+import { useNotationTypography } from '../composables/useNotationTypography.ts'
 
 const props = defineProps<{
   svg: string
@@ -21,10 +22,13 @@ const props = defineProps<{
   vertical?: boolean
   notationMode?: 'numbered' | 'staff'
   eager?: boolean
+  octaveShift?: number
 }>()
 const VocalStaffScore = defineAsyncComponent(() => import('./VocalStaffScore.vue'))
 const staffScore = ref<{ syncPosition(position: number): void }>()
 const surface = ref<HTMLElement>()
+const scoreRoot = ref<HTMLElement>()
+const measureTypography = useNotationTypography(scoreRoot)
 const emit = defineEmits<{ layout: [] }>()
 const namespace = 'http://www.w3.org/2000/svg'
 const markup = computed(() => {
@@ -94,7 +98,8 @@ const markup = computed(() => {
     if (text.closest('[data-note]') || /^[0-7–.]+$/.test(text.textContent?.trim() ?? '')) {
       text.setAttribute('data-score-symbol', '')
       text.setAttribute('font-size', '2.2001')
-    }
+    } else if (text.textContent?.trim() && props.text.includes(text.textContent.trim()))
+      text.setAttribute('data-score-lyric', '')
   }
   for (const node of svg.querySelectorAll<SVGGElement>('[data-note]')) {
     const index = Number(node.getAttribute('data-note')),
@@ -104,7 +109,7 @@ const markup = computed(() => {
     const text = node.querySelector('text'),
       container = text?.parentElement
     if (!text || !container || node.hasAttribute('data-held')) continue
-    const pitch = numberedNote(note.midi, props.tonalKey)
+    const pitch = numberedNote(note.midi + (props.octaveShift ?? 0), props.tonalKey)
     text.textContent = pitch.label.slice(-1)
     text.setAttribute('x', '.65')
     text.setAttribute('text-anchor', 'middle')
@@ -177,7 +182,9 @@ function reflow() {
     ? `height:${(box.height + 2 * pad) / 2.47}em;width:auto;max-height:100%`
     : `width:${(box.width + 2 * pad) / 2.47}em;max-width:100%;height:auto`
   emit('layout')
+  measureTypography()
 }
+function staffLayout() { measureTypography(); emit('layout') }
 watch(
   markup,
   async () => {
@@ -196,6 +203,7 @@ defineExpose({ syncPosition: highlight, reflow })
 </script>
 <template>
   <span
+    ref="scoreRoot"
     class="lyric-rhythmic-score"
     :data-notation-mode="notationMode ?? 'numbered'"
     :aria-label="`${text}，${notationMode === 'staff' ? '人声五线谱' : '人声简谱'}`"
@@ -207,7 +215,7 @@ defineExpose({ syncPosition: highlight, reflow })
       :tonal-key="tonalKey"
       :position="position"
       :eager="eager"
-      @layout="emit('layout')"
+      @layout="staffLayout"
     />
     <span v-else ref="surface" v-html="markup" />
   </span>
@@ -233,6 +241,20 @@ defineExpose({ syncPosition: highlight, reflow })
 .lyric-rhythmic-score :deep(text) {
   font-family: var(--lyric-score-font-family, inherit);
   -webkit-text-stroke: 0;
+  paint-order: stroke fill;
+  stroke: var(--lyric-annotation-outline-color, transparent);
+  stroke-width: var(--lyric-annotation-outline-width, 0px);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* Engraved lyrics/rests contain tspans; vector-effect does not inherit by default. */
+.lyric-rhythmic-score :deep(tspan) {
+  vector-effect: inherit;
+}
+.lyric-rhythmic-score :deep(circle) {
+  stroke: var(--lyric-annotation-outline-color, transparent);
+  stroke-width: var(--lyric-annotation-outline-width, 0px);
+  vector-effect: non-scaling-stroke;
 }
 .lyric-rhythmic-score :deep([data-score-symbol]) {
   font-family: 'Inter', var(--lyric-score-font-family, var(--te-font-sans));
@@ -245,10 +267,11 @@ defineExpose({ syncPosition: highlight, reflow })
   font-weight: 400;
 }
 .lyric-rhythmic-score :deep([data-note]) {
-  opacity: 0.7;
+  color: var(--lyric-annotation-inactive, inherit);
+  opacity: var(--lyric-annotation-opacity, 0.7);
 }
 .lyric-rhythmic-score :deep([aria-current='true']) {
   opacity: 1;
-  color: var(--te-playback-lyric-active-text, currentColor);
+  color: var(--lyric-annotation-active, var(--te-playback-lyric-active-text, currentColor));
 }
 </style>

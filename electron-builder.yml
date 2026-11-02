@@ -47,9 +47,13 @@ extraResources:
       - resident_child.py
       - vocal_runtime.py
       - vocal_pipeline.py
+      - vocal_pitch.py
+      - vocal_activity.py
       - vocal_residency.py
       - vocal_cache.py
       - vocal_lyrics.py
+      - vocal_lyric_classifier.py
+      - lyric_line_models.json
       - lyric_credits.json
       - vocal_score.py
       - vocal_models.json

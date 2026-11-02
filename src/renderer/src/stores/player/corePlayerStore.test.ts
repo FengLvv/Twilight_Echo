@@ -353,6 +353,11 @@ test('FFT starts only with a consumer, reconnects subscriptions and stops at zer
   await tick()
   const first = f.requests[0].payload as { subscriptionId: string }
   assert.equal(f.requests[0].name, 'visualization.subscribe')
+  for (let sequence = 1; sequence <= 100; sequence++) {
+    f.state.value = { ...f.state.value, sequence }
+    await tick()
+  }
+  assert.equal(f.requests.length, 1, 'unrelated snapshots must retain the accepted FFT tap')
   const data = { ...createInactiveVisualizationData(), active: true }
   f.emit({
     kind: 'visualization',

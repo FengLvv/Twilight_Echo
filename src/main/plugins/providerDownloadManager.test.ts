@@ -4,7 +4,7 @@ import test from 'node:test'
 
 // Throttle policy source checks complement the portable runtime tests.
 const source = readFileSync(
-  new URL('../../core/downloads/providerDownloadManager.ts', import.meta.url),
+  new URL('../adapters/downloads/providerDownloadManager.ts', import.meta.url),
   'utf8'
 )
 

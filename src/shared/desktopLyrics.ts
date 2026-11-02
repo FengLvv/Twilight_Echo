@@ -3,6 +3,7 @@ import type { StudyChord, StudyLyricDisplay, StudyResult } from './musicStudy.ts
 import type { ChordKey } from './lyrics/chordDegrees.ts'
 
 export interface RhythmicLyricScore {
+  octaveShift?: number
   svg: string
   text: string
   notes: NonNullable<StudyResult['melody']>['notes']

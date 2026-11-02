@@ -156,7 +156,7 @@ def analyze(request):
     source_hash = previous.get('sourceSha256', '')
     vocal_parent = semantic_parent(source_hash)
     supplied_lyrics = request.get('lyrics')
-    note_signature = signature(model_keys(), vocal_parent + '|' + lyrics_key(supplied_lyrics)) if operation == 'melody' else ''
+    note_signature = signature(model_keys(supplied_lyrics), vocal_parent + '|' + lyrics_key(supplied_lyrics)) if operation == 'melody' else ''
     notes_hit = bool(previous.get('melody') and signatures.get('notes') == note_signature)
     needs_audio = operation != 'melody' or not notes_hit
     budget = request.get('budgetBytes', 2 * 1024**3) - 65536
@@ -293,7 +293,7 @@ def analyze(request):
         from vocal_melody import recognize, render_score
         phase[0] = 'melody'
         started = time.perf_counter()
-        key = signature(model_keys(), vocal_parent + '|' + lyrics_key(supplied_lyrics))
+        key = signature(model_keys(supplied_lyrics), vocal_parent + '|' + lyrics_key(supplied_lyrics))
         notes_hit = bool(result.get('melody') and signatures.get('notes') == key)
         previous_scores = result.get('melody', {}).get('scores', [])
         if not notes_hit:
@@ -301,7 +301,7 @@ def analyze(request):
                 raise ValueError('歌词对齐临时音频空间不足，请提高缓存上限')
             tick = time.perf_counter()
             result['melody'] = {**recognize(model_pack=pack, progress=report, lyrics=supplied_lyrics, directory=root,
-                previous=result.get('melody'), parent=signature(model_keys(), vocal_parent)), 'scores': previous_scores}
+                previous=result.get('melody'), parent=signature(model_keys(supplied_lyrics), vocal_parent)), 'scores': previous_scores}
             parts['recognitionMs'] = round((time.perf_counter() - tick) * 1000)
             signatures['notes'] = key
             signatures.pop('score', None)

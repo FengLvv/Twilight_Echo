@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PlaybackIcon from '@renderer/components/icons/PlaybackIcon.vue'
+import type { PlaylistSubscriptionControl } from './usePlaylistSubscription.ts'
 import NativeDialogTransition from '@renderer/components/NativeDialogTransition.vue'
 import TrackInfoDialog from '@renderer/components/TrackInfoDialog.vue'
 import EntityMetadataPanel from '../music-metadata/EntityMetadataPanel.vue'
@@ -66,6 +67,7 @@ const props = withDefaults(
     followLoading?: boolean
     followError?: string
     showPlayActions?: boolean
+    playlistSubscription?: PlaylistSubscriptionControl
     hasSelection?: boolean
     selectedCount?: number
     selectionAllFavorited?: boolean
@@ -129,6 +131,7 @@ const emit = defineEmits<{
   trackClick: [track: Track, index: number, event: MouseEvent]
   likeTrack: [track: Track, event: MouseEvent]
   follow: []
+  subscribePlaylist: []
   batchFavorite: []
   batchAddToPlaylist: []
   batchDelete: []
@@ -382,9 +385,23 @@ const infoTrack = shallowRef<Track | null>(null)
               <span>随机</span>
             </button>
           </template>
+          <button
+            v-if="kind === 'playlist' && playlistSubscription"
+            type="button"
+            class="stage-btn stage-btn-ghost stage-playlist-subscribe"
+            :aria-pressed="playlistSubscription.subscribed"
+            :aria-busy="playlistSubscription.busy"
+            :title="playlistSubscription.retry ? '重新读取收藏状态' : playlistSubscription.subscribed ? '取消收藏歌单' : '收藏歌单'"
+            :disabled="playlistSubscription.busy"
+            @click="emit('subscribePlaylist')"
+          >
+            <i :class="playlistSubscription.busy ? 'pi pi-spin pi-spinner' : playlistSubscription.retry ? 'pi pi-refresh' : playlistSubscription.subscribed ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
+            <span>{{ playlistSubscription.retry ? '重试' : playlistSubscription.subscribed ? '已收藏' : '收藏' }}</span>
+          </button>
         </div>
 
         <p v-if="followError" class="stage-follow-error">{{ followError }}</p>
+        <p v-if="playlistSubscription?.error" class="stage-follow-error" role="alert">{{ playlistSubscription.error }}</p>
       </div>
     </header>
 

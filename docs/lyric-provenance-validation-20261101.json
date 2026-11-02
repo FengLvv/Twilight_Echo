@@ -1,0 +1,628 @@
+{
+  "date": "2026-11-01",
+  "production": {
+    "algorithm": "vocal2midi-tifa-game-medium-rhythm-v7",
+    "originFiltering": true,
+    "acousticScoring": false,
+    "acousticRejection": false,
+    "additionalModels": false
+  },
+  "sourceAudit": {
+    "songs": 50,
+    "candidateRows": 2925,
+    "sourceMetadata": 9,
+    "unknownStructured": 269,
+    "additionalSourceMatches": [],
+    "crossRuntime": {
+      "modelKeys": true,
+      "selection": true
+    },
+    "perSong": [
+      {
+        "title": "十年",
+        "ncmId": "66842",
+        "candidateRows": 45,
+        "selectedRows": 38,
+        "sourceMetadata": 0,
+        "unknownStructured": 7
+      },
+      {
+        "title": "遇见",
+        "ncmId": "454828887",
+        "candidateRows": 28,
+        "selectedRows": 25,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "倔强",
+        "ncmId": "386175",
+        "candidateRows": 68,
+        "selectedRows": 53,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "平凡之路",
+        "ncmId": "28815250",
+        "candidateRows": 48,
+        "selectedRows": 38,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "Play我呸 (Alesso Remix Version)",
+        "ncmId": "432698987",
+        "candidateRows": 47,
+        "selectedRows": 44,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "光年之外",
+        "ncmId": "449818741",
+        "candidateRows": 63,
+        "selectedRows": 57,
+        "sourceMetadata": 4,
+        "unknownStructured": 0
+      },
+      {
+        "title": "爱人错过",
+        "ncmId": "1368754688",
+        "candidateRows": 57,
+        "selectedRows": 53,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "大鱼 (唱片版)",
+        "ncmId": "516823132",
+        "candidateRows": 34,
+        "selectedRows": 24,
+        "sourceMetadata": 0,
+        "unknownStructured": 10
+      },
+      {
+        "title": "云烟成雨",
+        "ncmId": "513360721",
+        "candidateRows": 50,
+        "selectedRows": 42,
+        "sourceMetadata": 0,
+        "unknownStructured": 5
+      },
+      {
+        "title": "最炫民族风",
+        "ncmId": "354738",
+        "candidateRows": 59,
+        "selectedRows": 57,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Someone Like You",
+        "ncmId": "16435049",
+        "candidateRows": 70,
+        "selectedRows": 68,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "bad guy",
+        "ncmId": "1355147933",
+        "candidateRows": 54,
+        "selectedRows": 47,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Just the Way You Are",
+        "ncmId": "25657276",
+        "candidateRows": 64,
+        "selectedRows": 54,
+        "sourceMetadata": 0,
+        "unknownStructured": 10
+      },
+      {
+        "title": "Numb",
+        "ncmId": "16686599",
+        "candidateRows": 37,
+        "selectedRows": 35,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Stan",
+        "ncmId": "17572422",
+        "candidateRows": 139,
+        "selectedRows": 137,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Get Lucky",
+        "ncmId": "26349642",
+        "candidateRows": 117,
+        "selectedRows": 114,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Bohemian Rhapsody",
+        "ncmId": "1868553",
+        "candidateRows": 72,
+        "selectedRows": 67,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "Don't Know Why",
+        "ncmId": "22489132",
+        "candidateRows": 27,
+        "selectedRows": 25,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "夜に駆ける",
+        "ncmId": "1409311773",
+        "candidateRows": 60,
+        "selectedRows": 56,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "残響散歌",
+        "ncmId": "1902315758",
+        "candidateRows": 35,
+        "selectedRows": 32,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "贝加尔湖畔",
+        "ncmId": "109998",
+        "candidateRows": 21,
+        "selectedRows": 17,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "海阔天空",
+        "ncmId": "1357375695",
+        "candidateRows": 36,
+        "selectedRows": 33,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Hotel California",
+        "ncmId": "1302701468",
+        "candidateRows": 60,
+        "selectedRows": 58,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Stairway To Heaven",
+        "ncmId": "1833372266",
+        "candidateRows": 73,
+        "selectedRows": 70,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Fix You",
+        "ncmId": "22447802",
+        "candidateRows": 52,
+        "selectedRows": 31,
+        "sourceMetadata": 0,
+        "unknownStructured": 21
+      },
+      {
+        "title": "when the party's over",
+        "ncmId": "1355149438",
+        "candidateRows": 31,
+        "selectedRows": 28,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Lemon",
+        "ncmId": "536622304",
+        "candidateRows": 46,
+        "selectedRows": 42,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "紅蓮華",
+        "ncmId": "1360592706",
+        "candidateRows": 47,
+        "selectedRows": 44,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "First Love",
+        "ncmId": "22786083",
+        "candidateRows": 36,
+        "selectedRows": 32,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "Rolling in the Deep",
+        "ncmId": "16435051",
+        "candidateRows": 56,
+        "selectedRows": 53,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "如愿",
+        "ncmId": "1888381008",
+        "candidateRows": 66,
+        "selectedRows": 44,
+        "sourceMetadata": 5,
+        "unknownStructured": 17
+      },
+      {
+        "title": "这世界那么多人",
+        "ncmId": "1842025914",
+        "candidateRows": 49,
+        "selectedRows": 36,
+        "sourceMetadata": 0,
+        "unknownStructured": 13
+      },
+      {
+        "title": "起风了",
+        "ncmId": "1330348068",
+        "candidateRows": 70,
+        "selectedRows": 58,
+        "sourceMetadata": 0,
+        "unknownStructured": 12
+      },
+      {
+        "title": "孤勇者",
+        "ncmId": "1901371647",
+        "candidateRows": 67,
+        "selectedRows": 57,
+        "sourceMetadata": 0,
+        "unknownStructured": 10
+      },
+      {
+        "title": "山海",
+        "ncmId": "411314659",
+        "candidateRows": 20,
+        "selectedRows": 16,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "凄美地",
+        "ncmId": "436346833",
+        "candidateRows": 61,
+        "selectedRows": 52,
+        "sourceMetadata": 0,
+        "unknownStructured": 9
+      },
+      {
+        "title": "如果可以",
+        "ncmId": "1890530891",
+        "candidateRows": 38,
+        "selectedRows": 34,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "刻在我心底的名字",
+        "ncmId": "1472921626",
+        "candidateRows": 57,
+        "selectedRows": 47,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "漠河舞厅",
+        "ncmId": "1430319727",
+        "candidateRows": 51,
+        "selectedRows": 46,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Blinding Lights",
+        "ncmId": "1406633327",
+        "candidateRows": 38,
+        "selectedRows": 35,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Levitating",
+        "ncmId": "1433934518",
+        "candidateRows": 105,
+        "selectedRows": 89,
+        "sourceMetadata": 0,
+        "unknownStructured": 16
+      },
+      {
+        "title": "Shape of You",
+        "ncmId": "451703096",
+        "candidateRows": 116,
+        "selectedRows": 95,
+        "sourceMetadata": 0,
+        "unknownStructured": 25
+      },
+      {
+        "title": "Uptown Funk",
+        "ncmId": "29722263",
+        "candidateRows": 113,
+        "selectedRows": 103,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "Billie Jean",
+        "ncmId": "21178262",
+        "candidateRows": 58,
+        "selectedRows": 51,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "Smells Like Teen Spirit",
+        "ncmId": "4208530",
+        "candidateRows": 54,
+        "selectedRows": 52,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Hallelujah",
+        "ncmId": "18604663",
+        "candidateRows": 62,
+        "selectedRows": 60,
+        "sourceMetadata": 0,
+        "unknownStructured": 2
+      },
+      {
+        "title": "Pretender",
+        "ncmId": "1365924378",
+        "candidateRows": 56,
+        "selectedRows": 53,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "群青",
+        "ncmId": "1472480890",
+        "candidateRows": 78,
+        "selectedRows": 75,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      },
+      {
+        "title": "打上花火",
+        "ncmId": "496869422",
+        "candidateRows": 49,
+        "selectedRows": 45,
+        "sourceMetadata": 0,
+        "unknownStructured": 4
+      },
+      {
+        "title": "白日",
+        "ncmId": "1347630432",
+        "candidateRows": 85,
+        "selectedRows": 82,
+        "sourceMetadata": 0,
+        "unknownStructured": 3
+      }
+    ]
+  },
+  "experiment": {
+    "verdict": "Rejected as a production lyric-validity classifier",
+    "statistics": {
+      "matched": {
+        "rows": 14,
+        "review": 0,
+        "min": 0.5978,
+        "max": 0.75707
+      },
+      "wrong_lyrics": {
+        "rows": 14,
+        "review": 0,
+        "min": 0.41424,
+        "max": 0.63038
+      },
+      "attribution": {
+        "rows": 14,
+        "review": 0,
+        "min": 0.39308,
+        "max": 0.6485
+      },
+      "silence": {
+        "rows": 14,
+        "review": 14,
+        "min": -0.18565,
+        "max": -0.01521
+      }
+    },
+    "cases": 28,
+    "experimentalIntegration": [
+      {
+        "title": "如愿",
+        "outcome": "passed",
+        "notes": 334,
+        "scoreRows": 42,
+        "evidence": {
+          "rows": 42,
+          "reviewRows": 0,
+          "bytes": 8421
+        }
+      },
+      {
+        "title": "Shape of You",
+        "outcome": "passed",
+        "notes": 814,
+        "scoreRows": 92,
+        "evidence": {
+          "rows": 92,
+          "reviewRows": 6,
+          "bytes": 18510
+        }
+      },
+      {
+        "title": "白日",
+        "outcome": "passed",
+        "notes": 852,
+        "scoreRows": 82,
+        "evidence": {
+          "rows": 82,
+          "reviewRows": 0,
+          "bytes": 16630
+        }
+      },
+      {
+        "title": "when the party's over",
+        "outcome": "passed",
+        "notes": 246,
+        "scoreRows": 28,
+        "evidence": {
+          "rows": 28,
+          "reviewRows": 0,
+          "bytes": 5574
+        }
+      }
+    ]
+  },
+  "checks": {
+    "node": 232,
+    "python": 47,
+    "agentCli": 31,
+    "typeProjects": 3,
+    "experimentalExports": 8,
+    "finalExports": 2,
+    "productionHasNoAcousticScores": true
+  },
+  "finalIntegration": [
+    {
+      "index": 1,
+      "ncmId": "1888381008",
+      "title": "如愿",
+      "artist": "王菲",
+      "coverage": "华语／弦乐",
+      "language": "zh",
+      "outcome": "passed",
+      "stageTimings": {
+        "six": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 5669,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 713
+          }
+        },
+        "chords": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 6425,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 713
+          }
+        },
+        "melody": {
+          "status": "completed",
+          "progress": 1,
+          "elapsedMs": 69118,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 62193,
+            "layoutMs": 6918
+          }
+        }
+      },
+      "startedAt": "2026-11-01T08:22:17.274Z",
+      "projectId": "044537de-dfef-47d1-bb65-7cdca9628154",
+      "duration": 265.3836054421769,
+      "chords": 130,
+      "notes": 332,
+      "scoreRows": 42,
+      "key": {
+        "tonic": 6,
+        "mode": "minor"
+      },
+      "sourceSha256": "22836da03abf505a8b466bb8ee01edcec80892b13a8edfc74518ed9f40fa6cfb",
+      "notesHash": "9408d0ca789c528d529ece3bceae6da8c0591b64d1a29bd832a54b4f4c87a480",
+      "timings": {
+        "six": {
+          "elapsedMs": 37,
+          "cacheHit": true,
+          "parts": {}
+        },
+        "chords": {
+          "elapsedMs": 6425,
+          "cacheHit": false,
+          "parts": {
+            "decodeMs": 713
+          }
+        },
+        "melody": {
+          "elapsedMs": 69118,
+          "cacheHit": false,
+          "parts": {
+            "recognitionMs": 62193,
+            "layoutMs": 6918
+          }
+        }
+      },
+      "melodyTimings": {
+        "importsAndModelMs": 22819,
+        "alignmentMs": 9214,
+        "pitchMs": 8716,
+        "activityMs": 478,
+        "beatMs": 6399,
+        "reusedGroups": 0,
+        "processedGroups": 6
+      },
+      "audio": {
+        "frames": 11703417,
+        "sampleRate": 44100,
+        "channels": 2,
+        "peaks": {
+          "original": 1.1098586320877075,
+          "vocals": 0.8737627863883972,
+          "drums": 0.9002649784088135,
+          "bass": 0.6806530952453613,
+          "guitar": 0.5633426904678345,
+          "piano": 0.344772607088089,
+          "other": 0.3828909695148468
+        },
+        "mixtureResidualRatio": 0.09806698640775045
+      },
+      "audioVerification": "current run",
+      "exports": {
+        "numbered": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\lyric-evidence-20261101\\final-integration\\results-final\\01-1888381008\\exports\\TwilightEcho-score-044537de-a4523b21ab",
+          "pdfBytes": 115171
+        },
+        "staff": {
+          "directory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\lyric-evidence-20261101\\final-integration\\results-final\\01-1888381008\\exports\\TwilightEcho-score-044537de-e634fb6368",
+          "pdfBytes": 434465
+        }
+      },
+      "cache": {
+        "limitBytes": 2147483648,
+        "preloadNext": false,
+        "usedBytes": 655391968,
+        "reservedBytes": 0,
+        "protectedBytes": 0,
+        "resultBytes": 33507
+      },
+      "wallMs": 143586,
+      "completedAt": "2026-11-01T08:24:40.864Z"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import { PluginSettingsRepository } from '../../core/plugins/settingsRepository.ts'
+import { PluginSettingsRepository } from '../adapters/plugins/settingsRepository.ts'
 import { protectJsonValue, unprotectJsonValue } from '../security/secureStorage.ts'
-export { pluginSettingsPath } from '../../core/plugins/settingsRepository.ts'
+export { pluginSettingsPath } from '../adapters/plugins/settingsRepository.ts'
 const settings = new PluginSettingsRepository({
   protect: protectJsonValue,
   unprotect: unprotectJsonValue

@@ -1,6 +1,6 @@
 import { randomUUID } from '../../shared/portableCrypto.ts'
 import type { CoreApplication } from '../application.ts'
-import type { CoreSettingsRepository } from '../persistence/settingsRepository.ts'
+import type { CoreSettingsRepository } from '../persistence/settingsRepositoryContract.ts'
 import type { CorePlaybackSession } from '../playback/session.ts'
 import type {
   CoreCommands,
@@ -19,9 +19,10 @@ import {
   type RemoteBrowseRequest,
   type RemoteBrowseResult
 } from '../../shared/remoteControl.ts'
-import { RemoteCommandError, type RemoteHttpServer } from '../cast/httpServer.ts'
+import type { RemoteHttpServer } from '../cast/httpServerPort.ts'
+import { RemoteCommandError } from './errors.ts'
 import { RemoteCoreBridge } from './coreBridge.ts'
-import type { RemoteMediaResolver } from './media.ts'
+import type { RemoteMediaResolver } from './mediaPort.ts'
 import type { RemoteCoreRpcContext, RemoteProviderSession } from '../../shared/remoteCoreBridge.ts'
 
 export interface CoreRemoteOptions {

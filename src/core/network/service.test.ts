@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Readable } from 'node:stream'
 import test from 'node:test'
-import { CoreNetworkService } from './service.ts'
-import { createNetworkProfileStore } from './profileStore.ts'
-import { createNetworkLibrary } from './networkLibrary.ts'
+import { CoreNetworkService } from '../../main/composition/network/service.ts'
+import { createNetworkProfileStore } from '../../main/adapters/network/profileStore.ts'
+import { createNetworkLibrary } from '../../main/composition/network/networkLibrary.ts'
 import { buildNetworkEntryId } from './networkPath.ts'
 import { createSourceResolver } from '../playback/sourceResolver.ts'
-import { clearDirectory, downloadEntryToCache, getDirectorySize } from './networkCache.ts'
+import { clearDirectory, downloadEntryToCache, getDirectorySize } from '../../main/adapters/network/networkCache.ts'
 import type { NetworkEntry } from '../../shared/networkSources.ts'
 import type { NetworkSourceSession } from './adapters/types.ts'
 
@@ -128,9 +128,10 @@ async function fixture(t: { after(fn: () => Promise<void>): void }) {
   }
 }
 async function completed(service: CoreNetworkService) {
-  for (let i = 0; i < 100; i++) {
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
     if (service.state().jobs.every((job) => job.state !== 'running')) return
-    await tick()
+    await new Promise(resolve => setTimeout(resolve, 5))
   }
   throw new Error('job did not finish')
 }

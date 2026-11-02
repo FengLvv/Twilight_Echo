@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {useCollectionAlphabet} from './song-list/useCollectionAlphabet.ts'
+
 import PlaybackIcon from '@renderer/components/icons/PlaybackIcon.vue'
 import NativeDialogTransition from '@renderer/components/NativeDialogTransition.vue'
 import { useHoldReorder } from '@renderer/composables/useHoldReorder'
@@ -49,11 +51,8 @@ import { useBackHandler } from '../app/useBackStack.ts'
 import {
   applyLibraryCollectionView,
   availableCollectionGenres,
-  availableCollectionLetters,
   AZ_INDEX_LETTERS,
   collectionIndexLetter,
-  collectionLetterAtScroll,
-  firstCollectionIndexForLetter,
   LibraryCollectionViewPreferences,
   type LibraryCollectionSort,
   type LibraryCollectionViewState
@@ -3060,11 +3059,8 @@ const {
   viewportHeight
 })
 
-const availableIndexLetters = computed(() =>
-  databaseGridEnabled.value
-    ? new Set(Object.keys(databaseCollections.letterOffsets.value))
-    : availableCollectionLetters(filteredGridItems.value)
-)
+const {collectionLetterDisabled,jumpToCollectionLetter,onSongListScroll}=useCollectionAlphabet({items:()=>filteredGridItems.value,database:()=>databaseGridEnabled.value,enabled:()=>isCollectionGrid.value,letters:()=>databaseCollections.letterOffsets.value,category:()=>props.category,scrollTop:()=>scrollTop.value,offset:()=>gridOffsetTop.value,stride:()=>gridRowStride.value,columns:()=>gridColumns.value,range:gridDataRange,active:activeCollectionLetter,renderThrough:renderGridThroughIndex,onScroll})
+
 watch(
   [gridDataRange, databaseGridEnabled, () => databaseCollectionState.value.total],
   ([range, enabled, total]) => {
@@ -3090,68 +3086,6 @@ useLocatePlayingTrack({
   ),
   rowHeight,
   database: { enabled: databaseTableEnabled, locate: locateCurrentTrack }
-})
-
-function collectionLetterDisabled(letter: string): boolean {
-  return !availableIndexLetters.value.has(letter)
-}
-
-function jumpToCollectionLetter(letter: string): void {
-  if (!isCollectionGrid.value || collectionLetterDisabled(letter)) return
-  if (databaseGridEnabled.value) {
-    const index = databaseCollections.letterOffsets.value[letter]
-    if (index === undefined) return
-    renderGridThroughIndex(index)
-    activeCollectionLetter.value = letter
-    return
-  }
-  const index = firstCollectionIndexForLetter(filteredGridItems.value, letter)
-  if (index < 0) return
-  activeCollectionLetter.value = letter
-  renderGridThroughIndex(index)
-}
-
-function updateActiveCollectionLetter(): void {
-  if (!isCollectionGrid.value) return
-  const index =
-    Math.max(
-      0,
-      Math.floor((scrollTop.value + 104 - gridOffsetTop.value) / Math.max(1, gridRowStride.value))
-    ) * Math.max(1, gridColumns.value)
-  const next = databaseGridEnabled.value
-    ? (Object.entries(databaseCollections.letterOffsets.value)
-        .filter(([, offset]) => offset <= index)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null)
-    : (collectionLetterAtScroll(
-        filteredGridItems.value,
-        scrollTop.value,
-        gridOffsetTop.value,
-        gridColumns.value,
-        gridRowStride.value
-      ) ?? collectionIndexLetter(filteredGridItems.value[0]?.name ?? ''))
-  if (next === activeCollectionLetter.value) return
-  activeCollectionLetter.value = next
-}
-
-let collectionLetterFrame: number | null = null
-function onSongListScroll(event: Event): void {
-  onScroll(event)
-  if (collectionLetterFrame !== null) return
-  collectionLetterFrame = window.requestAnimationFrame(() => {
-    collectionLetterFrame = null
-    updateActiveCollectionLetter()
-  })
-}
-
-onBeforeUnmount(() => {
-  if (collectionLetterFrame !== null) window.cancelAnimationFrame(collectionLetterFrame)
-  collectionLetterFrame = null
-})
-
-watch([filteredGridItems, () => props.category], updateActiveCollectionLetter)
-
-watch([scrollTop, gridDataRange], () => {
-  if (isCollectionGrid.value) updateActiveCollectionLetter()
 })
 
 function openRowArtist(track: Track): void {

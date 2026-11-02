@@ -24,6 +24,11 @@ export function splitEmbeddedLyricLayers(lines: readonly ParsedTimedLyricLine[])
   }
   const groups = new Map<number, ParsedTimedLyricLine[]>()
   for (const line of lines) {
+    // Provider records must not become an inferred translation at a shared timestamp.
+    if (line.origin) {
+      result.original.push(line)
+      continue
+    }
     const label = line.voice ? null : LABEL.exec(line.text)
     if (label) {
       const layer: Layer = /romanization|romaji|注音|罗马音/i.test(label[1] ?? label[2])

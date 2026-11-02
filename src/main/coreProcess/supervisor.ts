@@ -1,4 +1,3 @@
-import '../../adapters-node/index.ts'
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { writeDiagnostic } from '../diagnostics/logger.ts'

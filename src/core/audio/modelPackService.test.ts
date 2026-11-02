@@ -7,9 +7,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
-import { CoreModelPackService, decodeWithPlatform } from './modelPackService.ts'
-import { managedStemPackDirectories } from './autoMixStemInstaller.ts'
-import { STEM_MODEL_VERSION } from './autoMixStemService.ts'
+import { CoreModelPackService, decodeWithPlatform } from '../../main/adapters/audio/modelPackService.ts'
+import { managedStemPackDirectories } from '../../main/adapters/audio/autoMixStemInstaller.ts'
+import { STEM_MODEL_VERSION } from '../../main/adapters/audio/autoMixStemService.ts'
 
 const crc32 = createRequire(import.meta.url)('buffer-crc32')
 const model = Buffer.from('Core model installation fixture')

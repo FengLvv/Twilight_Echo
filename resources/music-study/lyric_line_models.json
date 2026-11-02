@@ -1,0 +1,13 @@
+{
+  "algorithm": "minilm-v4-real1092-precision",
+  "directory": "lyric-line-v4-real1092-precision",
+  "manifestSha256": "755cbbeaaabe639add88c5887da33fb3ff0cffae5bbcab52627cf90c5133d23f",
+  "files": {
+    "lyric-line.onnx": "ef9f5cbe152e57fcc293370e43651ffca03bc92de2546d1b4bbc221b004c8c20",
+    "tokenizer.json": "a514807cffabd8abaf028cfaffe7ff0c4f60b97ea2db80c41f14172ae6b018ca",
+    "manifest.json": "755cbbeaaabe639add88c5887da33fb3ff0cffae5bbcab52627cf90c5133d23f"
+  },
+  "baseModel": "MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli",
+  "baseRevision": "0a71e92a985b6e1ad1828cf67ce9c459639c1dca",
+  "license": "MIT"
+}

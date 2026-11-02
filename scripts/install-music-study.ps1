@@ -1,7 +1,8 @@
 param(
   [string]$Root = "$env:LOCALAPPDATA\TwilightEcho\music-study-runtime",
   [ValidateSet('cuda','cpu')][string]$Device = 'cuda',
-  [string]$UvPath = 'uv'
+  [string]$UvPath = 'uv',
+  [string]$LyricLineModelDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 $taskRuntime = Join-Path $Root 'runtime'
@@ -37,5 +38,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Vocal PyTorch installation failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Vocal notation dependencies installation failed' }
 & $taskVocalPython (Join-Path $taskWorker 'prepare_vocal_models.py') $Root
 if ($LASTEXITCODE -ne 0) { throw 'Vocal notation model preparation failed' }
+if ($LyricLineModelDirectory) {
+  & (Join-Path $PSScriptRoot 'install-lyric-line-model.ps1') -SourceDirectory $LyricLineModelDirectory -Root $Root
+} else {
+  Write-Host 'NetEase lyric cleanup also needs install-lyric-line-model.ps1 -SourceDirectory <model package> -Root <runtime>.'
+}
 Write-Host "Analysis environment ready: $Root"
 Write-Host 'Open 歌曲分析 → 选择分析环境 and choose this directory.'

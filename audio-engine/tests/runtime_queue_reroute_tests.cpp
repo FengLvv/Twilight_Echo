@@ -478,7 +478,7 @@ void testTwilightAudioEngineReusesParsedDspConfigSnapshot() {
   const std::string source = readTextFile(sourcePath);
   const std::string header = readTextFile(headerPath);
   const std::string playBody =
-      extractFunctionBody(source, "TAE_Result TwilightAudioEngine::play(const std::string& source, double startTimeSeconds, bool initiallyPaused)");
+      extractFunctionBody(source, "TAE_Result TwilightAudioEngine::play(const std::string& source, double startTimeSeconds, bool initiallyPaused, bool followPlaybackClock)");
   const std::string playQueueBody =
       extractFunctionBody(source, "TAE_Result TwilightAudioEngine::playQueueItem(const QueueItem& item, double startTimeSeconds)");
   const std::string perfectBody = extractFunctionBody(source, "void TwilightAudioEngine::updatePerfectLocked()");
@@ -1396,7 +1396,7 @@ TrackProfile buildTrackProfile(const std::string& source) {
   }
   profile.stream.decodedFormat = profile.stream.sourceFormat;
   profile.defaultOutput = profile.stream.decodedFormat;
-  profile.totalFrames = 65536;
+  profile.totalFrames = source.find("study-clock") != std::string::npos ? 44100 * 30 : 65536;
   profile.sampleValue = 0.25f;
   if (source.find("fractional-duration-") != std::string::npos) {
     profile.stream.durationSeconds = source.find("-current") != std::string::npos
@@ -4642,6 +4642,58 @@ void testCrossfadeDiscontinuitiesRestartPreloadAtItsBeginning() {
   pipeline.stop();
 }
 
+void testStudySourceHandoffKeepsDeviceAndClock(bool paused, bool highRate) {
+  const auto root = std::filesystem::temp_directory_path() /
+      ("twilight-study-clock-" + std::to_string(paused) + std::to_string(highRate));
+  std::filesystem::create_directories(root);
+  const auto audio = root / "study-clock-original.wav";
+  const auto mix = root / "mix.temix";
+  {
+    std::ofstream wave(audio, std::ios::binary);
+    const uint32_t bytes = 44100 * 30 * 8;
+    wave.write("RIFF", 4); writeLe32(wave, bytes + 36); wave.write("WAVEfmt ", 8);
+    writeLe32(wave, 16); writeLe16(wave, 3); writeLe16(wave, 2);
+    writeLe32(wave, 44100); writeLe32(wave, 44100 * 8);
+    writeLe16(wave, 8); writeLe16(wave, 32); wave.write("data", 4); writeLe32(wave, bytes);
+    wave.seekp(bytes + 43); wave.put(0);
+    std::ofstream file(mix); file << "TEMIX1\n44100 " << 44100 * 30 << " 1\n1\n" << audio.string() << "\n";
+  }
+  g_backendRegistry.reset();
+  AudioPipeline pipeline;
+  std::string error;
+  const auto original = highRate ? (root / "study-clock-pcm-192k-original.flac").string() : audio.string();
+  QueueItem item; item.source = original;
+  assert(pipeline.play(item, std::nullopt, .5, "wasapi", "auto", .5, "{\"enabled\":true}", false, &error, paused) == TAE_RESULT_OK);
+  auto backend = waitForLatestStartedBackendState(); assert(backend);
+  std::atomic<bool> running{true};
+  std::atomic<size_t> silence{0};
+  std::thread driver([&] {
+    while (running.load()) {
+      const auto samples = renderBackendFrames(backend, 256);
+      if (!paused && std::all_of(samples.begin(), samples.end(), [](float v) { return std::abs(v) < .001f; })) ++silence;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  });
+  for (int n = 0; n < 10; ++n) {
+    const double before = pipeline.status().positionSeconds;
+    QueueItem target; target.source = n % 2 == 0 ? mix.string() : original;
+    // Deliberately stale request: the old 250 ms heuristic must not turn a
+    // source toggle into a seek, including different source sample rates.
+    assert(pipeline.play(target, std::nullopt, 0, "wasapi", "auto", .5, "{\"enabled\":true}", false, &error, paused, true) == TAE_RESULT_OK);
+    const auto after = pipeline.status();
+    assert(after.positionSeconds + 1e-6 >= before);
+    assert(after.state == (paused ? PipelineState::Paused : PipelineState::Playing));
+    if (paused) assert(std::abs(after.positionSeconds - .5) < .0001);
+    std::lock_guard lock(g_backendRegistry.mutex);
+    assert(backend->startCalls == 1);
+    assert(backend->stopCalls == 0);
+  }
+  running = false; driver.join();
+  assert(silence.load() == 0);
+  pipeline.stop();
+  std::filesystem::remove(mix); std::filesystem::remove(audio); std::filesystem::remove(root);
+}
+
 void testPreloadedPromotionKeepsRuntimeReplayGainSettings() {
   EngineHarness harness;
   auto& engine = harness.engine();
@@ -5381,6 +5433,13 @@ void FFmpegDecoder::pollStreamMetadata() {}
   } while (false)
 
 int main() {
+  if (std::getenv("TAE_RUNTIME_STUDY_ONLY")) {
+    RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(false, false));
+    RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(true, false));
+    RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(false, true));
+    return 0;
+  }
+
   if (std::getenv("TAE_RUNTIME_AB_LOOP_ONLY")) {
     RUN_RUNTIME_CASE(testLoopRangeKeepsSameOccurrenceButClearsDuplicateAndCue());
     RUN_RUNTIME_CASE(testLoopRangeClearsBeforePromotedDuplicateCanSeek(false, false));
@@ -5568,6 +5627,9 @@ int main() {
   RUN_RUNTIME_CASE(testAutoNextDoesNotInheritDsdPath());
   RUN_RUNTIME_CASE(testNativeCrossfadeOverlapMixesPreloadAndPromotes());
   RUN_RUNTIME_CASE(testCrossfadeDiscontinuitiesRestartPreloadAtItsBeginning());
+  RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(false, false));
+  RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(true, false));
+  RUN_RUNTIME_CASE(testStudySourceHandoffKeepsDeviceAndClock(false, true));
   RUN_RUNTIME_CASE(testPreloadedPromotionKeepsRuntimeReplayGainSettings());
   RUN_RUNTIME_CASE(testGaplessBlockedReasonReportsCrossfadeAndDisabled());
   RUN_RUNTIME_CASE(testDecodedTimelineOverridesRoundedQueueDurations());

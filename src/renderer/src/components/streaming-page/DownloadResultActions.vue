@@ -25,7 +25,7 @@ async function refreshIndexedTrack() {
     indexState.value = 'unknown'
   }
 }
-watch(() => [props.task.id, core.state.value?.libraryRevision], refreshIndexedTrack, {
+watch([() => props.task.id, () => core.state.value?.libraryRevision], refreshIndexedTrack, {
   immediate: true
 })
 onBeforeUnmount(() => {

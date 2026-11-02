@@ -7,6 +7,7 @@ const PROVIDER_WRITE_METHODS = new Set([
   'followUser',
   'createPlaylist',
   'deletePlaylist',
+  'subscribePlaylist',
   'addTracksToPlaylist',
   'removeTracksFromPlaylist',
   'createDownload'

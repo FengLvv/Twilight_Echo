@@ -4,6 +4,11 @@ export interface LyricWord {
   text: string
 }
 
+/** Source semantics survive display parsing; unknown structured text is not a credit verdict. */
+export type LyricOrigin =
+  | { format: 'netease-json'; kind: 'metadata' | 'unknown' }
+  | { format: 'amll-ttml'; kind: 'lyric' }
+
 export type LyricVoiceRole = 'lead' | 'background' | 'harmony'
 export type LyricVoiceLane = 'center' | 'start' | 'end'
 
@@ -36,6 +41,7 @@ export interface ParsedTimedLyricLine {
   text: string
   words?: LyricWord[]
   voice?: LyricVoiceMetadata
+  origin?: LyricOrigin
 }
 
 export interface LyricLine {
@@ -47,6 +53,7 @@ export interface LyricLine {
   words?: LyricWord[]
   rowKey?: string
   voices?: LyricVoiceLayer[]
+  origin?: LyricOrigin
 }
 
 export interface BuildLyricLinesOptions {

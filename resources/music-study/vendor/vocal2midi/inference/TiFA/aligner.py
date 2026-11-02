@@ -21,6 +21,7 @@ from inference.API.hfa_api import _repair_pred_dict_short_words
 from inference.HubertFA.tools.align_word import Phoneme, Word, WordList
 from inference.HubertFA.tools.g2p import JapanesePhonemeMoraG2P
 from inference.TiFA.decoding import decode_alignment_flat
+from inference.TiFA.evidence import token_evidence
 from inference.TiFA.g2p.encoding import G2PEncodingError, encode_paths
 from inference.TiFA.g2p_pipeline import build_g2p_pipeline
 from inference.TiFA.runtime import TifaModel
@@ -184,6 +185,7 @@ def run_tifa_fa(
     japanese_g2p_engine: str = "kashi-g2p-onnx",
     kashi_g2p_model_dir=None,
     languages: list[str] | None = None,
+    evidence: dict | None = None,
 ) -> tuple[dict, dict[str, list[tuple[str, str]]]]:
     """Align every chunk_N.wav/.txt pair in temp_dir.
 
@@ -328,6 +330,9 @@ def run_tifa_fa(
         valid_tokens = best_tokens[0, :token_count]
         valid_words = best_words[0, :token_count]
         valid_groups = best_groups[0, :token_count]
+        if evidence is not None:
+            evidence[stem] = token_evidence(similarities[0, :frame_count, :token_count],
+                                            valid_spans, valid_words, timestep)
         word_list, mora_display = _build_word_list(
             valid_spans, valid_tokens, valid_words, valid_groups,
             choices[0], lexicon, texts, model.vocabulary, language, timestep, duration,

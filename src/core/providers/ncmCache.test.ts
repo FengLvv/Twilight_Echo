@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, mkdir, writeFile, utimes } from 'node:f
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
-import { createNcmCache } from './ncmCache.ts'
+import { createNcmCache } from '../../main/adapters/providers/ncmCache.ts'
 import { SourceResources } from '../playback/sourceResources.ts'
 
 async function fixture(

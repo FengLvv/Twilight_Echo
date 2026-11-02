@@ -6,10 +6,10 @@ import { join } from 'node:path'
 
 const { RadioMediaService } = (await import(
   new URL('./radioMediaService.ts', import.meta.url).href
-)) as typeof import('./radioMediaService')
+)) as typeof import('./radioMediaService.ts')
 const { PersistentDataRevisionConflictError } = (await import(
   new URL('../../shared/versionedPersistence.ts', import.meta.url).href
-)) as typeof import('../../shared/versionedPersistence')
+)) as typeof import('../../shared/versionedPersistence.ts')
 
 const RSS = `<?xml version="1.0"?>
 <rss version="2.0"><channel>

@@ -36,6 +36,13 @@ test('plugin UI adapters use finite Core operations and plugin revision events',
     await useCoreConnection().attach()
     let changes = 0
     const stop = corePlugins.onChanged(() => changes++)
+    for (let sequence = 1; sequence <= 100; sequence++) {
+      state = { ...state, sequence }
+      for (const listener of listeners)
+        listener({ connectionId: 'desktop', message: { kind: 'state', epoch: state.epoch, sequence, snapshot: state } })
+      await nextTick()
+    }
+    assert.equal(changes, 0, 'playback snapshots must not refresh plugin contributions')
     await corePlugins.list()
     await corePlugins.listIndex()
     await corePlugins.refreshIndex()
@@ -58,7 +65,7 @@ test('plugin UI adapters use finite Core operations and plugin revision events',
       ]
     )
     assert.deepEqual(requests[4].payload, { kind: 'directory' })
-    state = { ...state, sequence: 1, pluginsRevision: 2 }
+    state = { ...state, sequence: 101, pluginsRevision: 2 }
     for (const listener of listeners)
       listener({
         connectionId: 'desktop',

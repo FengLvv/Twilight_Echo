@@ -13,8 +13,8 @@ import {
   type PersonalData
 } from '../../shared/personalBackup.ts'
 import type { PersonalLibraryDatabase } from '../../shared/coreBackup.ts'
-import { CorePersonalBackupService } from './personalBackupService.ts'
-import { createPersonalBackupRepository } from './personalBackup.ts'
+import { CorePersonalBackupService } from '../../main/composition/persistence/personalBackupService.ts'
+import { createPersonalBackupRepository } from '../../main/adapters/persistence/personalBackup.ts'
 import { PERSONAL_BACKUP_LIMIT, type PersonalRestoreOptions } from '../../shared/personalBackup.ts'
 import { emptyMusicBackupRecords, type MusicPersonalBackupDocument } from '../../shared/musicPersonalBackup.ts'
 import type { TrackData } from '../../shared/track.ts'

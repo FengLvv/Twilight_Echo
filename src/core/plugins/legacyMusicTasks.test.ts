@@ -29,11 +29,11 @@ import type { MusicAlbum } from '../../shared/rhineMusic.ts'
 import type { TwilightPluginDescriptor } from '../../shared/pluginTypes.ts'
 import type { LegacyMusicAuthorityDatabase } from './legacyMusicAuthority.ts'
 import { legacyExperienceAlbumId } from './legacyMusicAuthority.ts'
-import { CorePluginExperiences } from './experiences.ts'
+import { CorePluginExperiences } from '../../main/adapters/plugins/experiences.ts'
 import {
   createLegacyMusicLookupProvider,
   type LegacyMusicLookupProvider
-} from './legacyMusicLookupProvider.ts'
+} from '../../main/composition/plugins/legacyMusicLookupProvider.ts'
 
 const PLUGIN = 'com.twilightecho.experience.rhine-lab'
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve))

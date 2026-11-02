@@ -402,7 +402,8 @@ export class PlaybackController {
     source: string,
     startTime = 0,
     requested?: () => boolean,
-    initiallyPaused = false
+    initiallyPaused = false,
+    followPlaybackClock = false
   ): Promise<AudioEnginePlayResult> {
     if (!source) throw audioEngineError('audio.source_empty', 'playback source is empty')
     const revision = ++this.transportRevision
@@ -432,7 +433,7 @@ export class PlaybackController {
       '播放',
       source,
       boundedStartTime,
-      firstErrorContext.output !== 'asio', initiallyPaused
+      firstErrorContext.output !== 'asio', initiallyPaused, followPlaybackClock
     )
     if (!isCurrent()) return superseded
     let nativeFallbackReason = ''
@@ -504,6 +505,11 @@ export class PlaybackController {
     this.pendingNativeSource = nativeStarted ? source : null
     const nativeInfo = nativeStarted ? await this.readNativePlaybackInfoAsync() : null
     if (!isCurrent()) return superseded
+    const nativePositionConfirmed =
+      nativeInfo?.source === source &&
+      nativeInfo.state !== 'stopped' &&
+      Number.isFinite(nativeInfo.position) &&
+      (followPlaybackClock || Math.abs(nativeInfo.position - boundedStartTime) <= 5)
     if (nativeInfo?.source === source) {
       this.pendingNativeSource = null
     }
@@ -528,8 +534,10 @@ export class PlaybackController {
     this.playbackInfo = {
       ...this.playbackInfo,
       ...nativeInfo,
-      state: initiallyPaused ? 'paused' : 'playing',
-      position: boundedStartTime,
+      state: followPlaybackClock && nativeInfo?.source === source
+        ? nativeInfo.state : initiallyPaused ? 'paused' : 'playing',
+      position: nativePositionConfirmed && nativeInfo
+        ? nativeInfo.position : boundedStartTime,
       duration:
         nativeInfo?.source === source && nativeInfo.duration > 0 ? nativeInfo.duration : duration,
       source,
@@ -566,11 +574,6 @@ export class PlaybackController {
     await this.applyNativeDspGraph('播放源格式变更后解析 DSP 场景')
     if (!isCurrent()) return superseded
     this.lastTick = this.scheduler.now()
-    const nativePositionConfirmed =
-      nativeInfo?.source === source &&
-      nativeInfo.state !== 'stopped' &&
-      Number.isFinite(nativeInfo.position) &&
-      Math.abs(nativeInfo.position - boundedStartTime) <= 5
     this.lastNativeReportedPosition =
       nativePositionConfirmed && nativeInfo ? nativeInfo.position : Number.NaN
     this.pendingNativePositionTarget = nativePositionConfirmed ? null : boundedStartTime
@@ -1347,14 +1350,15 @@ export class PlaybackController {
     }
   }
 
-  async getPlaybackInfo(): Promise<PlaybackInfo> {
+  async getPlaybackInfo(fresh = false): Promise<PlaybackInfo> {
     const now = this.scheduler.now()
+    const revision = this.transportRevision
     if (
       this.nativePlaybackActive &&
-      now - this.lastNativePlaybackInfoTickReadAt > PLAYBACK_INFO_CACHE_TTL_MS
+      (fresh || now - this.lastNativePlaybackInfoTickReadAt > PLAYBACK_INFO_CACHE_TTL_MS)
     ) {
-      const nativeInfo = this.readNativePlaybackInfo()
-      if (nativeInfo) {
+      const nativeInfo = fresh ? await this.readNativePlaybackInfoAsync() : this.readNativePlaybackInfo()
+      if (nativeInfo && revision === this.transportRevision) {
         this.playbackInfo = this.mergeNativePlaybackInfo(nativeInfo)
         this.lastNativePlaybackInfoTickReadAt = now
       }
@@ -2104,7 +2108,8 @@ export class PlaybackController {
     source: string,
     startTime: number,
     logFailure = true,
-    initiallyPaused = false
+    initiallyPaused = false,
+    followPlaybackClock = false
   ): Promise<boolean> {
     if (!this.native) {
       this.lastNativeError = '未加载 twilight_audio_node.node'
@@ -2112,7 +2117,8 @@ export class PlaybackController {
     }
     if (typeof this.native.callAsync === 'function') {
       try {
-        await this.native.callAsync('Play', initiallyPaused ? [source,startTime,true] : [source,startTime])
+        await this.native.callAsync('Play', followPlaybackClock ? [source,startTime,initiallyPaused,true]
+          : initiallyPaused ? [source,startTime,true] : [source,startTime])
         this.lastNativeError = ''
         return true
       } catch (err) {
@@ -2126,7 +2132,7 @@ export class PlaybackController {
         return false
       }
     }
-    return this.tryNative(context, (native) => native.Play(source, startTime, initiallyPaused), logFailure)
+    return this.tryNative(context, (native) => native.Play(source, startTime, initiallyPaused, followPlaybackClock), logFailure)
   }
 
   publishProperty(name: string, data: unknown): void {

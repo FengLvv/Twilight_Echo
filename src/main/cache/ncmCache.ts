@@ -1,11 +1,11 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import { runtime } from '../core/runtime'
-import { createNcmCache } from '../../core/providers/ncmCache.ts'
+import { createNcmCache } from '../adapters/providers/ncmCache.ts'
 export {
   ensureMusicCacheDirectories,
   inferNcmCacheExtension
-} from '../../core/providers/ncmCache.ts'
+} from '../adapters/providers/ncmCache.ts'
 
 const cache = createNcmCache({
   root: () => runtime.appSettings.musicCachePath || join(app.getPath('userData'), 'music-cache')

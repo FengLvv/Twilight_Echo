@@ -1,2 +1,1 @@
-import '../../adapters-node/index.ts'
-export * from '../../core/persistence/themeLibraryRepository.ts'
+export * from '../composition/persistence/themeLibraryRepository.ts'

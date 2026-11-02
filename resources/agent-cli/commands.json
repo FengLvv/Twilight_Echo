@@ -44064,6 +44064,14 @@
               },
               {
                 "type": "string",
+                "const": "fetchPlaylistSubscriptionState"
+              },
+              {
+                "type": "string",
+                "const": "subscribePlaylist"
+              },
+              {
+                "type": "string",
                 "const": "addTracksToPlaylist"
               },
               {
@@ -47083,15 +47091,15 @@
                     "anyOf": [
                       {
                         "type": "number",
+                        "const": 3
+                      },
+                      {
+                        "type": "number",
                         "const": 1
                       },
                       {
                         "type": "string",
                         "const": "all"
-                      },
-                      {
-                        "type": "number",
-                        "const": 3
                       },
                       {
                         "type": "number",
@@ -48156,15 +48164,15 @@
                               "anyOf": [
                                 {
                                   "type": "number",
+                                  "const": 3
+                                },
+                                {
+                                  "type": "number",
                                   "const": 1
                                 },
                                 {
                                   "type": "string",
                                   "const": "all"
-                                },
-                                {
-                                  "type": "number",
-                                  "const": 3
                                 },
                                 {
                                   "type": "number",
@@ -56330,6 +56338,20 @@
       "inputType": "{ id: string; stems: StudyTrack[]; }"
     },
     {
+      "name": "study.automation",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "inputType": "Record<string, never>",
+      "outputType": "StudyAutomationPolicy"
+    },
+    {
       "name": "study.cache",
       "domain": "study",
       "kind": "query",
@@ -57212,6 +57234,42 @@
       "outputType": "StudyRuntimeStatus"
     },
     {
+      "name": "study.setAutomation",
+      "domain": "study",
+      "kind": "command",
+      "permission": "library:write",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "stages": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "six"
+                },
+                {
+                  "type": "string",
+                  "const": "chords"
+                },
+                {
+                  "type": "string",
+                  "const": "melody"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "stages"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "StudyAutomationPolicy"
+    },
+    {
       "name": "study.setCachePolicy",
       "domain": "study",
       "kind": "command",
@@ -57331,6 +57389,27 @@
       },
       "inputType": "{ songId: string; }",
       "outputType": "StudyProject | null"
+    },
+    {
+      "name": "study.songSummary",
+      "domain": "study",
+      "kind": "query",
+      "permission": "playback:read",
+      "interactive": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "songId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "songId"
+        ],
+        "additionalProperties": false
+      },
+      "inputType": "{ songId: string; }",
+      "outputType": "StudyProjectSummary | null"
     },
     {
       "name": "study.splitVocals",

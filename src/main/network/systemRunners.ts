@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import type { SftpBatchResult } from '../../core/network/adapters/sftpSystemAdapter.ts'
+import type { SftpBatchResult } from '../../core/network/adapters/sftpSystemAdapterPort.ts'
 export async function runSftpBatch(
   batch: string,
   deps: { host: string; port: number; username: string; keyPath: string },
@@ -32,7 +32,7 @@ export async function runSftpBatch(
   })
 }
 
-import type { MountCommandResult } from '../../core/network/adapters/smbMountAdapter.ts'
+import type { MountCommandResult } from '../../core/network/adapters/smbMountAdapterPort.ts'
 export async function runMountCommand(
   command: string,
   args: string[],

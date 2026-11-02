@@ -1,0 +1,163 @@
+{
+  "validatedUtc": "2026-11-01T11:41:28.750Z",
+  "package": {
+    "checkedUtc": "2026-11-01T11:41:28.750Z",
+    "executable": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\dist\\study-ui-lexicon\\win-unpacked\\TwilightEcho.exe",
+    "bytes": 239410176,
+    "executableSha256": "55cafb57f97a8ce1b367986d17c426b5a02b7ac7044dd77babf251d5d932c379",
+    "asarSha256": "d4881f19753034524f52f63c0e7b81fae4acee851cce6d14e8343d76aecb1d8b",
+    "compiledFilesCompared": 264,
+    "resources": [
+      {
+        "name": "lyric_credits.json",
+        "sha256": "ae4294c7b808e375c44e10cb68553b4c3894d079fc7695af333728c3b47f1ce6"
+      },
+      {
+        "name": "vocal_lyrics.py",
+        "sha256": "c0b6fea37e9d32e9691695f6e45e1464c22f65ffb5dbac1db532550de998acde"
+      },
+      {
+        "name": "vocal_pipeline.py",
+        "sha256": "545dc3e0cf98e8b212cd68c46f4a195d9fa1f338728b2de9d74dd53afdd8cd6d"
+      }
+    ]
+  },
+  "changes": [
+    "Independent chord and melody display toggles; repeated pending clicks settle to the latest intent.",
+    "Chord display never opens or closes the stem mixer or sends study.mix/study.transport.",
+    "Two fixed toolbar buttons expose format choices on hover or keyboard focus.",
+    "Tonal key remains beside the track title and can be manually overridden.",
+    "The playback scroll container hides its scrollbar and the HiFi stage fills its container."
+  ],
+  "checks": {
+    "nodeTests": 121,
+    "pythonTests": 37,
+    "webTypes": true,
+    "coreTypes": true,
+    "nodeTypes": true,
+    "rendererBudgets": true,
+    "dependencyClosurePackages": 255,
+    "uiWidths": [
+      1440,
+      900
+    ],
+    "hoverAndKeyboard": true,
+    "tonalKeyOverride": true,
+    "lyricsColumnStable": true,
+    "hifiGutterPixels": 0,
+    "displayRaceCases": 8,
+    "compiledFilesCompared": 264
+  },
+  "lexicon": {
+    "songs": 940,
+    "rows": 44845,
+    "before": 2750,
+    "after": 3167,
+    "added": 417,
+    "lost": 0,
+    "crossRuntimeStrings": 30193,
+    "crossRuntimeMismatches": [],
+    "policyCounts": {
+      "roles": 334,
+      "instrumentPrefixes": 17,
+      "instruments": 53,
+      "instrumentRoles": 23,
+      "studioRoles": 3,
+      "exactNotices": 12,
+      "creditIntroducers": 16,
+      "studioIntroducers": 2
+    },
+    "frozenReferenceStats": {
+      "rows": 27897,
+      "nonLyric": 2682,
+      "lyric": 25215,
+      "nonLyricBefore": 2154,
+      "nonLyricAfter": 2533,
+      "lyricBefore": 0,
+      "lyricAfter": 4,
+      "newLyricCandidates": [
+        {
+          "id": "456175645",
+          "text": "Bass by Young K",
+          "references": [
+            {
+              "label": 1,
+              "reason": "timed-original-text",
+              "song": "예뻤어"
+            }
+          ]
+        },
+        {
+          "id": "456175645",
+          "text": "Drums by 윤도운",
+          "references": [
+            {
+              "label": 1,
+              "reason": "timed-original-text",
+              "song": "예뻤어"
+            }
+          ]
+        },
+        {
+          "id": "456175645",
+          "text": "Mixed by 이태섭 at JYPE Studios",
+          "references": [
+            {
+              "label": 1,
+              "reason": "timed-original-text",
+              "song": "예뻤어"
+            }
+          ]
+        },
+        {
+          "id": "1965085154",
+          "text": "Bass by 陈兆基",
+          "references": [
+            {
+              "label": 1,
+              "reason": "timed-original-text",
+              "song": "老派约会之必要"
+            }
+          ]
+        }
+      ]
+    },
+    "referenceConflictsReviewed": [
+      {
+        "songId": "456175645",
+        "text": "Bass by Young K",
+        "frozenLabel": 1,
+        "review": "production_credit_text",
+        "audioVerified": false
+      },
+      {
+        "songId": "456175645",
+        "text": "Drums by 윤도운",
+        "frozenLabel": 1,
+        "review": "production_credit_text",
+        "audioVerified": false
+      },
+      {
+        "songId": "456175645",
+        "text": "Mixed by 이태섭 at JYPE Studios",
+        "frozenLabel": 1,
+        "review": "production_credit_text",
+        "audioVerified": false
+      },
+      {
+        "songId": "1965085154",
+        "text": "Bass by 陈兆基",
+        "frozenLabel": 1,
+        "review": "production_credit_text",
+        "audioVerified": false
+      }
+    ]
+  },
+  "limits": [
+    "UI fixtures use production toolbar/title markup, component styles, real Vue composables and the production HiFi document, with an isolated Core stub and fixture clock.",
+    "No physical audio listening or full song model inference was repeated for these UI/lexicon fixes.",
+    "890 source files have verified original hashes; the 50 older songs use captured input rows and did not retain original file hashes.",
+    "Reference labels are weak text annotations, not independently audio-verified ground truth. The four disputed labels remain unchanged."
+  ],
+  "evidenceDirectory": "C:\\Users\\vilolu\\.codex\\worktrees\\music-study\\twilight_echo\\.local\\playback-fixes-20261101"
+}
