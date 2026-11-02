@@ -31,7 +31,8 @@ test('real installer: ranged resume, split archives, restart, corruption, safe e
   const resources = join(directory, 'resources/music-study'), bytes = randomBytes(1024 * 512)
   await mkdir(join(resources, 'component-manifests'), { recursive: true })
   const components = [], data = {}
-  for (const [id, name] of [['demucs', 'models/torch/test.bin'], ['mdx', 'models/UVR_MDXNET_KARA_2.onnx'], ['mert', 'models/mert2/test.bin'], ['btc', '../escape.bin']]) {
+  await writeFile(join(directory, 'payload.bin'), bytes)
+  for (const [id, name] of [['demucs', 'models/torch/test.bin'], ['mdx', 'models/UVR_MDXNET_KARA_2.onnx'], ['mert', 'models/mert2/test.bin'], ['btc', '../escape.bin'], ['engine-torch', 'shared-python/site-packages/torch/test.bin']]) {
     const version = sha(Buffer.from(id)), files = [{ path: name, bytes: bytes.length, sha256: sha(bytes) }]
     const manifest = { id, version, files }, packed = archive([[name, bytes], ['component-manifest.json', Buffer.from(JSON.stringify(manifest))]])
     await writeFile(join(resources, 'component-manifests', version + '.json'), JSON.stringify(manifest))
@@ -86,7 +87,14 @@ app.whenReady().then(async()=>{try{
  await installer.io({action:'remove',id:'mdx'});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[external]});await installer.io({action:'import'});await until('mdx','ready')
  assert.equal((await installer.state()).components.find(c=>c.id==='mdx').external,true);await installer.io({action:'remove',id:'mdx'});assert.ok(fs.existsSync(join(external,'models/UVR_MDXNET_KARA_2.onnx')))
  corrupt=true;await installer.io({action:'start',ids:['mdx']});assert.match((await until('mdx','failed')).error,/校验/);corrupt=false
- await installer.io({action:'task',id:'mdx',task:'retry'});await until('mdx','ready');await installer.close()
+ await installer.io({action:'task',id:'mdx',task:'retry'});await until('mdx','ready')
+ const bundle=join(__dirname,'complete-offline-bundle'),catalog=JSON.parse(fs.readFileSync(join(__dirname,'resources/music-study/components.json')))
+ const mdx=catalog.components.find(c=>c.id==='mdx'),version=mdx.version.slice(0,16),nested=join(bundle,'analysis-components/components/mdx',version,'models');fs.mkdirSync(nested,{recursive:true});fs.copyFileSync((await installer.paths()).models['UVR_MDXNET_KARA_2.onnx'],join(nested,'UVR_MDXNET_KARA_2.onnx'))
+ await installer.io({action:'remove',id:'mdx'});const noDownload=calls;dialog.showOpenDialog=async()=>({canceled:false,filePaths:[bundle]});await installer.io({action:'import'});await until('mdx','ready');assert.equal(calls,noDownload);assert.ok(fs.realpathSync((await installer.paths()).models['UVR_MDXNET_KARA_2.onnx']).startsWith(bundle))
+ const legacy=join(__dirname,'existing-runtime'),torchHome=join(legacy,'runtime/Lib/site-packages');fs.mkdirSync(join(torchHome,'torch'),{recursive:true});fs.copyFileSync(join(__dirname,'payload.bin'),join(torchHome,'torch/test.bin'))
+ dialog.showOpenDialog=async()=>({canceled:false,filePaths:[legacy]});await installer.io({action:'import'});await until('engine-torch','ready');assert.equal(calls,noDownload);assert.equal(fs.realpathSync((await installer.paths()).sharedPython),fs.realpathSync(torchHome))
+ await installer.close();installer=new StudyComponentsPlatform(profile,()=>false,fetcher);await installer.state();assert.equal(fs.realpathSync((await installer.paths()).sharedPython),fs.realpathSync(torchHome));await installer.io({action:'remove',id:'mdx'});await installer.io({action:'remove',id:'demucs'});await installer.io({action:'remove',id:'mert'});await installer.io({action:'remove',id:'engine-torch'});assert.ok(fs.existsSync(join(torchHome,'torch/test.bin')))
+ await installer.io({action:'start',ids:['mdx']});await until('mdx','ready');await installer.close()
  const previous=process.env.TWILIGHT_STUDY_COMPONENTS_HOME,next=previous+'-moved';fs.renameSync(previous,next);process.env.TWILIGHT_STUDY_COMPONENTS_HOME=next;installer=new StudyComponentsPlatform(profile,()=>false,fetcher);assert.equal((await installer.state()).components.find(c=>c.id==='mdx').phase,'ready');assert.ok(fs.realpathSync((await installer.paths()).models['UVR_MDXNET_KARA_2.onnx']).startsWith(next));await installer.close()
  console.log('COMPONENT_INSTALLER_OK',JSON.stringify({calls,ranges}));app.exit(0)
 }catch(error){console.error(error.stack);if(installer)await installer.close();app.exit(1)}})

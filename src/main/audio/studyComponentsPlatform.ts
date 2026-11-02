@@ -10,7 +10,8 @@ import { coreArchive } from '../adapters/sdk/archive.ts'
 import { resolveStudyRuntimeView } from './studyRuntimeView.ts'
 import { componentBusy, componentPriority, type StudyComponent, type StudyComponentCatalog, type StudyComponentIO, type StudyComponentState, type StudyComponentStatus, type StudyRuntimePaths } from '../../shared/studyComponents.ts'
 
-interface Installed extends StudyComponentStatus { version?: string; directory?: string }
+interface ExternalSource { directory: string; layout?: 'site-packages' }
+interface Installed extends StudyComponentStatus { version?: string; directory?: string; layout?: 'site-packages' }
 interface ComponentFile { path: string; bytes: number; sha256: string; originalSha256?: string }
 interface ComponentManifest { id: string; version: string; files: ComponentFile[] }
 const MODEL_PREFIX: Record<string, string> = {
@@ -47,7 +48,7 @@ export class StudyComponentsPlatform {
   private initialized?: Promise<void>
   private saveWork = Promise.resolve()
   private stopped = false
-  private imports = new Map<string, string>()
+  private imports = new Map<string, ExternalSource>()
   private lock?: { path: string; handle: Awaited<ReturnType<typeof open>> }
   private cudaProbe?: Promise<void>
   private cudaController?: AbortController
@@ -72,8 +73,9 @@ export class StudyComponentsPlatform {
           if (row.directory && !row.external) row.directory = resolve(this.root, row.directory)
           if (componentBusy(row.phase)) row.phase = 'interrupted'
           if (row.phase === 'ready' && (!row.directory || !(await stat(row.directory).catch(() => null))?.isDirectory())) row.phase = 'missing'
+          if (row.layout && (row.layout !== 'site-packages' || row.id !== 'engine-torch' || !row.external)) continue
           this.entries.set(row.id, row)
-          if (row.external && row.directory && row.phase !== 'ready' && row.phase !== 'missing') this.imports.set(row.id, row.directory)
+          if (row.external && row.directory && row.phase !== 'ready' && row.phase !== 'missing') this.imports.set(row.id, { directory: row.directory, layout: row.layout })
         }
       } catch { /* An absent index contains no accepted installations. */ }
       for (const component of this.catalog.components) if (!this.entries.has(component.id)) this.entries.set(component.id, {
@@ -124,7 +126,7 @@ export class StudyComponentsPlatform {
       if (row.phase !== 'ready') row.cachedBytes = (await Promise.all(item.parts.map(async part => Math.min(part.bytes, await size(join(this.root, 'downloads', part.sha256 + '.part')))))).reduce((a, b) => a + b, 0)
     }
     return { directory: this.root, supported: process.platform === 'win32' && process.arch === 'x64', catalog: this.catalog,
-      components: [...this.entries.values()].map(({ directory: _directory, version: _version, ...row }) => ({ ...row })), requests: [] }
+      components: [...this.entries.values()].map(({ directory: _directory, version: _version, layout: _layout, ...row }) => ({ ...row })), requests: [] }
   }
   async paths(): Promise<StudyRuntimePaths> {
     await this.init()
@@ -135,7 +137,7 @@ export class StudyComponentsPlatform {
       const directory = view[id]
       if (id === 'engine-main') result.python = join(directory, 'runtime/Scripts/python.exe')
       else if (id === 'engine-vocal') result.vocalPython = join(directory, 'runtime-vocal2midi/Scripts/python.exe')
-      else if (id === 'engine-torch') result.sharedPython = join(directory, 'shared-python/site-packages')
+      else if (id === 'engine-torch') result.sharedPython = item.layout === 'site-packages' ? directory : join(directory, 'shared-python/site-packages')
       else if (id === 'lilypond') result.notationHome = directory
       else if (MODEL_PREFIX[id]) result.models[MODEL_PREFIX[id]] = join(directory, 'models', MODEL_PREFIX[id])
     }
@@ -157,11 +159,19 @@ export class StudyComponentsPlatform {
     if (value.id !== component.id || value.version !== component.version) throw new Error('组件文件目录不匹配')
     return value
   }
-  private async verify(directory: string, manifest: ComponentManifest, signal?: AbortSignal, external = false) {
+  private importPath(source: ExternalSource, name: string): string {
+    if (source.layout === 'site-packages') {
+      const prefix = 'shared-python/site-packages/'
+      if (!name.startsWith(prefix)) throw new Error('共享依赖文件目录不匹配')
+      name = name.slice(prefix.length)
+    }
+    return safeComponentPath(source.directory, name)
+  }
+  private async verify(directory: string, manifest: ComponentManifest, signal?: AbortSignal, external = false, layout?: ExternalSource['layout']) {
     for (const file of manifest.files) {
       signal?.throwIfAborted()
       if (external && file.path === 'THIRD_PARTY.md') continue
-      const path = safeComponentPath(directory, file.path), info = await stat(path)
+      const path = this.importPath({ directory, layout }, file.path), info = await stat(path)
       const hash = await hashComponentFile(path, signal)
       if (hash !== file.sha256 && !(external && file.originalSha256 === hash)) throw new Error('组件文件校验失败：' + file.path)
       if (hash === file.sha256 && info.size !== file.bytes) throw new Error('组件文件大小错误：' + file.path)
@@ -288,7 +298,7 @@ export class StudyComponentsPlatform {
           await removeComponentTree(this.root, previous)
         }
       } else await rename(temporary, destination)
-      Object.assign(row, { phase: 'ready', directory: destination, external: false, error: undefined, version: component.version, receivedBytes: row.totalBytes })
+      Object.assign(row, { phase: 'ready', directory: destination, layout: undefined, external: false, error: undefined, version: component.version, receivedBytes: row.totalBytes })
       await this.persist()
       await Promise.all([download.archive, ...download.parts].map(path => rm(path, { force: true })))
     } finally { await removeComponentTree(this.root, temporary) }
@@ -304,8 +314,8 @@ export class StudyComponentsPlatform {
       const external = this.imports.get(row.id)
       const work = external ? (async () => {
         row.phase = 'verifying'
-        await this.verify(external, await this.manifest(this.component(row.id)), controller.signal, true)
-        Object.assign(row, { phase: 'ready', directory: external, external: true, error: undefined })
+        await this.verify(external.directory, await this.manifest(this.component(row.id)), controller.signal, true, external.layout)
+        Object.assign(row, external, { phase: 'ready', external: true, error: undefined })
       })() : this.install(this.component(row.id), controller.signal)
       const done = work.catch(error => {
         if (!controller.signal.aborted) { row.phase = external ? 'missing' : 'failed'; row.error = external ? undefined : String(error) }
@@ -334,12 +344,28 @@ export class StudyComponentsPlatform {
     for (const component of this.catalog.components) {
       const manifest = await this.manifest(component), first = manifest.files.find(file => file.path !== 'THIRD_PARTY.md')
       if (this.entries.get(component.id)?.phase === 'ready') continue
-      let path: string | undefined
-      try { if (first) path = safeComponentPath(directory, first.path) } catch { continue }
-      if (path && (await stat(path).catch(() => null))?.isFile()) {
+      if (!first) continue
+      const roots = [directory, join(directory, 'analysis-components'), join(directory, 'music-study-runtime')]
+      const candidates: ExternalSource[] = []
+      for (const root of roots) {
+        for (const version of [component.version.slice(0, 16), component.version]) {
+          for (const path of [join(root, 'components', component.id, version), join(root, component.id, version), join(root, version)]) candidates.push({ directory: path })
+        }
+        candidates.push({ directory: root })
+        if (component.id === 'engine-torch') {
+          for (const path of ['runtime/Scripts/Lib/site-packages', 'runtime/Lib/site-packages']) candidates.push({ directory: join(root, path), layout: 'site-packages' })
+        }
+      }
+      let source: ExternalSource | undefined
+      for (const candidate of candidates) {
+        let path: string
+        try { path = this.importPath(candidate, first.path) } catch { continue }
+        if ((await stat(path).catch(() => null))?.isFile()) { source = candidate; break }
+      }
+      if (source) {
         await this.acquireLock()
-        Object.assign(this.entries.get(component.id)!, { phase: 'queued', error: undefined, directory, external: true })
-        this.imports.set(component.id, directory); scheduled++
+        Object.assign(this.entries.get(component.id)!, source, { phase: 'queued', error: undefined, external: true })
+        this.imports.set(component.id, source); scheduled++
       }
     }
     if (scheduled) { await this.persist(); this.pump() }
@@ -364,7 +390,10 @@ export class StudyComponentsPlatform {
           this.imports.delete(row.id)
           row.phase = request.task === 'pause' ? 'paused' : 'cancelled'
           const job = this.jobs.get(row.id); job?.controller.abort(); await job?.done
-        } else { await this.acquireLock(); row.phase = 'queued'; row.error = undefined }
+        } else {
+          await this.acquireLock(); row.phase = 'queued'; row.error = undefined
+          if (row.external && row.directory) this.imports.set(row.id, { directory: row.directory, layout: row.layout })
+        }
         await this.persist(); this.pump(); await this.releaseLock()
       }
     } else if (request.action === 'remove') {
@@ -380,7 +409,7 @@ export class StudyComponentsPlatform {
         if (dirname(target) !== boundary) throw new Error('组件删除路径越界')
         await removeComponentTree(this.root, target)
       }
-      Object.assign(row, { phase: 'missing', directory: undefined, external: false, receivedBytes: 0 }); await this.persist()
+      Object.assign(row, { phase: 'missing', directory: undefined, layout: undefined, external: false, receivedBytes: 0 }); await this.persist()
     } else if (request.action === 'directory') {
       if (this.inUse() || this.jobs.size) throw new Error('请先结束分析和组件下载')
       const chosen = await dialog.showOpenDialog({ title: '选择分析组件下载位置', properties: ['openDirectory', 'createDirectory'] })
