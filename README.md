@@ -6,72 +6,85 @@
 
 <p align="center">
   <strong>收藏你喜欢的音乐，找到下一首心动。</strong><br />
-  一款整合本地曲库、在线发现与网络音乐源的开源桌面播放器。<br />
-  从沉浸歌词、主题定制，到 HiFi 调音与 AutoMix，让音乐按你的习惯播放。
+  一款整合在线音乐、本地播放与歌曲分析的开源桌面播放器。<br />
+  从沉浸歌词、HiFi 调音，到六轨混音、和弦与人声曲谱，在听歌时看见音乐的结构。
 </p>
 
 <p align="center">
-  <a href="https://github.com/Px-asen/Twilight_Echo/releases/latest"><img alt="最新正式版" src="https://img.shields.io/github/v/release/Px-asen/Twilight_Echo?display_name=tag&style=flat-square&color=8b5cf6" /></a>
+  <a href="https://github.com/FengLvv/Twilight_Echo/releases"><img alt="最新预览版" src="https://img.shields.io/github/v/release/FengLvv/Twilight_Echo?include_prereleases&display_name=tag&style=flat-square&color=8b5cf6" /></a>
   <img alt="支持 Windows 10 和 11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-2563eb?style=flat-square" />
   <a href="./LICENSE"><img alt="Apache 2.0 开源许可证" src="https://img.shields.io/badge/license-Apache--2.0-64748b?style=flat-square" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Px-asen/Twilight_Echo/releases/latest"><strong>下载 Windows 版</strong></a>
+  <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4"><strong>下载 Windows 版</strong></a>
   · <a href="#快速开始">快速开始</a>
   · <a href="#功能一览">功能一览</a>
+  · <a href="#歌曲分析">歌曲分析</a>
+  · <a href="#agent-与-cli">Agent / CLI</a>
   · <a href="#界面预览">界面预览</a>
-  · <a href="./docs/release-notes/1.3.1.md">1.3.1 更新说明</a>
+  · <a href="https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4">1.4.0-preview.4 更新说明</a>
   · <a href="#常见问题">常见问题</a>
-  · <a href="https://github.com/Px-asen/Twilight_Echo/issues">问题反馈</a>
+  · <a href="#反馈与交流">问题反馈</a>
 </p>
 
 ![Twilight Echo 音乐主页：唱片式正在播放、每日推荐与音乐入口](./assets/screenshots/home-dashboard.png)
 
 <p align="center"><sub>从硬盘里的珍藏，到每日推荐里的新发现，让音乐陪你度过每一个日常。</sub></p>
 
-## 1.3.1 更新亮点
+## 1.4.0-preview.4 更新亮点
 
-- **余晖模式（Afterglow）**：卸载界面渲染器释放内存，原生引擎继续播放；托盘、媒体键、系统媒体控制和局域网遥控仍可用，恢复界面不中断播放。
-- **全窗口插件体验与灵动岛**：插件 API v4 / bridge v2 让插件在宿主窗口内提供完整工作区；灵动岛支持歌词、播放控制和 DIY 配置。
-- **快捷键、页面历史与网络源**：快捷键可配置并显示占用状态，鼠标侧键可前进／后退；WebDAV 等网络源与在线歌单分组分页继续完善。
-- **原生音频、性能与修复**：改进 ASIO 协商和 Native DSD 边界，加入跨进程诊断；歌曲列表虚拟化与图片内存治理降低占用，并修复播放页配色、窗口外框和详情页布局。
+- **六轨混音**：分离人声、鼓、贝斯、吉他、钢琴与其他乐器，在播放页直接调节音量、独听和静音。
+- **和弦与人声曲谱**：和弦名称／罗马级数、简谱／五线谱与歌词按时间同步；桌面歌词沿用相同的显示控制与主题样式。
+- **按需拆分多人声**：从六轨的人声继续进行主唱／和声分离或双歌手分离，结果作为人声子轨呈现。
+- **自动分析与缓存管理**：选择播放时自动分析分轨、和弦或曲谱，在任务与通知中查看进度；音频缓存按容量上限淘汰，保留和弦与曲谱结果。
+- **网易云收藏与 Agent CLI**：支持歌单收藏／取消收藏、搜索结果喜欢状态，以及由 Agent 控制播放器、批量分析和导出曲谱。
+- **近期修复与完整离线包**：修复日语制谱发音转换、桌面谱面描边、封面圆角与界面交互，并提供自带全部当前模型的 Windows 完整包。
 
-完整的新增功能、修复与使用说明见 **[v1.3.1 发布说明](./docs/release-notes/1.3.1.md)**。
+完整更新记录见 **[v1.4.0-preview.4 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)**。本版为 **Windows x64 预览版**。
 
 ## 下载与安装
 
-**[前往 Releases 下载最新版 →](https://github.com/Px-asen/Twilight_Echo/releases/latest)**
+**[打开当前版本的 Release 附件 →](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)**
 
-发布页同时提供 Windows、macOS 与 Linux 安装包。每个安装包旁都有同名 `.sha256` 文件，下载后可核对完整性。
+| 需要什么 | 下载什么 |
+| --- | --- |
+| 只安装或更新播放器 | [TwilightEcho-1.4.0-preview.4-setup.exe](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-setup.exe)，约 133 MB，不含 Python 和分析模型 |
+| 首次使用完整分析功能、离线使用或分享给朋友 | `TwilightEcho-1.4.0-preview.4-win-x64-full.zip.001` 至 `.005` **全部五卷**，以及 [Offline-Tools.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/Offline-Tools.zip)，分卷合计约 9.31 GB |
+| 核对附件完整性 | [SHA256SUMS.txt](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/SHA256SUMS.txt)；发布页同时提供验证摘要 `Verification.json` |
+| 获取与本版对应的完整源码 | [TwilightEcho-1.4.0-preview.4-source.zip](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-source.zip)，包含 Agent CLI 与插件协议源码，不含模型 |
 
-**Windows 10/11**：下载以 `-setup.exe` 结尾的安装程序，运行后按向导选择安装位置并完成安装。
+### 安装播放器
 
-**macOS**：Apple 芯片下载 `-mac-arm64.dmg`，Intel 芯片下载 `-mac-x64.dmg`；也可以使用同名的 `.zip` 压缩包。应用未做商业代码签名与公证，首次打开请右键 →「打开」，或先执行：
+Windows 10/11 x64：运行 `setup.exe`，按向导完成安装。已有分析环境可继续使用；首次使用分轨、和弦和制谱时，建议选择下方完整离线包。
 
-```bash
-xattr -dr com.apple.quarantine /Applications/TwilightEcho.app
-```
+### 使用完整离线包
 
-**Linux x64**：`.AppImage` 添加执行权限后可直接运行；`.deb` 与 `.rpm` 适合安装到发行版中；`.tar.gz` 为免安装压缩包。
+1. 从 [Release 附件](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4) 下载 `.001`～`.005` 五个分卷和 `Offline-Tools.zip`。
+2. 解压 `Offline-Tools.zip`，把 `Merge-Offline.cmd`、`Merge-Offline.ps1`、`offline-volumes.json` 与五个分卷放在**同一文件夹**。
+3. 双击 `Merge-Offline.cmd`。工具会逐卷校验 SHA-256、合并为普通 ZIP，并核对完整 ZIP 的校验值。
+4. 解压生成的 `TwilightEcho-1.4.0-preview.4-win-x64-full.zip`，双击其中的 `Start.cmd`。可运行 `Verify.cmd` 检查全部解压文件。
 
-打开 Twilight Echo，跟随首次使用向导设置听歌习惯、音乐文件夹和播放器外观。
+**完整包已包含播放器、两套独立 Python 运行环境、全部当前分析模型与排谱工具，无需再安装 `setup.exe` 或另装 Python。** 请保留完整目录结构。
 
-> [!NOTE]
-> Windows 10/11 是当前主要且验证最完整的平台。macOS 与 Linux 后端已有实现，但尚未达到正式发布验证标准。
+完整包解压后约 15.32 GB；同时保留分卷、合并 ZIP 与解压目录时，建议预留 40 GB 空间。合并校验完成后可删除分卷再解压。分析已有本地音频可离线运行；网易云登录、检索和播放等在线服务仍需要网络及使用者自己的账号。
+
+支持 CUDA 的 NVIDIA GPU 可加速分析；**双歌手分离需要 CUDA**，其他功能按可用能力回退 CPU，速度取决于设备与歌曲。完整包不包含个人账号、原始歌曲或用户缓存。
+
+本次 Release 仅提供 Windows x64 成品；macOS / Linux 状态见[常见问题](#常见问题)。
 
 <details>
 <summary>安装时提示“未知发布者”？</summary>
 
-当前安装包由个人开发者发布，尚无商业代码签名证书，因此 Windows SmartScreen 可能显示“未知发布者”。请从本项目的 GitHub Releases 下载，并在发布页提供 `.sha256` 文件时核对安装包的校验值。
+当前安装包尚无商业代码签名证书，Windows SmartScreen 可能显示“未知发布者”。请从本仓库的 [Releases](https://github.com/FengLvv/Twilight_Echo/releases) 下载，并核对 `SHA256SUMS.txt` 中的校验值。
 
 在安装包所在文件夹打开 PowerShell，运行下面的命令，将引号内的名称替换为实际文件名，然后与发布页的 SHA-256 比对：
 
 ```powershell
-Get-FileHash -LiteralPath '.\你下载的安装包文件名.exe' -Algorithm SHA256
+Get-FileHash -LiteralPath '.\TwilightEcho-1.4.0-preview.4-setup.exe' -Algorithm SHA256
 ```
 
-macOS 与 Linux 可使用 `shasum -a 256 <文件名>` 或 `sha256sum -c <文件名>.sha256` 核对。
+完整包的合并工具会自动核对各分卷及合并 ZIP；解压后的 `Verify.cmd` 检查包内全部文件。
 
 </details>
 
@@ -89,7 +102,7 @@ macOS 与 Linux 可使用 `shasum -a 256 <文件名>` 或 `sha256sum -c <文件�
 
 **选择声音与衔接方式** — 在「设置 → 播放与音效」选择输出设备，可用左右声道测试音检查输出。日常听歌可保持默认配置；想尝试自动混音，在「歌曲衔接 → Twilight AutoMix」选择自然或 DJ 模式后再播放队列。基础 AutoMix 无需额外分轨包，分轨增强的安装方式见下方常见问题。
 
-扫描、下载或更新进行时，可从标题栏「任务与通知」查看进度和处理结果。设置搜索也能直接定位选项，无需逐个展开分类。
+扫描、歌曲分析、下载或更新进行时，可从标题栏「任务与通知」查看进度和处理结果。设置搜索也能直接定位选项，无需逐个展开分类。
 
 ## 功能一览
 
@@ -141,10 +154,64 @@ macOS 与 Linux 可使用 `shasum -a 256 <文件名>` 或 `sha256sum -c <文件�
     </td>
     <td valign="top">
       <h3>💾 管理任务与个人数据</h3>
-      <p>任务与通知中心汇总扫描、补全、响度分析、下载与更新，支持勿扰。个人数据备份涵盖十类记录，恢复前预览冲突并映射音乐目录；软件更新支持进度显示、续传和完整性校验。</p>
+      <p>任务与通知中心汇总歌曲分析、扫描、补全、响度分析、下载与更新，支持勿扰。个人数据备份涵盖十类记录，恢复前预览冲突并映射音乐目录；软件更新支持进度显示、续传和完整性校验。</p>
     </td>
   </tr>
 </table>
+
+## 歌曲分析
+
+### 六轨与多人声混音
+
+打开歌曲播放页，点击左上角 **HiFi 按钮右侧的分析图标**。默认提交六轨分离与和弦识别；六轨就绪后，封面区域切换为混音控件，不必等待和弦处理结束。歌词、播放进度和底部控制继续使用原来的位置。
+
+- 人声位于最上方，各轨支持音量、独听和静音。
+- 点击人声右侧「多人声拆分」，选择「主唱／和声分离」或「双歌手分离」才会执行对应任务；两者都复用六轨人声，不重新跑六轨。
+- 再点分析图标，返回封面与原曲播放。切换显示与音源不等于取消后台分析，任务进度统一在标题栏「任务与通知」查看。
+
+### 和弦与旋律
+
+播放页右上角保留 **「和弦」和「旋律」** 两个独立开关。未有结果时，开启会启动所需分析；可分别开启或关闭，无需为了显示和弦而切换分轨播放。
+
+| 功能 | 格式与显示 |
+| --- | --- |
+| 和弦 | 悬浮按钮选择「和弦名称」或「罗马级数」，例如 `C–Am–F–G` / `I–vi–IV–V`；识别使用去除人声后的伴奏 |
+| 旋律 | 悬浮按钮选择「简谱」或「五线谱」；带时值的谱面与原文歌词对应，随播放时间同步 |
+| 调性 | 分析结果可用后，在歌名附近显示；名称与级数转换共用调性设置 |
+| 桌面歌词 | 同步和弦、谱面格式与主题样式，可在主窗口外查看 |
+
+旋律制谱需要**带时间的原文歌词**，不进行语音转文字。优先使用 AMLL 社区结构化歌词并提取主唱；回退网易云歌词时，自动执行真实歌词提取流程。
+
+在「设置 → 播放与音效 → 歌曲分析 → 播放时自动分析」选择 **分轨、和弦、曲谱**，默认全部关闭。自动分析只提交后台任务，不自动开启分轨播放；额外的多人声拆分始终按需执行。
+
+## Agent 与 CLI
+
+Agent 可通过 CLI 操作真实播放器、查询网易云、调节 DSP、批量分析歌曲，并读取指定时间段的和弦、音高与带时值曲谱。状态、账号与任务仍由播放器统一管理。
+
+从本版[源码包](https://github.com/FengLvv/Twilight_Echo/releases/download/v1.4.0-preview.4/TwilightEcho-1.4.0-preview.4-source.zip)解压，或检出本仓库 `v1.4.0-preview.4` 后，在源码根目录安装客户端（Python 3.10+）：
+
+```powershell
+python -m pip install -e ./agent-harness
+cli-anything-twilightecho --help
+```
+
+首次从 CLI 启动完整包时，先指定包内的分析环境，再启动播放器。把示例路径换成自己的实际路径：
+
+```powershell
+$env:TWILIGHT_MUSIC_STUDY_HOME = 'C:/Apps/TwilightEcho/music-study-runtime'
+cli-anything-twilightecho --json app start --executable "C:/Apps/TwilightEcho/TwilightEcho.exe" --visible
+cli-anything-twilightecho --json doctor
+```
+
+```powershell
+cli-anything-twilightecho --json music analyze --file "D:/Music/song.flac" --lyrics "D:/Music/song.lrc" --stages six,chords,melody --wait
+cli-anything-twilightecho --json music result --id PROJECT_ID --from 45 --to 75
+cli-anything-twilightecho --json music export --id PROJECT_ID --directory "D:/Scores" --notation staff
+```
+
+使用 `--notation numbered` 导出简谱；分析完成后的 `PROJECT_ID` 可继续用于读取结果、导出分轨和拆分多人声。导出包含 SVG、PDF、分析 JSON，以及可用的 MIDI / MusicXML。
+
+完整命令、批处理和模型配置见 **[Agent CLI 指南](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.4/agent-harness/cli_anything/twilightecho/README.md)**。默认后台启动，示例中的 `--visible` 会打开正常窗口。
 
 ## 界面预览
 
@@ -265,7 +332,7 @@ macOS 与 Linux 可使用 `shasum -a 256 <文件名>` 或 `sha256sum -c <文件�
 
 在「设置 → 播放与音效 → 歌曲衔接 → Twilight AutoMix」选择自然或 DJ 模式，再开始播放队列。AutoMix 默认关闭，当前已开放试用；自然模式侧重保留歌曲内容，DJ 模式允许更长重叠、对拍和更明显的片头／片尾调整。不适合混音或过渡准备失败时会回退常规播放。
 
-基础 AutoMix 不需要安装分轨包。需要人声、贝斯分轨辅助时，在 [Releases](https://github.com/Px-asen/Twilight_Echo/releases) 找到当前版本对应的 Assets（附件），下载分轨运行包，再在上述设置中点击「安装分轨包…」选择 ZIP 文件。按运行包能力选择自动、GPU 或 CPU；分轨会额外占用内存或显存，详见[发布说明](./docs/release-notes/1.3.0.md)。
+基础 AutoMix 不需要安装分轨包。AutoMix 的可选人声／贝斯过渡包通过同一设置中的「安装分轨包…」安装；它与本版歌曲分析使用的六轨环境分别配置，完整分析包不会自动开启 AutoMix 分轨增强。没有匹配运行包时仍可使用基础 AutoMix。详见[AutoMix 指南](./audio-engine/automix-native/README.md)。
 
 </details>
 
@@ -283,7 +350,7 @@ macOS 与 Linux 可使用 `shasum -a 256 <文件名>` 或 `sha256sum -c <文件�
 
 打开「设置 → 系统与关于」检查更新，可选择稳定或测试频道，并查看更新说明、下载进度与安装状态。Windows 使用完整安装包升级，下载支持中断恢复，并在安装前校验文件大小和 SHA-256；任务与通知中心也能查看更新进度。后台检查只提示新版本，下载和安装由你决定。
 
-也可以从 [Releases](https://github.com/Px-asen/Twilight_Echo/releases) 手动下载安装包；当前版本的变化见 [v1.3.1 发布说明](./docs/release-notes/1.3.1.md)。
+本仓库预览版请从 [Releases](https://github.com/FengLvv/Twilight_Echo/releases) 手动下载安装包；当前变化见 [v1.4.0-preview.4 发布说明](https://github.com/FengLvv/Twilight_Echo/releases/tag/v1.4.0-preview.4)。应用内更新渠道以实际显示的仓库和版本为准。已有模型环境可继续使用，只更新播放器无需重新下载五个完整包分卷。
 
 </details>
 
@@ -309,25 +376,25 @@ CoreAudio 与 ALSA 后端已存在，但目前没有经过与 Windows 同等级�
 
 ## 反馈与交流
 
-遇到问题或有新想法，欢迎[提交 Issue](https://github.com/Px-asen/Twilight_Echo/issues/new/choose)，选择对应表单：
+本分支暂未开放 GitHub Issue。可通过分享本版本的交流渠道反馈，建议包含以下信息：
 
 - **Bug 反馈**：提供应用版本、系统版本、问题表现、复现步骤和预期结果。无法稳定复现时，说明发生前的操作与大致频率即可。
 - **功能建议**：描述使用场景、当前困难和希望改善的体验。
 - **使用问题**：说明想完成什么操作、在哪一步遇到困难，以及已经尝试的方法。
 
-提交前先查看[常见问题](#常见问题)，并[搜索已有 Issue](https://github.com/Px-asen/Twilight_Echo/issues)，包括已关闭的问题；已有相同问题时，直接补充到原 Issue。每条 Issue 只讨论一个问题，标题描述具体现象，例如「[Bug] 切换 WASAPI 独占模式后播放无声」。
+反馈前先查看[常见问题](#常见问题)。每条反馈只讨论一个问题，标题描述具体现象，例如「切换 WASAPI 独占模式后播放无声」。原项目通用功能的问题，也可在[上游 Issue](https://github.com/Px-asen/Twilight_Echo/issues) 中搜索和反馈；歌曲分析与 CLI 的功能说明以本分支为准。
 
 截图和日志按需提供。音频问题建议补充输出设备、驱动、输出模式及歌曲格式，也可在「设置 → 系统与关于 → 导出音频诊断」保存诊断文件，并附上导出的 Markdown 报告。AutoMix 问题可补充模式、分轨运行包和计算设备；插件问题请提供插件名称、版本和来源。如果仅涉及第三方插件，可优先向对应插件作者反馈。
 
-Issue 内容和附件会公开显示，上传前请检查并删除密码、Cookie、Token、账号信息及私人文件路径，无需上传整首音乐或完整媒体库。
+上传截图或日志前请删除密码、Cookie、Token、账号信息及私人文件路径，无需上传整首音乐或完整媒体库。
 
-**官方 QQ 群：1093775290** — 交流使用体验、参与预览版内测，获取Apple Music 音源。
+**原项目 QQ 群：1093775290** — 原项目的交流与内测渠道；分析功能反馈请使用分享本版本的交流渠道。
 
-## 支持与赞助
+## 支持原项目
 
 ##### **如果 Twilight Echo 成了你常用的播放器，欢迎给项目点一个 Star、分享给朋友，或通过[爱发电](https://afdian.com/a/pxasen)支持后续开发。捐赠者将记录在软件内的贡献者名单中，感谢每一份支持。**
 
-#### **每一位想参与TwilightEcho开发的开发者可以通过：QQ3248974986 来加我的联系方式进入内部开发者群聊，让我们一起将TwilightEcho做的更好**！
+原项目开发交流联系方式：QQ3248974986。
 
 ## 扩展与开发
 
@@ -337,10 +404,14 @@ Issue 内容和附件会公开显示，上传前请检查并删除密码、Cooki
 
 第三方开发者可在自己的公开仓库发布 `.tep`，通过 GitHub Topic 和 Release 自动进入插件市场；无需把源码提交到目录仓库。发布步骤见[插件开发指南](./docs/PLUGIN_README.md#14-发布到插件市场)。
 
-开发环境使用项目锁定的 `pnpm@11.7.0`；依赖安装、原生音频工具链和运行步骤见开发者文档，Windows 发布流程见[发布检查](./docs/windows-release-gate.md)。
+当前分析版的发布源码以 [`v1.4.0-preview.4`](https://github.com/FengLvv/Twilight_Echo/tree/v1.4.0-preview.4) 为准，持续开发位于 [`codex/music-study-cli`](https://github.com/FengLvv/Twilight_Echo/tree/codex/music-study-cli)；默认分支保留原有开发线。开发环境使用项目锁定的 `pnpm@11.7.0`；依赖安装、原生音频工具链和运行步骤见开发者文档，Windows 发布流程见[发布检查](./docs/windows-release-gate.md)。
 
 ## 开源许可
 
-Twilight Echo 采用 [Apache License 2.0](./LICENSE) 开源。第三方依赖、字体、图标、插件和内容素材遵循各自的许可证或服务条款；相关商标归其权利人所有，Twilight Echo 与这些服务不存在官方隶属或背书关系。
+本仓库在 [Px-asen/Twilight_Echo](https://github.com/Px-asen/Twilight_Echo) 基础上开发，保留原项目的开源许可与署名。
 
-如有版权或侵权问题，请联系 Pxasen@outlook.com，以便核实并处理。
+Twilight Echo 软件采用 [Apache License 2.0](./LICENSE) 开源。第三方依赖、字体、图标、插件和内容素材遵循各自的许可证或服务条款；相关商标归其权利人所有，Twilight Echo 与这些服务不存在官方隶属或背书关系。
+
+完整分析包中的模型另有许可：SheetSage2 / MERT-v2 权重采用 CC BY-NC 4.0，TiFA / GAME 权重采用 CC BY-NC-SA 4.0。完整模型包用于非商业分享与个人学习，详见[模型与工具许可](https://github.com/FengLvv/Twilight_Echo/blob/v1.4.0-preview.4/resources/music-study/THIRD_PARTY.md)。
+
+如有原项目版权或侵权问题，请联系 Pxasen@outlook.com；本分支的问题见[反馈与交流](#反馈与交流)。
